@@ -1,0 +1,114 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:m="using:JxTerminal.Models"
+             xmlns:vm="using:JxTerminal.ViewModels"
+             xmlns:c="using:JxTerminal.Converters"
+             xmlns:suki="https://github.com/kikipoulet/SukiUI"
+             xmlns:theme="using:Avalonia.Styling"
+             xmlns:primitives="using:Avalonia.Controls.Primitives"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="JxTerminal.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+    <UserControl.Resources>
+        <c:ColorToHexConverter x:Key="ColorToHexConverter"/>
+        <c:ColorToBrushConverter x:Key="ColorToBrushConverter"/>
+        <c:StringLocalizationConverter x:Key="LocalizeConverter"/>
+    </UserControl.Resources>
+
+    <ScrollViewer>
+        <StackPanel Margin="20" Spacing="20">
+            <!-- General Group -->
+            <suki:GlassCard>
+                <StackPanel Spacing="15">
+                    <TextBlock Text="{c:Localize General}" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                    <Grid ColumnDefinitions="*, Auto">
+                        <TextBlock Text="{c:Localize Language}" VerticalAlignment="Center"/>
+                        <ComboBox SelectedIndex="0" SelectionChanged="LanguageChanged" MinWidth="150" Grid.Column="1">
+                             <ComboBoxItem Tag="en-US">English</ComboBoxItem>
+                             <ComboBoxItem Tag="zh-CN">中文</ComboBoxItem>
+                        </ComboBox>
+                    </Grid>
+                    
+                    <Grid ColumnDefinitions="*, Auto">
+                        <TextBlock Text="{c:Localize Theme}" VerticalAlignment="Center"/>
+                        <ComboBox ItemsSource="{Binding AvailableThemes}" SelectedItem="{Binding SelectedBaseTheme}" MinWidth="150" Grid.Column="1">
+                             <ComboBox.ItemTemplate>
+                                 <DataTemplate>
+                                     <TextBlock Text="{Binding DisplayName}"/>
+                                 </DataTemplate>
+                             </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*, Auto">
+                        <TextBlock Text="{c:Localize PrimaryColor}" VerticalAlignment="Center"/>
+                        <ComboBox ItemsSource="{Binding AvailableColors}" SelectedItem="{Binding SelectedColor}" MinWidth="150" Grid.Column="1">
+                             <ComboBox.ItemTemplate>
+                                 <DataTemplate>
+                                     <StackPanel Orientation="Horizontal" Spacing="10">
+                                         <Border Background="{Binding Value.Primary, Converter={StaticResource ColorToBrushConverter}}" Width="20" Height="20" CornerRadius="10"/>
+                                         <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"/>
+                                     </StackPanel>
+                                 </DataTemplate>
+                             </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </Grid>
+                </StackPanel>
+            </suki:GlassCard>
+
+            <!-- Terminal Group -->
+            <suki:GlassCard>
+                <StackPanel Spacing="15">
+                    <TextBlock Text="{c:Localize Terminal}" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                    <!-- Font -->
+                    <Grid ColumnDefinitions="*, Auto">
+                        <TextBlock Text="{c:Localize FontFamily}" VerticalAlignment="Center"/>
+                        <TextBox Text="{Binding Settings.FontFamily}" MinWidth="200" Grid.Column="1"/>
+                    </Grid>
+                    
+                    <Grid ColumnDefinitions="*, Auto">
+                        <TextBlock Text="{c:Localize FontSize}" VerticalAlignment="Center"/>
+                        <NumericUpDown Value="{Binding Settings.FontSize}" Minimum="8" Maximum="72" Increment="1" MinWidth="100" Grid.Column="1"/>
+                    </Grid>
+
+                    <!-- Colors -->
+                    <Grid ColumnDefinitions="*, Auto">
+                        <TextBlock Text="{c:Localize Foreground}" VerticalAlignment="Center"/>
+                        <ColorPicker Color="{Binding Settings.ForegroundColor}" Grid.Column="1"/>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*, Auto">
+                        <TextBlock Text="{c:Localize Background}" VerticalAlignment="Center"/>
+                        <ColorPicker Color="{Binding Settings.BackgroundColor}" Grid.Column="1"/>
+                    </Grid>
+
+                    <Grid ColumnDefinitions="*, Auto">
+                        <TextBlock Text="{c:Localize EnableColors}" VerticalAlignment="Center"/>
+                        <ToggleSwitch IsChecked="{Binding Settings.EnableColors}" Grid.Column="1"/>
+                    </Grid>
+
+                    <!-- Behavior -->
+                    <Grid ColumnDefinitions="*, Auto">
+                        <TextBlock Text="{c:Localize Scrollback}" VerticalAlignment="Center"/>
+                        <NumericUpDown Value="{Binding Settings.ScrollbackLines}" Minimum="100" Maximum="10000" Increment="100" MinWidth="120" Grid.Column="1"/>
+                    </Grid>
+
+                    <!-- Background Image -->
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="{c:Localize BackgroundImage}" FontWeight="SemiBold"/>
+                        <Grid ColumnDefinitions="*, Auto">
+                            <TextBox Text="{Binding Settings.BackgroundImagePath}" Watermark="{c:Localize ImagePathWatermark}"/>
+                            <Button Grid.Column="1" Content="..." Margin="5,0,0,0" Click="BrowseFile_Click" Classes="Flat"/>
+                        </Grid>
+                        <Grid ColumnDefinitions="Auto, *">
+                            <TextBlock Text="{c:Localize Opacity}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <Slider Grid.Column="1" Value="{Binding Settings.BackgroundImageOpacity}" Minimum="0" Maximum="1" TickFrequency="0.05" IsSnapToTickEnabled="True"/>
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </suki:GlassCard>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

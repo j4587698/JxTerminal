@@ -1,0 +1,102 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:JxTerminal.ViewModels"
+             xmlns:c="using:JxTerminal.Converters"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="JxTerminal.Views.HostListView"
+             x:DataType="vm:HostListViewModel"
+             x:Name="Root">
+    <UserControl.Resources>
+        <c:StringLocalizationConverter x:Key="LocalizeConverter"/>
+    </UserControl.Resources>
+    <Grid RowDefinitions="Auto, *">
+        <StackPanel Orientation="Horizontal" Margin="20" Spacing="15">
+            <TextBlock Text="{c:Localize HostManagement}" FontSize="24" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,20,0"/>
+            
+            <Button Command="{Binding QuickConnectLocalCommand}" Theme="{DynamicResource SolidButton}" Classes="Primary">
+                <StackPanel Orientation="Horizontal" Spacing="5">
+                    <PathIcon Data="M4,20H20V22H4V20M20,18H4V2H20V18M18,4H6V16H18V4M8,6V8H10V6H8M12,6V8H16V6H12Z" Width="16" Height="16" Foreground="White"/>
+                    <TextBlock Text="{c:Localize QuickLocal}" Foreground="White"/>
+                </StackPanel>
+            </Button>
+            
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="20,0,0,0">
+                <Button Command="{Binding AddGroupCommand}" Theme="{DynamicResource BorderlessButton}">
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                        <PathIcon Data="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V6C22,4.89 21.1,4 20,4M20,18H4V6H20V18M20,6V18H4V6H20Z" Width="16" Height="16"/>
+                        <TextBlock Text="{c:Localize AddGroup}"/>
+                    </StackPanel>
+                </Button>
+                
+                <Button Command="{Binding AddConnectionCommand}" Theme="{DynamicResource BorderlessButton}">
+                     <StackPanel Orientation="Horizontal" Spacing="5">
+                         <PathIcon Data="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" Width="16" Height="16"/>
+                         <TextBlock Text="{c:Localize AddConnection}"/>
+                     </StackPanel>
+                 </Button>
+            </StackPanel>
+        </StackPanel>
+        
+        <ScrollViewer Grid.Row="1" Margin="20">
+            <ItemsControl ItemsSource="{Binding Groups}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Margin="0,0,0,20">
+                            <Border BorderBrush="{DynamicResource SemiColorBorder}" BorderThickness="0,0,0,1" Margin="0,0,0,10" Padding="0,0,0,5" Background="Transparent">
+                                <Border.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="{c:Localize Delete}" 
+                                                  Command="{Binding #Root.DataContext.DeleteGroupCommand}" 
+                                                  CommandParameter="{Binding}"
+                                                  Foreground="Red"/>
+                                    </ContextMenu>
+                                </Border.ContextMenu>
+                                <TextBlock Text="{Binding Name, Converter={StaticResource LocalizeConverter}}" FontWeight="Bold" FontSize="18" Opacity="0.8"/>
+                            </Border>
+                            
+                            <ItemsControl ItemsSource="{Binding Connections}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Width="280" Margin="0,0,20,20" CornerRadius="8" Background="{DynamicResource SemiColorBackground1}" BorderBrush="{DynamicResource SemiColorBorder}" BorderThickness="1" Padding="15">
+                                             <Border.ContextMenu>
+                                                 <ContextMenu>
+                                                     <MenuItem Header="{c:Localize Edit}" 
+                                                               Command="{Binding #Root.DataContext.EditConnectionCommand}" 
+                                                               CommandParameter="{Binding}"/>
+                                                     <MenuItem Header="{c:Localize Delete}" 
+                                                               Command="{Binding #Root.DataContext.DeleteConnectionCommand}" 
+                                                               CommandParameter="{Binding}"
+                                                               Foreground="Red"/>
+                                                 </ContextMenu>
+                                             </Border.ContextMenu>
+                                             <StackPanel Spacing="15">
+                                                 <StackPanel Orientation="Horizontal" Spacing="10">
+                                                     <Border CornerRadius="8" Width="40" Height="40" Background="{DynamicResource SemiColorPrimary}">
+                                                          <PathIcon Data="M20,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V6C22,4.89 21.1,4 20,4M20,18H4V6H20V18M7.5,15L9,16.5L14.5,11L9,5.5L7.5,7L11.5,11L7.5,15M13,15H19V17H13V15Z" Width="20" Height="20" Foreground="White"/>
+                                                     </Border>
+                                                     <StackPanel VerticalAlignment="Center">
+                                                         <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="16"/>
+                                                         <TextBlock Text="{Binding Host}" FontSize="12" Opacity="0.7"/>
+                                                     </StackPanel>
+                                                 </StackPanel>
+                                                 
+                                                 <Button Content="{c:Localize Connect}" Command="{Binding #Root.DataContext.ConnectCommand}" CommandParameter="{Binding}" Theme="{DynamicResource SolidButton}" HorizontalAlignment="Stretch"/>
+                                             </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

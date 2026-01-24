@@ -1,0 +1,43 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:JxTerminal.ViewModels"
+             xmlns:v="using:JxTerminal.Views"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="JxTerminal.Views.TerminalListView"
+             x:DataType="vm:TerminalListViewModel">
+    <TabControl ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}">
+        <TabControl.ItemTemplate>
+            <DataTemplate>
+                <TextBlock Text="{Binding Title}" />
+            </DataTemplate>
+        </TabControl.ItemTemplate>
+        <TabControl.ContentTemplate>
+            <DataTemplate DataType="vm:TerminalViewModel">
+                <Grid ColumnDefinitions="*, Auto">
+                    <v:TerminalControl x:Name="terminalControl"
+                                       Session="{Binding Session}" 
+                                       FontFamily="{Binding Settings.FontFamily}" 
+                                       FontSize="{Binding Settings.FontSize}"
+                                       BackgroundColor="{Binding Settings.BackgroundColor}"
+                                       ForegroundColor="{Binding Settings.ForegroundColor}"
+                                       EnableColors="{Binding Settings.EnableColors}"
+                                       ScrollbackLines="{Binding Settings.ScrollbackLines}"
+                                       BackgroundImage="{Binding Settings.BackgroundImage}"
+                                       BackgroundImageOpacity="{Binding Settings.BackgroundImageOpacity}"
+                                       HorizontalAlignment="Stretch"
+                                       VerticalAlignment="Stretch"/>
+                    <ScrollBar Grid.Column="1"
+                               Orientation="Vertical"
+                               Minimum="0"
+                               Maximum="{Binding #terminalControl.ScrollMaximum}"
+                               Value="{Binding #terminalControl.ScrollPosition, Mode=TwoWay}"
+                               ViewportSize="{Binding #terminalControl.ScrollViewport}"
+                               SmallChange="1"
+                               LargeChange="10"/>
+                </Grid>
+            </DataTemplate>
+        </TabControl.ContentTemplate>
+    </TabControl>
+</UserControl>
