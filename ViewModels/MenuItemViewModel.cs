@@ -1,5 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using Avalonia.Media;
+using Material.Icons;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 
@@ -8,7 +8,7 @@ namespace JxTerminal.ViewModels;
 public partial class MenuItemViewModel : ViewModelBase
 {
     [ObservableProperty] private string _header = "";
-    [ObservableProperty] private StreamGeometry? _icon;
+    [ObservableProperty] private MaterialIconKind _iconKind;
     [ObservableProperty] private string _key = "";
     [ObservableProperty] private bool _isSeparator;
     [ObservableProperty] private ObservableCollection<MenuItemViewModel> _children = new();

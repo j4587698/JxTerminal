@@ -104,6 +104,27 @@ public class SshSession : ITerminalSession
         });
     }
 
+    public async Task<string> ExecuteCommandAsync(string command)
+    {
+        return await Task.Run(() =>
+        {
+            if (_sshClient != null && _sshClient.IsConnected)
+            {
+                try 
+                {
+                    var cmd = _sshClient.CreateCommand(command);
+                    return cmd.Execute();
+                }
+                catch (Exception ex)
+                {
+                    // Log or handle? For now return empty or error
+                    return string.Empty;
+                }
+            }
+            return string.Empty;
+        });
+    }
+
     public void Send(string data)
     {
         if (_shellStream != null && IsConnected)

@@ -4,21 +4,20 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Threading;
 using System;
-using JxTerminal.Models;
 using System.Text;
 using System.Threading.Tasks;
 using XTerm.Buffer;
 using XTerm.Common;
 
-namespace JxTerminal.Views;
+namespace JxTerminal.Controls;
 
 public class TerminalControl : Control
 {
-    private XTerm.Terminal _terminal;
-    private ITerminalSession? _session;
     private Typeface _typeface;
     private double _charWidth;
     private double _charHeight;
+
+    private const string StandardMonoFont = "Consolas, Menlo, Courier New, monospace";
 
     // Selection state
     private Point? _selectionStart;
@@ -28,14 +27,10 @@ public class TerminalControl : Control
     // ANSI 256 color palette
     private static readonly Color[] AnsiColors = CreateAnsiColorPalette();
 
-    // Default colors
-    private static readonly Color DefaultForeground = Color.FromRgb(229, 229, 229);
-    private static readonly Color DefaultBackground = Color.FromRgb(0, 0, 0);
-
-    public static readonly StyledProperty<string> FontFamilyProperty =
+    public static readonly StyledProperty<string> FontFamilyProperty = 
         AvaloniaProperty.Register<TerminalControl, string>(nameof(FontFamily), "DejaVu Sans Mono, Consolas, Courier New, monospace");
 
-    public static readonly StyledProperty<double> FontSizeProperty =
+    public static readonly StyledProperty<double> FontSizeProperty = 
         AvaloniaProperty.Register<TerminalControl, double>(nameof(FontSize), 14);
 
     public string FontFamily
@@ -50,23 +45,24 @@ public class TerminalControl : Control
         set => SetValue(FontSizeProperty, value);
     }
 
-    public static readonly StyledProperty<ITerminalSession?> SessionProperty =
-        AvaloniaProperty.Register<TerminalControl, ITerminalSession?>(nameof(Session));
+    // Bind to Interface instead of ViewModel
+    public static readonly StyledProperty<ITerminalController?> ControllerProperty = 
+        AvaloniaProperty.Register<TerminalControl, ITerminalController?>(nameof(Controller));
 
-    public ITerminalSession? Session
+    public ITerminalController? Controller
     {
-        get => GetValue(SessionProperty);
-        set => SetValue(SessionProperty, value);
+        get => GetValue(ControllerProperty);
+        set => SetValue(ControllerProperty, value);
     }
 
     // Scroll properties for binding to external ScrollBar
-    public static readonly StyledProperty<double> ScrollPositionProperty =
+    public static readonly StyledProperty<double> ScrollPositionProperty = 
         AvaloniaProperty.Register<TerminalControl, double>(nameof(ScrollPosition), 0);
 
-    public static readonly StyledProperty<double> ScrollMaximumProperty =
+    public static readonly StyledProperty<double> ScrollMaximumProperty = 
         AvaloniaProperty.Register<TerminalControl, double>(nameof(ScrollMaximum), 0);
 
-    public static readonly StyledProperty<double> ScrollViewportProperty =
+    public static readonly StyledProperty<double> ScrollViewportProperty = 
         AvaloniaProperty.Register<TerminalControl, double>(nameof(ScrollViewport), 24);
 
     public double ScrollPosition
@@ -88,22 +84,22 @@ public class TerminalControl : Control
     }
 
     // Terminal appearance properties
-    public static readonly StyledProperty<Color> BackgroundColorProperty =
+    public static readonly StyledProperty<Color> BackgroundColorProperty = 
         AvaloniaProperty.Register<TerminalControl, Color>(nameof(BackgroundColor), Color.FromRgb(0, 0, 0));
 
-    public static readonly StyledProperty<Color> ForegroundColorProperty =
+    public static readonly StyledProperty<Color> ForegroundColorProperty = 
         AvaloniaProperty.Register<TerminalControl, Color>(nameof(ForegroundColor), Color.FromRgb(229, 229, 229));
 
-    public static readonly StyledProperty<IImage?> BackgroundImageProperty =
+    public static readonly StyledProperty<IImage?> BackgroundImageProperty = 
         AvaloniaProperty.Register<TerminalControl, IImage?>(nameof(BackgroundImage), null);
 
-    public static readonly StyledProperty<double> BackgroundImageOpacityProperty =
+    public static readonly StyledProperty<double> BackgroundImageOpacityProperty = 
         AvaloniaProperty.Register<TerminalControl, double>(nameof(BackgroundImageOpacity), 0.3);
 
-    public static readonly StyledProperty<bool> EnableColorsProperty =
+    public static readonly StyledProperty<bool> EnableColorsProperty = 
         AvaloniaProperty.Register<TerminalControl, bool>(nameof(EnableColors), true);
 
-    public static readonly StyledProperty<int> ScrollbackLinesProperty =
+    public static readonly StyledProperty<int> ScrollbackLinesProperty = 
         AvaloniaProperty.Register<TerminalControl, int>(nameof(ScrollbackLines), 1000);
 
     public Color BackgroundColor
@@ -145,16 +141,6 @@ public class TerminalControl : Control
     public TerminalControl()
     {
         Focusable = true;
-
-        // Create terminal with configured scrollback
-        var options = new XTerm.Options.TerminalOptions
-        {
-            Scrollback = ScrollbackLines,
-            Cols = 80,
-            Rows = 24
-        };
-        _terminal = new XTerm.Terminal(options);
-
         UpdateTypeface();
 
         // Context Menu
@@ -221,44 +207,10 @@ public class TerminalControl : Control
         return palette;
     }
 
-    public void AttachSession(ITerminalSession session)
-    {
-        _session = session;
-        if (_session != null)
-        {
-            _session.DataReceived += OnDataReceived;
-            _session.Disconnected += OnDisconnected;
-        }
-        ResizeTerminal();
-
-        // Auto-focus when session is attached
-        Dispatcher.UIThread.InvokeAsync(() => Focus());
-    }
-
-    public void DetachSession()
-    {
-        if (_session != null)
-        {
-            _session.DataReceived -= OnDataReceived;
-            _session.Disconnected -= OnDisconnected;
-            _session = null;
-        }
-    }
-
-    private void OnDisconnected()
+    private void OnScreenUpdated()
     {
         Dispatcher.UIThread.InvokeAsync(() =>
         {
-            _terminal.Write("\r\n[DISCONNECTED]\r\n");
-            InvalidateVisual();
-        });
-    }
-
-    private void OnDataReceived(string data)
-    {
-        Dispatcher.UIThread.InvokeAsync(() =>
-        {
-            _terminal.Write(data);
             UpdateScrollProperties();
             InvalidateVisual();
         });
@@ -273,22 +225,31 @@ public class TerminalControl : Control
             ResizeTerminal();
             InvalidateVisual();
         }
-        else if (change.Property == SessionProperty)
+        else if (change.Property == ControllerProperty)
         {
-            if (change.NewValue is ITerminalSession newSession)
+            if (change.OldValue is ITerminalController oldController)
             {
-                AttachSession(newSession);
+                oldController.ScreenUpdated -= OnScreenUpdated;
+            }
+
+            if (change.NewValue is ITerminalController newController)
+            {
+                newController.ScreenUpdated += OnScreenUpdated;
+                ResizeTerminal();
+                Dispatcher.UIThread.InvokeAsync(() => Focus());
+                OnScreenUpdated(); // Initial render
             }
         }
         else if (change.Property == ScrollPositionProperty)
         {
             // External scrollbar changed position
-            if (_terminal != null)
+            var terminal = Controller?.Terminal;
+            if (terminal != null)
             {
                 int newYDisp = (int)ScrollPosition;
-                if (newYDisp != _terminal.Buffer.YDisp)
+                if (newYDisp != terminal.Buffer.YDisp)
                 {
-                    _terminal.Buffer.ViewportY = newYDisp;
+                    terminal.Buffer.ViewportY = newYDisp;
                     InvalidateVisual();
                 }
             }
@@ -305,14 +266,12 @@ public class TerminalControl : Control
 
     private void UpdateScrollProperties()
     {
-        if (_terminal == null) return;
+        var terminal = Controller?.Terminal;
+        if (terminal == null) return;
 
-        var buffer = _terminal.Buffer;
-        // YBase is the index of the first line that could scroll off (scrollback start)
-        // Lines.Length is total lines, including scrollback
-        // Rows is the visible viewport lines count
+        var buffer = terminal.Buffer;
         double maximum = Math.Max(0, buffer.YBase);
-        double viewport = _terminal.Rows;
+        double viewport = terminal.Rows;
         double position = buffer.YDisp;
 
         if (Math.Abs(ScrollMaximum - maximum) > 0.01)
@@ -327,8 +286,11 @@ public class TerminalControl : Control
     {
         _typeface = new Typeface(FontFamily);
 
-        // Measure character size (assuming monospaced)
-        var formatted = new FormattedText("M", System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, _typeface, FontSize, Brushes.White);
+        // Measure a representative character to determine grid size
+        // We use 'M' as a standard measure for width and height
+        var formatted = new FormattedText("M", System.Globalization.CultureInfo.CurrentCulture, 
+            FlowDirection.LeftToRight, _typeface, FontSize, Brushes.White);
+        
         _charWidth = formatted.WidthIncludingTrailingWhitespace;
         _charHeight = formatted.Height;
     }
@@ -343,63 +305,44 @@ public class TerminalControl : Control
     {
         if (_charWidth <= 0 || _charHeight <= 0) return;
 
+        var terminal = Controller?.Terminal;
+        if (terminal == null) return;
+
         var cols = (int)(Bounds.Width / _charWidth);
         var rows = (int)(Bounds.Height / _charHeight);
 
-        if (cols > 0 && rows > 0 && (cols != _terminal.Cols || rows != _terminal.Rows))
+        if (cols > 0 && rows > 0 && (cols != terminal.Cols || rows != terminal.Rows))
         {
-            int oldRows = _terminal.Rows;
-            _terminal.Resize(cols, rows);
+            int oldRows = terminal.Rows;
+            terminal.Resize(cols, rows);
 
-            // When height increases, adjust viewport to show cursor correctly
-            var buffer = _terminal.Buffer;
+            var buffer = terminal.Buffer;
             if (rows > oldRows && buffer != null)
             {
-                // Ensure cursor is visible and viewport is at the right position
-                // When growing, we want to scroll up to show more scrollback if available,
-                // but keep the cursor line visible
                 int cursorAbsoluteY = buffer.YBase + buffer.Y;
                 int maxYDisp = Math.Max(0, buffer.YBase);
-
-                // Adjust YDisp to keep cursor at bottom of screen if it was there
                 if (cursorAbsoluteY >= buffer.YDisp + oldRows - 1)
                 {
-                    // Cursor was at/near bottom, keep it visible
                     buffer.ViewportY = Math.Max(0, Math.Min(cursorAbsoluteY - rows + 1, maxYDisp));
                 }
             }
 
             UpdateScrollProperties();
-            _session?.Resize(rows, cols, (int)Bounds.Width, (int)Bounds.Height);
+            Controller?.Resize(rows, cols, (int)Bounds.Width, (int)Bounds.Height);
             InvalidateVisual();
         }
     }
 
-    /// <summary>
-    /// Converts color from XTerm AttributeData to Avalonia Color.
-    /// </summary>
-    private Color GetColor(int colorValue, int colorMode, Color defaultColor, bool isBold = false)
+    private Color GetColor(int colorValue, int colorMode, Color defaultColor, bool isBold = false, bool isBackground = false)
     {
-        // Default color (usually indicated by color value < 0 or special mode)
-        if (colorValue < 0)
-        {
-            return defaultColor;
-        }
+        if (colorValue < 0) return defaultColor;
 
-        // Palette 256 mode
         if (colorMode == (int)ColorMode.Palette256)
         {
-            // If bold and standard color (0-7), use bright version (8-15) for foreground
-            if (isBold && colorValue >= 0 && colorValue < 8)
-            {
-                colorValue += 8;
-            }
-            if (colorValue >= 0 && colorValue < 256)
-            {
-                return AnsiColors[colorValue];
-            }
+            if (isBackground && colorValue == 0) return defaultColor;
+            if (isBold && !isBackground && colorValue >= 0 && colorValue < 8) colorValue += 8;
+            if (colorValue >= 0 && colorValue < 256) return AnsiColors[colorValue];
         }
-        // RGB mode - value is 0xRRGGBB
         else if (colorMode == (int)ColorMode.RGB)
         {
             byte r = (byte)((colorValue >> 16) & 0xFF);
@@ -408,13 +351,10 @@ public class TerminalControl : Control
             return Color.FromRgb(r, g, b);
         }
 
-        // Fallback for standard colors (often Mode 0 or similar but with valid index)
         if (colorValue >= 0 && colorValue < 256)
         {
-             if (isBold && colorValue >= 0 && colorValue < 8)
-             {
-                 colorValue += 8;
-             }
+             if (isBackground && colorValue == 0) return defaultColor;
+             if (isBold && !isBackground && colorValue >= 0 && colorValue < 8) colorValue += 8;
              return AnsiColors[colorValue];
         }
 
@@ -423,10 +363,8 @@ public class TerminalControl : Control
 
     public override void Render(DrawingContext context)
     {
-        // Draw background
         context.DrawRectangle(new SolidColorBrush(BackgroundColor), null, new Rect(0, 0, Bounds.Width, Bounds.Height));
 
-        // Draw Background Image
         if (BackgroundImage != null)
         {
             using (context.PushOpacity(BackgroundImageOpacity))
@@ -435,12 +373,12 @@ public class TerminalControl : Control
             }
         }
 
-        if (_terminal == null) return;
+        var terminal = Controller?.Terminal;
+        if (terminal == null) return;
 
-        var buffer = _terminal.Buffer;
+        var buffer = terminal.Buffer;
 
-        // Render each line in the viewport
-        for (int row = 0; row < _terminal.Rows; row++)
+        for (int row = 0; row < terminal.Rows; row++)
         {
             int lineIndex = buffer.YDisp + row;
             if (lineIndex >= buffer.Lines.Length) break;
@@ -450,138 +388,76 @@ public class TerminalControl : Control
 
             double yPos = row * _charHeight;
 
-            // Render cells with proper color support
-            int col = 0;
-            while (col < _terminal.Cols && col < bl.Length)
+            for (int col = 0; col < terminal.Cols && col < bl.Length; col++)
             {
                 var cell = bl[col];
+                if (cell.Width == 0) continue;
 
-                // Skip placeholder cells (width 0) that follow wide characters
-                if (cell.Width == 0)
-                {
-                    col++;
-                    continue;
-                }
-
-                // Get cell attributes
                 var attrs = cell.Attributes;
                 bool isBold = attrs.IsBold();
                 bool isInverse = attrs.IsInverse();
-
+                
                 int fgColorValue = attrs.GetFgColor();
                 int bgColorValue = attrs.GetBgColor();
                 int fgColorMode = attrs.GetFgColorMode();
                 int bgColorMode = attrs.GetBgColorMode();
 
-                Color fgColor = GetColor(fgColorValue, fgColorMode, ForegroundColor, isBold);
-                Color bgColor = GetColor(bgColorValue, bgColorMode, BackgroundColor);
+                Color fgColor = GetColor(fgColorValue, fgColorMode, ForegroundColor, isBold, isBackground: false);
+                Color bgColor = GetColor(bgColorValue, bgColorMode, BackgroundColor, isBold: false, isBackground: true);
 
-                // Handle inverse colors
-                if (isInverse)
-                {
-                    (fgColor, bgColor) = (bgColor, fgColor);
-                }
+                if (isInverse) (fgColor, bgColor) = (bgColor, fgColor);
 
-                // Batch consecutive cells with same attributes
-                var textBuilder = new StringBuilder();
-                int startCol = col;
-                int cellCount = 0;
+                double xPos = col * _charWidth;
+                double width = cell.Width * _charWidth;
 
-                while (col < _terminal.Cols && col < bl.Length)
-                {
-                    var currentCell = bl[col];
-
-                    // Stop if width=0 placeholder
-                    if (currentCell.Width == 0)
-                    {
-                        col++;
-                        continue;
-                    }
-
-                    // Check if attributes match
-                    var currentAttrs = currentCell.Attributes;
-
-                    if (EnableColors)
-                    {
-                        if (currentAttrs.GetFgColor() != attrs.GetFgColor() ||
-                            currentAttrs.GetBgColor() != attrs.GetBgColor() ||
-                            currentAttrs.GetFgColorMode() != attrs.GetFgColorMode() ||
-                            currentAttrs.GetBgColorMode() != attrs.GetBgColorMode() ||
-                            currentAttrs.IsBold() != isBold ||
-                            currentAttrs.IsInverse() != isInverse)
-                        {
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        // In monochrome, only inverse changes rendering
-                        if (currentAttrs.IsInverse() != isInverse)
-                        {
-                            break;
-                        }
-                    }
-
-                    // Append content
-                    string content = currentCell.Content;
-                    if (!string.IsNullOrEmpty(content))
-                    {
-                        textBuilder.Append(content);
-                    }
-                    cellCount += currentCell.Width;
-                    col += currentCell.Width; // Skip placeholder cells for wide chars
-                }
-
-                string text = textBuilder.ToString();
-                if (string.IsNullOrEmpty(text)) continue;
-
-                double xPos = startCol * _charWidth;
-                double width = cellCount * _charWidth;
-
-                // Draw background if not default
                 if (bgColor != BackgroundColor)
                 {
                     context.FillRectangle(new SolidColorBrush(bgColor), new Rect(xPos, yPos, width, _charHeight));
                 }
 
                 // Draw text
-                var typeface = isBold ? new Typeface(FontFamily, FontStyle.Normal, FontWeight.Bold) : _typeface;
-                var fgBrush = new SolidColorBrush(fgColor);
-                var formatted = new FormattedText(text, System.Globalization.CultureInfo.CurrentCulture,
-                    FlowDirection.LeftToRight, typeface, FontSize, fgBrush);
-                context.DrawText(formatted, new Point(xPos, yPos));
+                string content = cell.Content;
+                if (!string.IsNullOrEmpty(content))
+                {
+                    var typeface = isBold ? new Typeface(_typeface.FontFamily, FontStyle.Normal, FontWeight.Bold) : _typeface;
+                    var fgBrush = new SolidColorBrush(fgColor);
+                    
+                    var formatted = new FormattedText(content, System.Globalization.CultureInfo.CurrentCulture,
+                        FlowDirection.LeftToRight, typeface, FontSize, fgBrush);
+                        
+                    // Vertically center content within the cell
+                    double verticalOffset = (_charHeight - formatted.Height) / 2;
+                    
+                    context.DrawText(formatted, new Point(xPos, yPos + verticalOffset));
+                }
             }
         }
 
-        // Render Selection
         if (_selectionStart.HasValue && _selectionEnd.HasValue)
         {
             RenderSelection(context, buffer);
         }
 
-        // Draw cursor
-        // absoluteCursorY = YBase + Y (buffer.Y is relative to active screen starting at YBase)
         int absoluteCursorY = buffer.YBase + buffer.Y;
         int viewportY = buffer.YDisp;
         int screenY = absoluteCursorY - viewportY;
 
-        // Only draw cursor if visible in viewport
-        if (screenY >= 0 && screenY < _terminal.Rows)
+        if (screenY >= 0 && screenY < terminal.Rows)
         {
             double cursorX = buffer.X * _charWidth;
             double cursorY = screenY * _charHeight;
-
-            // Use bright green cursor for visibility
             context.FillRectangle(new SolidColorBrush(Color.FromRgb(0, 255, 0)), new Rect(cursorX, cursorY, _charWidth, _charHeight));
         }
     }
 
     private void RenderSelection(DrawingContext context, TerminalBuffer buffer)
     {
+        var terminal = Controller?.Terminal;
+        if (terminal == null) return;
+
         var p1 = _selectionStart!.Value;
         var p2 = _selectionEnd!.Value;
 
-        // Normalize selection coordinates
         if (p1.Y > p2.Y || (p1.Y == p2.Y && p1.X > p2.X))
         {
             (p1, p2) = (p2, p1);
@@ -597,7 +473,7 @@ public class TerminalControl : Control
             if (r < 0 || r >= buffer.Lines.Length) continue;
 
             var line = buffer.Lines[r];
-            int lineLen = _terminal.Cols;
+            int lineLen = terminal.Cols;
 
             if (line is BufferLine bl)
             {
@@ -608,7 +484,6 @@ public class TerminalControl : Control
             int c1 = (r == startRowSel) ? startColSel : 0;
             int c2 = (r == endRowSel) ? endColSel : lineLen;
 
-            // Clamp to actual content
             if (c1 > lineLen) c1 = lineLen;
             if (c2 > lineLen) c2 = lineLen;
             if (c1 >= c2) continue;
@@ -627,22 +502,18 @@ public class TerminalControl : Control
     protected override void OnTextInput(TextInputEventArgs e)
     {
         base.OnTextInput(e);
-
-        // Only process if focused and have a session
-        if (!IsFocused || _session == null)
-            return;
+        if (!IsFocused || Controller == null) return;
 
         if (!string.IsNullOrEmpty(e.Text))
         {
-            _session.Send(e.Text);
+            Controller.SendInput(e.Text);
             e.Handled = true;
         }
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
-        // Only process if focused and have a session
-        if (!IsFocused || _session == null)
+        if (!IsFocused || Controller == null)
         {
             base.OnKeyDown(e);
             return;
@@ -650,27 +521,25 @@ public class TerminalControl : Control
 
         string? sequence = null;
 
-        // Handle Ctrl+key combinations
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
         {
             sequence = e.Key switch
             {
-                Key.C => "\x03",  // Ctrl+C (SIGINT)
-                Key.D => "\x04",  // Ctrl+D (EOF)
-                Key.Z => "\x1a",  // Ctrl+Z (SIGTSTP)
-                Key.L => "\x0c",  // Ctrl+L (clear screen)
-                Key.A => "\x01",  // Ctrl+A (beginning of line)
-                Key.E => "\x05",  // Ctrl+E (end of line)
-                Key.K => "\x0b",  // Ctrl+K (kill to end of line)
-                Key.U => "\x15",  // Ctrl+U (kill to beginning of line)
-                Key.W => "\x17",  // Ctrl+W (kill word)
-                Key.R => "\x12",  // Ctrl+R (reverse search)
+                Key.C => "\x03",
+                Key.D => "\x04",
+                Key.Z => "\x1a",
+                Key.L => "\x0c",
+                Key.A => "\x01",
+                Key.E => "\x05",
+                Key.K => "\x0b",
+                Key.U => "\x15",
+                Key.W => "\x17",
+                Key.R => "\x12",
                 _ => null
             };
         }
         else
         {
-            // Handle special keys with ANSI escape sequences
             sequence = e.Key switch
             {
                 Key.Enter => "\r",
@@ -705,7 +574,7 @@ public class TerminalControl : Control
 
         if (sequence != null)
         {
-            _session.Send(sequence);
+            Controller.SendInput(sequence);
             e.Handled = true;
         }
     }
@@ -713,16 +582,12 @@ public class TerminalControl : Control
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
-
-        // Only start selection on Left Click
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
 
         var point = e.GetPosition(this);
         _selectionStart = GetGridPosition(point);
         _selectionEnd = _selectionStart;
         _isSelecting = true;
-
-        // Focus the control for keyboard input
         Focus();
         InvalidateVisual();
     }
@@ -747,16 +612,13 @@ public class TerminalControl : Control
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
+        var terminal = Controller?.Terminal;
+        if (terminal?.Buffer == null) return;
 
-        var buffer = _terminal?.Buffer;
-        if (buffer == null) return;
-
-        // Scroll by 3 lines per wheel notch
         int scrollAmount = (int)(-e.Delta.Y * 3);
-        buffer.ScrollLines(scrollAmount);
+        terminal.Buffer.ScrollLines(scrollAmount);
         UpdateScrollProperties();
         InvalidateVisual();
-
         e.Handled = true;
     }
 
@@ -764,14 +626,14 @@ public class TerminalControl : Control
     {
         if (_charWidth <= 0 || _charHeight <= 0) return new Point(0, 0);
 
-        var buffer = _terminal?.Buffer;
-        if (buffer == null) return new Point(0, 0);
+        var terminal = Controller?.Terminal;
+        if (terminal?.Buffer == null) return new Point(0, 0);
 
+        var buffer = terminal.Buffer;
         int col = (int)(p.X / _charWidth);
         int row = (int)(p.Y / _charHeight) + buffer.YDisp;
 
-        // Clamp to valid range
-        col = Math.Max(0, Math.Min(col, _terminal?.Cols - 1 ?? 0));
+        col = Math.Max(0, Math.Min(col, terminal.Cols - 1));
         row = Math.Max(0, Math.Min(row, buffer.Lines.Length - 1));
 
         return new Point(col, row);
@@ -796,10 +658,10 @@ public class TerminalControl : Control
         var topLevel = TopLevel.GetTopLevel(this);
         if (topLevel?.Clipboard != null)
         {
-            var text = await topLevel.Clipboard.GetTextAsync() ?? "";
-            if (!string.IsNullOrEmpty(text))
+            var text = await topLevel.Clipboard.GetTextAsync();
+            if (!string.IsNullOrEmpty(text) && Controller != null)
             {
-                _session?.Send(text);
+                Controller.SendInput(text);
             }
         }
     }
@@ -807,18 +669,14 @@ public class TerminalControl : Control
     private string GetSelectedText()
     {
         if (_selectionStart == null || _selectionEnd == null) return "";
+        var terminal = Controller?.Terminal;
+        if (terminal?.Buffer == null) return "";
 
         var p1 = _selectionStart.Value;
         var p2 = _selectionEnd.Value;
+        var buffer = terminal.Buffer;
 
-        var buffer = _terminal?.Buffer;
-        if (buffer == null) return "";
-
-        // Normalize: p1 should be before p2
-        if (p1.Y > p2.Y || (p1.Y == p2.Y && p1.X > p2.X))
-        {
-            (p1, p2) = (p2, p1);
-        }
+        if (p1.Y > p2.Y || (p1.Y == p2.Y && p1.X > p2.X)) (p1, p2) = (p2, p1);
 
         int startRow = (int)p1.Y;
         int endRow = (int)p2.Y;
@@ -833,14 +691,8 @@ public class TerminalControl : Control
             var line = buffer.Lines[r];
 
             string lineText = "";
-            if (line is BufferLine bl)
-            {
-                lineText = bl.TranslateToString(true);
-            }
-            else
-            {
-                lineText = line?.ToString() ?? "";
-            }
+            if (line is BufferLine bl) lineText = bl.TranslateToString(true);
+            else lineText = line?.ToString() ?? "";
 
             int c1 = 0;
             int c2 = lineText.Length;
@@ -853,23 +705,14 @@ public class TerminalControl : Control
 
             if (c1 < c2)
             {
-                if (r == startRow && r == endRow)
-                {
-                    sb.Append(lineText.Substring(c1, c2 - c1));
-                }
+                if (r == startRow && r == endRow) sb.Append(lineText.Substring(c1, c2 - c1));
                 else if (r == startRow)
                 {
                     sb.Append(lineText.Substring(c1));
                     sb.AppendLine();
                 }
-                else if (r == endRow)
-                {
-                    sb.Append(lineText.Substring(0, c2));
-                }
-                else
-                {
-                    sb.AppendLine(lineText);
-                }
+                else if (r == endRow) sb.Append(lineText.Substring(0, c2));
+                else sb.AppendLine(lineText);
             }
         }
 

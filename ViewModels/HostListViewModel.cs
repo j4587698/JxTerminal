@@ -15,14 +15,86 @@ using SukiUI.Dialogs;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using JxTerminal.Views;
+using Material.Icons;
 
 namespace JxTerminal.ViewModels;
+
+public enum NavigationType
+{
+    AllHosts,
+    GroupRoot,
+    GroupItem
+}
+
+public partial class NavigationItem : ObservableObject
+{
+    [ObservableProperty] private string _title = "";
+    [ObservableProperty] private MaterialIconKind _icon;
+    [ObservableProperty] private NavigationType _type;
+    [ObservableProperty] private ConnectionGroup? _group;
+    [ObservableProperty] private int _count;
+    [ObservableProperty] private bool _isExpanded = true;
+    [ObservableProperty] private bool _isSelected;
+
+    public ObservableCollection<NavigationItem> Children { get; } = new();
+
+    public NavigationItem(string title, MaterialIconKind icon, NavigationType type, ConnectionGroup? group = null)
+    {
+        Title = title;
+        Icon = icon;
+        Type = type;
+        Group = group;
+        if (group != null)
+        {
+            Count = group.Connections.Count;
+            // Assuming we might want to listen to collection changes in the future for live updates
+        }
+    }
+}
 
 public partial class HostListViewModel : ViewModelBase
 {
     private readonly MainWindowViewModel _mainViewModel;
 
     public ObservableCollection<ConnectionGroup> Groups { get; private set; } = new();
+
+    // Tree Navigation Source
+    public ObservableCollection<NavigationItem> NavigationItems { get; } = new();
+
+    [ObservableProperty]
+    private NavigationItem? _selectedNavigationItem;
+
+    partial void OnSelectedNavigationItemChanged(NavigationItem? value)
+    {
+        if (value == null) return;
+
+        if (value.Type == NavigationType.AllHosts || value.Type == NavigationType.GroupRoot)
+        {
+            SelectedGroup = null;
+        }
+        else if (value.Type == NavigationType.GroupItem)
+        {
+            SelectedGroup = value.Group;
+        }
+    }
+
+    // Filtered view for the UI
+    public ObservableCollection<ConnectionGroup> DisplayGroups { get; } = new();
+
+    [ObservableProperty]
+    private string _searchText = "";
+
+    [ObservableProperty]
+    private ConnectionGroup? _selectedGroup;
+
+    [ObservableProperty]
+    private string _selectedProtocolFilter = "全协议";
+
+    public ObservableCollection<string> ProtocolFilters { get; } = new() { "全协议", "SSH", "Telnet", "Serial", "Local" };
+
+    partial void OnSearchTextChanged(string value) => UpdateDisplay();
+    partial void OnSelectedGroupChanged(ConnectionGroup? value) => UpdateDisplay();
+    partial void OnSelectedProtocolFilterChanged(string value) => UpdateDisplay();
 
     // Callback to open Add/Edit Connection UI
     // First param: List of groups, Second param: Connection to edit (nullable)
@@ -33,6 +105,11 @@ public partial class HostListViewModel : ViewModelBase
     public HostListViewModel(MainWindowViewModel mainViewModel)
     {
         _mainViewModel = mainViewModel;
+        LocalizationService.Instance.PropertyChanged += (_, _) => {
+            RebuildNavigationTree();
+            // Update protocol filters? Usually combobox items are static strings or need converter.
+            // For now let's keep protocol filters simple or refresh them too if we want to localize "All Protocols".
+        };
         LoadData();
     }
 
@@ -44,11 +121,95 @@ public partial class HostListViewModel : ViewModelBase
         {
             Groups.Add(group);
         }
+        RebuildNavigationTree();
+        UpdateDisplay();
+    }
+
+    private void RebuildNavigationTree()
+    {
+        NavigationItems.Clear();
+
+        // Root Node: All Hosts
+        var allHostsNode = new NavigationItem(LocalizationService.Instance["AllHosts"], MaterialIconKind.ViewDashboardOutline, NavigationType.AllHosts)
+        {
+            IsSelected = true // Default selection
+        };
+        NavigationItems.Add(allHostsNode);
+
+        // Group Root Node
+        var groupsRoot = new NavigationItem(LocalizationService.Instance["Group"], MaterialIconKind.FolderMultipleOutline, NavigationType.GroupRoot);
+        
+        foreach (var group in Groups)
+        {
+            var groupNode = new NavigationItem(group.Name, MaterialIconKind.FolderOutline, NavigationType.GroupItem, group);
+            groupsRoot.Children.Add(groupNode);
+        }
+
+        NavigationItems.Add(groupsRoot);
+    }
+
+    private void UpdateDisplay()
+    {
+        DisplayGroups.Clear();
+
+        // 1. Filter by Search Text
+        var search = SearchText?.Trim().ToLower();
+        bool hasSearch = !string.IsNullOrEmpty(search);
+
+        // 2. Filter by Selected Group
+        var sourceGroups = SelectedGroup != null 
+            ? new[] { SelectedGroup } 
+            : Groups.ToArray();
+
+        foreach (var group in sourceGroups)
+        {
+            // Filter connections within the group
+            var matchingConnections = group.Connections.AsEnumerable();
+
+            // A. Protocol Filter
+            if (SelectedProtocolFilter != "全协议")
+            {
+                matchingConnections = matchingConnections.Where(c => c.Type.ToString().Equals(SelectedProtocolFilter, StringComparison.OrdinalIgnoreCase));
+            }
+
+            // B. Search Text Filter
+            if (hasSearch)
+            {
+                matchingConnections = matchingConnections.Where(c => 
+                    c.Name.ToLower().Contains(search!) || 
+                    c.Host.ToLower().Contains(search!) || 
+                    c.Username.ToLower().Contains(search!));
+            }
+
+            var filteredList = matchingConnections.ToList();
+
+            if (filteredList.Any())
+            {
+                // Create a temporary group for display
+                var tempGroup = new ConnectionGroup(group.Name);
+                foreach(var c in filteredList) tempGroup.Connections.Add(c);
+                DisplayGroups.Add(tempGroup);
+            }
+        }
+    }
+
+    [RelayCommand]
+    public void SelectAllHosts()
+    {
+        SelectedGroup = null;
+    }
+
+    [RelayCommand]
+    public void SelectGroup(ConnectionGroup group)
+    {
+        SelectedGroup = group;
     }
 
     private async void SaveData()
     {
         await DataStore.SaveConnectionsAsync(Groups);
+        RebuildNavigationTree();
+        UpdateDisplay();
     }
 
     [RelayCommand]
@@ -92,7 +253,7 @@ public partial class HostListViewModel : ViewModelBase
         if (!string.IsNullOrWhiteSpace(name) && !Groups.Any(g => g.Name == name))
         {
             Groups.Add(new ConnectionGroup(name));
-            SaveData();
+            SaveData(); // SaveData calls UpdateDisplay
         }
     }
 
@@ -102,7 +263,7 @@ public partial class HostListViewModel : ViewModelBase
         if (Groups.Contains(group))
         {
             Groups.Remove(group);
-            SaveData();
+            SaveData(); // SaveData calls UpdateDisplay
         }
     }
 
@@ -166,7 +327,7 @@ public partial class HostListViewModel : ViewModelBase
             if (group.Connections.Contains(connection))
             {
                 group.Connections.Remove(connection);
-                SaveData();
+                SaveData(); // SaveData calls UpdateDisplay
                 return;
             }
         }
@@ -197,7 +358,7 @@ public partial class HostListViewModel : ViewModelBase
         // Add to new (or same) group based on result.GroupName
         AddConnectionToGroup(result);
 
-        SaveData();
+        SaveData(); // SaveData calls UpdateDisplay
     }
 
     private void AddConnectionToGroup(SavedConnection connection)

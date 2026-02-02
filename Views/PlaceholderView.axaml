@@ -1,0 +1,17 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:JxTerminal.ViewModels"
+             xmlns:avalonia="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="JxTerminal.Views.PlaceholderView"
+             x:DataType="vm:PlaceholderViewModel">
+    <Grid>
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="20">
+            <avalonia:MaterialIcon Kind="Cone" Width="64" Height="64" Opacity="0.2"/>
+            <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="Light" HorizontalAlignment="Center" Opacity="0.5"/>
+            <TextBlock Text="Feature coming soon" FontSize="14" HorizontalAlignment="Center" Opacity="0.3"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

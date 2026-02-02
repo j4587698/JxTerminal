@@ -6,20 +6,12 @@
                  xmlns:vm="using:JxTerminal.ViewModels"
                  xmlns:v="using:JxTerminal.Views"
                  xmlns:c="using:JxTerminal.Converters"
+                 xmlns:avalonia="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
                  mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
                  x:Class="JxTerminal.Views.MainWindow"
                  x:DataType="vm:MainWindowViewModel"
                  Icon="/Assets/avalonia-logo.ico"
                  Title="{c:Localize AppName}">
-
-    <suki:SukiWindow.Resources>
-        <StreamGeometry x:Key="HostListIcon">M3,13H5V11H3V13M3,17H5V15H3V17M3,9H5V7H3V9M7,13H21V11H7V13M7,17H21V15H7V17M7,9H21V7H7V9M7,5V3H21V5H7Z</StreamGeometry>
-        <StreamGeometry x:Key="TerminalIcon">M20,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V6C22,4.89 21.1,4 20,4M20,18H4V6H20V18M7.5,15L9,16.5L14.5,11L9,5.5L7.5,7L11.5,11L7.5,15M13,15H19V17H13V15Z</StreamGeometry>
-        <StreamGeometry x:Key="SettingsIcon">M19.14,12.94C19.14,12.94 19.14,12.94 19.14,12.94L19.14,12.94C19.14,12.94 19.14,12.94 19.14,12.94M12,8A4,4 0 0,0 8,12A4,4 0 0,0 12,16A4,4 0 0,0 16,12A4,4 0 0,0 12,8M19.43,12.97C19.46,12.65 19.5,12.33 19.5,12C19.5,11.67 19.46,11.35 19.43,11.03L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11.03C4.54,11.35 4.5,11.67 4.5,12C4.5,12.33 4.54,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.04 4.95,18.95L7.44,17.95C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.95L19.05,18.95C19.27,19.04 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z</StreamGeometry>
-        <StreamGeometry x:Key="UserIcon">M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z</StreamGeometry>
-    </suki:SukiWindow.Resources>
-
-
 
     <suki:SukiWindow.Hosts>
         <suki:SukiDialogHost Manager="{Binding DialogManager}" />
@@ -36,7 +28,7 @@
                        SelectionChanged="OnSelectionChanged">
         <suki:SukiSideMenu.HeaderContent>
             <StackPanel Orientation="Horizontal" Spacing="10" Margin="12,42,12,12">
-                <PathIcon Data="{StaticResource TerminalIcon}" Foreground="{DynamicResource SukiPrimaryColor}" Width="24" Height="24"/>
+                <avalonia:MaterialIcon Kind="ConsoleLine" Foreground="{DynamicResource SukiPrimaryColor}" Width="24" Height="24"/>
                 <TextBlock Text="JxTerminal" FontWeight="Bold" FontSize="18" VerticalAlignment="Center" />
             </StackPanel>
         </suki:SukiSideMenu.HeaderContent>
@@ -45,7 +37,7 @@
                             <DataTemplate DataType="vm:MenuItemViewModel">
                                 <suki:SukiSideMenuItem Header="{Binding Header}" ItemsSource="{Binding Children}">
                                     <suki:SukiSideMenuItem.Icon>
-                                        <PathIcon Data="{Binding Icon}" Width="24" Height="24" />
+                                        <avalonia:MaterialIcon Kind="{Binding IconKind}" Width="24" Height="24" />
                                     </suki:SukiSideMenuItem.Icon>
                                 </suki:SukiSideMenuItem>
                             </DataTemplate>
@@ -55,7 +47,7 @@
                 <Button Classes="Flat" HorizontalAlignment="Stretch" Padding="5" Margin="0,10,0,0">
                     <Grid ColumnDefinitions="Auto, *">
                         <Border Width="32" Height="32" CornerRadius="16" Background="Gray" Margin="0,0,10,0">
-                            <PathIcon Data="{StaticResource UserIcon}" Foreground="White" Width="16" Height="16"/>
+                            <avalonia:MaterialIcon Kind="User" Foreground="White" Width="16" Height="16"/>
                         </Border>
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="{c:Localize Login}" FontSize="10" Opacity="0.7"/>

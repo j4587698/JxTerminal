@@ -4,40 +4,289 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:JxTerminal.ViewModels"
              xmlns:v="using:JxTerminal.Views"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             xmlns:ctrl="using:JxTerminal.Controls"
+             xmlns:c="using:JxTerminal.Converters"
+             xmlns:suki="https://github.com/kikipoulet/SukiUI"
+             xmlns:avalonia="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             xmlns:i="clr-namespace:Avalonia.Xaml.Interactivity;assembly=Avalonia.Xaml.Interactivity"
+             xmlns:ia="clr-namespace:Avalonia.Xaml.Interactions.Core;assembly=Avalonia.Xaml.Interactions"
+             mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
              x:Class="JxTerminal.Views.TerminalListView"
-             x:DataType="vm:TerminalListViewModel">
-    <TabControl ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}">
-        <TabControl.ItemTemplate>
-            <DataTemplate>
-                <TextBlock Text="{Binding Title}" />
-            </DataTemplate>
-        </TabControl.ItemTemplate>
-        <TabControl.ContentTemplate>
-            <DataTemplate DataType="vm:TerminalViewModel">
-                <Grid ColumnDefinitions="*, Auto">
-                    <v:TerminalControl x:Name="terminalControl"
-                                       Session="{Binding Session}" 
-                                       FontFamily="{Binding Settings.FontFamily}" 
-                                       FontSize="{Binding Settings.FontSize}"
-                                       BackgroundColor="{Binding Settings.BackgroundColor}"
-                                       ForegroundColor="{Binding Settings.ForegroundColor}"
-                                       EnableColors="{Binding Settings.EnableColors}"
-                                       ScrollbackLines="{Binding Settings.ScrollbackLines}"
-                                       BackgroundImage="{Binding Settings.BackgroundImage}"
-                                       BackgroundImageOpacity="{Binding Settings.BackgroundImageOpacity}"
-                                       HorizontalAlignment="Stretch"
-                                       VerticalAlignment="Stretch"/>
-                    <ScrollBar Grid.Column="1"
-                               Orientation="Vertical"
-                               Minimum="0"
-                               Maximum="{Binding #terminalControl.ScrollMaximum}"
-                               Value="{Binding #terminalControl.ScrollPosition, Mode=TwoWay}"
-                               ViewportSize="{Binding #terminalControl.ScrollViewport}"
-                               SmallChange="1"
-                               LargeChange="10"/>
-                </Grid>
-            </DataTemplate>
-        </TabControl.ContentTemplate>
-    </TabControl>
+             x:DataType="vm:TerminalListViewModel"
+             x:Name="Root">
+    
+    <UserControl.Resources>
+        <c:FileSizeConverter x:Key="FileSizeConverter"/>
+        <c:ColorToBrushConverter x:Key="ColorToBrushConverter"/>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <Style Selector="RadioButton.MenuTab">
+            <Setter Property="Width" Value="38"/>
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Name="PART_Background" Background="{TemplateBinding Background}" CornerRadius="19">
+                        <avalonia:MaterialIcon Kind="{TemplateBinding Content}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="RadioButton.MenuTab:checked">
+            <Setter Property="Background" Value="{DynamicResource SukiPrimaryColor}"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="TextBlock.PropLabel">
+            <Setter Property="Opacity" Value="0.5"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.PropValue">
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid>
+        <Grid IsVisible="{Binding !HasTabs}" RowDefinitions="*,Auto,*" ColumnDefinitions="*,Auto,*">
+            <StackPanel Grid.Row="1" Grid.Column="1" Spacing="20" HorizontalAlignment="Center">
+                <avalonia:MaterialIcon Kind="LanDisconnect" Width="80" Height="80" Foreground="{DynamicResource SukiText}" Opacity="0.3"/>
+                <TextBlock Text="{c:Localize NoOpenConnections}" FontSize="28" FontWeight="Thin" HorizontalAlignment="Center"/>
+                <Button Command="{Binding CreateConnectionCommand}" Classes="Flat Primary" Padding="20,10">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                         <avalonia:MaterialIcon Kind="Plus" Width="20" Height="20"/><TextBlock Text="{c:Localize NewConnection}" FontSize="16"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <TabControl ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}" IsVisible="{Binding HasTabs}" Classes="Mobile">
+            <TabControl.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Background="Transparent" ContextMenu="{x:Null}">
+                        <StackPanel.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="{c:Localize DuplicateTab}" Command="{Binding $parent[UserControl].DataContext.DuplicateTabCommand}" CommandParameter="{Binding}"><MenuItem.Icon><avalonia:MaterialIcon Kind="ContentCopy"/></MenuItem.Icon></MenuItem>
+                                <Separator/>
+                                <MenuItem Header="{c:Localize Connect}" Command="{Binding ReconnectCommand}" IsVisible="{Binding !IsConnected}"><MenuItem.Icon><avalonia:MaterialIcon Kind="PowerPlug"/></MenuItem.Icon></MenuItem>
+                                <MenuItem Header="{c:Localize Disconnect}" Command="{Binding DisconnectCommand}" IsVisible="{Binding IsConnected}"><MenuItem.Icon><avalonia:MaterialIcon Kind="PowerPlugOff"/></MenuItem.Icon></MenuItem>
+                                <Separator/>
+                                <MenuItem Header="{c:Localize Close}" Command="{Binding CloseCommand}"><MenuItem.Icon><avalonia:MaterialIcon Kind="Close"/></MenuItem.Icon></MenuItem>
+                            </ContextMenu>
+                        </StackPanel.ContextMenu>
+                        <avalonia:MaterialIcon Kind="ConsoleLine" Width="14" Height="14" Opacity="0.6"/>
+                        <TextBlock Text="{Binding Title}" VerticalAlignment="Center" FontSize="12"/>
+                        <Button Command="{Binding CloseCommand}" Classes="Flat" Width="18" Height="18" Padding="0" CornerRadius="9"><avalonia:MaterialIcon Kind="Close" Width="10" Height="10" Opacity="0.5"/></Button>
+                    </StackPanel>
+                </DataTemplate>
+            </TabControl.ItemTemplate>
+            
+            <TabControl.ContentTemplate>
+                <DataTemplate DataType="vm:TerminalViewModel">
+                    <Grid ColumnDefinitions="*, Auto">
+                        <Grid>
+                            <ctrl:TerminalControl x:Name="terminalControl" Controller="{Binding}" 
+                                               FontFamily="{Binding Settings.FontFamily}" FontSize="{Binding Settings.FontSize}"
+                                               BackgroundColor="{Binding Settings.BackgroundColor}" ForegroundColor="{Binding Settings.ForegroundColor}"
+                                               EnableColors="{Binding Settings.EnableColors}" ScrollbackLines="{Binding Settings.ScrollbackLines}"
+                                               BackgroundImage="{Binding Settings.BackgroundImage}" BackgroundImageOpacity="{Binding Settings.BackgroundImageOpacity}"/>
+                            <ScrollBar Grid.Column="1" HorizontalAlignment="Right" Orientation="Vertical" Minimum="0"
+                                       Maximum="{Binding #terminalControl.ScrollMaximum}" Value="{Binding #terminalControl.ScrollPosition, Mode=TwoWay}"
+                                       ViewportSize="{Binding #terminalControl.ScrollViewport}" SmallChange="1" LargeChange="10"/>
+                            <Button Classes="Flat" Command="{Binding ToggleSftpCommand}" IsVisible="{Binding !IsSftpVisible}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,15,25,0" ZIndex="99">
+                                <Border Background="{DynamicResource SukiBackground}" CornerRadius="20" Padding="8" BoxShadow="0 2 8 0 #40000000">
+                                    <avalonia:MaterialIcon Kind="ViewDashboardVariant" Width="20" Height="20" Foreground="{DynamicResource SukiPrimaryColor}"/>
+                                </Border>
+                            </Button>
+                            <Grid IsVisible="{Binding ShowOverlay}" Background="#CC000000">
+                                <suki:GlassCard HorizontalAlignment="Center" VerticalAlignment="Center" Padding="30">
+                                    <StackPanel Spacing="20">
+                                        <TextBlock Text="{Binding StatusMessage}" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                        <Button Content="{c:Localize Reconnect}" Command="{Binding ReconnectCommand}" Classes="Flat Primary" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </suki:GlassCard>
+                            </Grid>
+                        </Grid>
+
+                        <Border Grid.Column="1" Width="420" Background="{DynamicResource SukiBackground}" BorderBrush="{DynamicResource SukiBorderBrush}" BorderThickness="1,0,0,0" IsVisible="{Binding IsSftpVisible}">
+                            <Grid RowDefinitions="Auto, *">
+                                <Border Margin="15" CornerRadius="12" Background="#10FFFFFF" Padding="4">
+                                    <Grid ColumnDefinitions="*, Auto">
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <RadioButton Classes="MenuTab" Content="ViewDashboard" IsChecked="True" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="0"/>
+                                            <RadioButton Classes="MenuTab" Content="Cpu64Bit" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="1"/>
+                                            <RadioButton Classes="MenuTab" Content="ExpansionCard" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="2"/>
+                                            <RadioButton Classes="MenuTab" Content="Memory" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="3"/>
+                                            <RadioButton Classes="MenuTab" Content="Harddisk" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="4"/>
+                                            <RadioButton Classes="MenuTab" Content="Network" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="5"/>
+                                            <RadioButton Classes="MenuTab" Content="FolderNetwork" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="6"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Command="{Binding ToggleSftpCommand}" Width="36" Height="36" CornerRadius="8" Margin="10,0,0,0" Background="{DynamicResource SukiPrimaryColor}" Foreground="White" Padding="0">
+                                            <avalonia:MaterialIcon Kind="Close" Width="18" Height="18"/>
+                                        </Button>
+                                    </Grid>
+                                </Border>
+
+                                <Carousel Grid.Row="1" SelectedIndex="{Binding SelectedSidebarIndex}">
+                                    <Carousel.PageTransition><CrossFade Duration="0:00:00.200"/></Carousel.PageTransition>
+
+                                    <!-- 0. OVERVIEW -->
+                                    <ScrollViewer Padding="20">
+                                        <StackPanel Spacing="25">
+                                            <TextBlock Text="System Overview" FontSize="18" FontWeight="Bold"/>
+                                            <Grid ColumnDefinitions="*, 15, *">
+                                                <Border Background="#10FFFFFF" CornerRadius="12" Padding="20">
+                                                    <StackPanel Spacing="10">
+                                                        <TextBlock Text="CPU" Classes="PropLabel" FontWeight="Bold"/>
+                                                        <TextBlock Text="{Binding CpuUsage, StringFormat='{}{0:0}%'}" FontSize="32" FontWeight="Bold"/>
+                                                        <ProgressBar Value="{Binding CpuUsage}" Minimum="0" Maximum="100" Height="4" Foreground="#FFC107" Background="#20FFC107"/>
+                                                    </StackPanel>
+                                                </Border>
+                                                <Border Grid.Column="2" Background="#10FFFFFF" CornerRadius="12" Padding="20">
+                                                    <StackPanel Spacing="10">
+                                                        <TextBlock Text="RAM" Classes="PropLabel" FontWeight="Bold"/>
+                                                        <TextBlock Text="{Binding RamUsage, StringFormat='{}{0:0}%'}" FontSize="32" FontWeight="Bold"/>
+                                                        <ProgressBar Value="{Binding RamUsage}" Minimum="0" Maximum="100" Height="4" Foreground="#E91E63" Background="#20E91E63"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </Grid>
+                                            <Border Background="#10FFFFFF" CornerRadius="12" Padding="20">
+                                                <Grid ColumnDefinitions="Auto, *">
+                                                    <avalonia:MaterialIcon Kind="ClockOutline" Width="24" Height="24" Opacity="0.5"/>
+                                                    <StackPanel Grid.Column="1" Margin="15,0">
+                                                        <TextBlock Text="Uptime" Classes="PropLabel"/>
+                                                        <TextBlock Text="{Binding Uptime}" FontSize="16" FontWeight="Bold"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </StackPanel>
+                                    </ScrollViewer>
+
+                                    <!-- 1. CPU -->
+                                    <ScrollViewer Padding="20">
+                                        <StackPanel Spacing="20">
+                                            <TextBlock Text="处理器 (CPU)" FontSize="18" FontWeight="Bold"/>
+                                            <suki:GlassCard Padding="20">
+                                                <StackPanel Spacing="20">
+                                                    <TextBlock Text="{Binding CpuModel}" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
+                                                    <Grid ColumnDefinitions="Auto, *">
+                                                        <suki:CircleProgressBar Value="{Binding CpuUsage}" Width="120" Height="120" StrokeWidth="10" Classes="Accent">
+                                                            <TextBlock Text="{Binding CpuUsage, StringFormat='{}{0:0}%'}" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        </suki:CircleProgressBar>
+                                                        <Grid Grid.Column="1" Margin="25,0,0,0" RowDefinitions="Auto, Auto, Auto, Auto" ColumnDefinitions="*, Auto">
+                                                            <TextBlock Grid.Row="0" Grid.Column="0" Classes="PropLabel" Text="核心数"/><TextBlock Grid.Row="0" Grid.Column="1" Classes="PropValue" Text="4"/>
+                                                            <TextBlock Grid.Row="1" Grid.Column="0" Classes="PropLabel" Text="线程数" Margin="0,10,0,0"/><TextBlock Grid.Row="1" Grid.Column="1" Classes="PropValue" Text="8" Margin="0,10,0,0"/>
+                                                            <TextBlock Grid.Row="2" Grid.Column="0" Classes="PropLabel" Text="主频" Margin="0,10,0,0"/><TextBlock Grid.Row="2" Grid.Column="1" Classes="PropValue" Text="{Binding CpuClock}" Margin="0,10,0,0"/>
+                                                            <TextBlock Grid.Row="3" Grid.Column="0" Classes="PropLabel" Text="温度" Margin="0,10,0,0"/><TextBlock Grid.Row="3" Grid.Column="1" Classes="PropValue" Text="{Binding CpuTemp, StringFormat='{}{0}°C'}" Margin="0,10,0,0"/>
+                                                        </Grid>
+                                                    </Grid>
+                                                </StackPanel>
+                                            </suki:GlassCard>
+                                        </StackPanel>
+                                    </ScrollViewer>
+
+                                    <!-- 2. GPU -->
+                                    <ScrollViewer Padding="20">
+                                        <StackPanel Spacing="20">
+                                            <TextBlock Text="显卡 (GPU)" FontSize="18" FontWeight="Bold"/>
+                                            <suki:GlassCard Padding="25">
+                                                <StackPanel Spacing="20">
+                                                    <TextBlock Text="{Binding GpuModel}" FontWeight="Bold" FontSize="15"/>
+                                                    <Grid ColumnDefinitions="Auto, 15, *">
+                                                        <avalonia:MaterialIcon Kind="ExpansionCard" Width="32" Height="32" Opacity="0.3"/>
+                                                        <StackPanel Grid.Column="2">
+                                                            <Grid ColumnDefinitions="*, Auto"><TextBlock Classes="PropLabel" Text="利用率"/><TextBlock Classes="PropValue" Text="{Binding GpuUsage, StringFormat='{}{0:0.0}%'}" Foreground="#E91E63"/></Grid>
+                                                            <ProgressBar Value="{Binding GpuUsage}" Height="6" Foreground="#E91E63" Margin="0,5,0,0"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                    <Grid RowDefinitions="Auto, Auto, Auto" ColumnDefinitions="*, Auto">
+                                                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="PropLabel" Text="功耗"/><TextBlock Grid.Row="0" Grid.Column="1" Classes="PropValue" Text="{Binding GpuPower, StringFormat='{}{0} W'}"/>
+                                                        <TextBlock Grid.Row="1" Grid.Column="0" Classes="PropLabel" Text="温度" Margin="0,10,0,0"/><TextBlock Grid.Row="1" Grid.Column="1" Classes="PropValue" Text="{Binding GpuTemp, StringFormat='{}{0}°C'}" Margin="0,10,0,0"/>
+                                                        <TextBlock Grid.Row="2" Grid.Column="0" Classes="PropLabel" Text="显存" Margin="0,10,0,0"/><TextBlock Grid.Row="2" Grid.Column="1" Classes="PropValue" Text="4.2 / 12 GB" Margin="0,10,0,0"/>
+                                                    </Grid>
+                                                </StackPanel>
+                                            </suki:GlassCard>
+                                        </StackPanel>
+                                    </ScrollViewer>
+
+                                    <!-- 3. MEMORY -->
+                                    <ScrollViewer Padding="20">
+                                        <StackPanel Spacing="20">
+                                            <TextBlock Text="内存 (Memory)" FontSize="18" FontWeight="Bold"/>
+                                            <Grid ColumnDefinitions="*, Auto">
+                                                <suki:WaveProgress Value="{Binding RamUsage}" Width="140" Height="140" Classes="Accent"/>
+                                                <StackPanel Grid.Column="1" Margin="20,0,0,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="8.4 GB" FontSize="28" FontWeight="Bold"/><TextBlock Text="总容量 16.0 GB" Opacity="0.5" FontSize="12"/>
+                                                </StackPanel>
+                                            </Grid>
+                                            <suki:GlassCard Padding="15">
+                                                <Grid RowDefinitions="Auto, Auto" ColumnDefinitions="*, Auto">
+                                                    <TextBlock Text="页面缓存" Classes="PropLabel"/><TextBlock Grid.Column="1" Text="4.2 GB" Classes="PropValue"/>
+                                                    <TextBlock Grid.Row="1" Text="交换分区" Classes="PropLabel" Margin="0,10,0,0"/><TextBlock Grid.Row="1" Grid.Column="1" Text="0 / 4.0 GB" Classes="PropValue" Margin="0,10,0,0"/>
+                                                </Grid>
+                                            </suki:GlassCard>
+                                        </StackPanel>
+                                    </ScrollViewer>
+
+                                    <!-- 4. DISK -->
+                                    <ScrollViewer Padding="20">
+                                        <StackPanel Spacing="20">
+                                            <TextBlock Text="磁盘 (Disk)" FontSize="18" FontWeight="Bold"/>
+                                            <Grid ColumnDefinitions="*, 15, *">
+                                                <suki:GlassCard Padding="15"><StackPanel><TextBlock Text="读取速度" Classes="PropLabel"/><TextBlock Text="{Binding DiskReadSpeed}" FontSize="18" FontWeight="Bold"/></StackPanel></suki:GlassCard>
+                                                <suki:GlassCard Grid.Column="2" Padding="15"><StackPanel><TextBlock Text="写入速度" Classes="PropLabel"/><TextBlock Text="{Binding DiskWriteSpeed}" FontSize="18" FontWeight="Bold"/></StackPanel></suki:GlassCard>
+                                            </Grid>
+                                            <suki:GlassCard Padding="15">
+                                                <StackPanel Spacing="10">
+                                                    <Grid ColumnDefinitions="Auto, *, Auto"><avalonia:MaterialIcon Kind="Harddisk" Width="20" Height="20" Opacity="0.5"/><TextBlock Grid.Column="1" Text="/" FontWeight="Bold" Margin="10,0"/><TextBlock Grid.Column="2" Text="{Binding DiskUsage, StringFormat='{}{0:0}%'}" Foreground="#FF9800" FontWeight="Bold"/></Grid>
+                                                    <ProgressBar Value="{Binding DiskUsage}" Height="6" Foreground="#FF9800"/><TextBlock Text="450 GB / 1 TB" FontSize="10" Opacity="0.5" HorizontalAlignment="Right"/>
+                                                </StackPanel>
+                                            </suki:GlassCard>
+                                        </StackPanel>
+                                    </ScrollViewer>
+
+                                    <!-- 5. NETWORK -->
+                                    <ScrollViewer Padding="20">
+                                        <StackPanel Spacing="20">
+                                            <TextBlock Text="网络 (Network)" FontSize="18" FontWeight="Bold"/>
+                                            <Grid ColumnDefinitions="*, 15, *">
+                                                <suki:GlassCard Padding="15"><StackPanel><StackPanel Orientation="Horizontal" Spacing="5"><avalonia:MaterialIcon Kind="ArrowDown" Foreground="#4CAF50"/><TextBlock Text="下载" Classes="PropLabel"/></StackPanel><TextBlock Text="{Binding NetworkDown}" FontSize="18" FontWeight="Bold"/></StackPanel></suki:GlassCard>
+                                                <suki:GlassCard Grid.Column="2" Padding="15"><StackPanel><StackPanel Orientation="Horizontal" Spacing="5"><avalonia:MaterialIcon Kind="ArrowUp" Foreground="#2196F3"/><TextBlock Text="上传" Classes="PropLabel"/></StackPanel><TextBlock Text="{Binding NetworkUp}" FontSize="18" FontWeight="Bold"/></StackPanel></suki:GlassCard>
+                                            </Grid>
+                                            <suki:GlassCard Padding="15">
+                                                <StackPanel Spacing="10">
+                                                    <Grid Height="100"><Path Data="M0,80 L20,70 L40,80 L60,20 L80,80 L100,70 L120,80" Stretch="Fill" Stroke="#2196F3" StrokeThickness="2" Opacity="0.6"/><Path Data="M0,90 L30,85 L50,90 L70,60 L90,90 L110,85 L120,90" Stretch="Fill" Stroke="#4CAF50" StrokeThickness="2" Opacity="0.6"/></Grid>
+                                                    <Grid ColumnDefinitions="*, Auto"><TextBlock Text="Total Sent: 1.2 GB" Classes="PropLabel"/><TextBlock Grid.Column="1" Text="Total Recv: 4.5 GB" Classes="PropLabel"/></Grid>
+                                                </StackPanel>
+                                            </suki:GlassCard>
+                                        </StackPanel>
+                                    </ScrollViewer>
+
+                                    <!-- 6. SFTP -->
+                                    <Grid RowDefinitions="Auto, *, Auto" Margin="20">
+                                        <Grid ColumnDefinitions="*, Auto" Margin="0,0,0,10"><TextBlock Text="文件管理" FontWeight="Bold" FontSize="16"/><StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5"><Button Classes="Flat" Command="{Binding Sftp.NavigateUpCommand}"><avalonia:MaterialIcon Kind="ArrowUpBold"/></Button><Button Classes="Flat" Command="{Binding Sftp.RefreshFilesCommand}"><avalonia:MaterialIcon Kind="Refresh"/></Button></StackPanel></Grid>
+                                        <TextBox Grid.Row="0" Text="{Binding Sftp.CurrentPath}" Classes="Small" Margin="0,35,0,10"/>
+                                        <ListBox Grid.Row="1" ItemsSource="{Binding Sftp.Files}" Background="Transparent">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid ColumnDefinitions="Auto, *, Auto" Height="30"><avalonia:MaterialIcon Kind="{Binding Icon}" Width="18" Height="18" Opacity="0.7" Margin="0,0,10,0"/><TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="2" Text="{Binding Size, Converter={StaticResource FileSizeConverter}}" FontSize="10" Opacity="0.5" VerticalAlignment="Center" Margin="10,0,0,0"/><i:Interaction.Behaviors><ia:EventTriggerBehavior EventName="DoubleTapped"><ia:InvokeCommandAction Command="{Binding $parent[ListBox].DataContext.Sftp.NavigateCommand}" CommandParameter="{Binding}"/></ia:EventTriggerBehavior></i:Interaction.Behaviors></Grid>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                        <Grid Grid.Row="2" ColumnDefinitions="*, *" Margin="0,15,0,0"><Button Content="上传" Command="{Binding Sftp.UploadFileCommand}" Classes="Outlined" Margin="0,0,5,0" HorizontalAlignment="Stretch"/><Button Grid.Column="1" Content="下载" Command="{Binding Sftp.DownloadFileCommand}" Classes="Flat Primary" Margin="5,0,0,0" HorizontalAlignment="Stretch"/></Grid>
+                                        <Grid Grid.Row="1" Grid.RowSpan="2" Background="#80000000" IsVisible="{Binding Sftp.IsLoading}"><ProgressBar IsIndeterminate="True" VerticalAlignment="Center" HorizontalAlignment="Center"/></Grid>
+                                    </Grid>
+                                </Carousel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </DataTemplate>
+            </TabControl.ContentTemplate>
+        </TabControl>
+    </Grid>
 </UserControl>

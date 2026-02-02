@@ -36,7 +36,7 @@ public class PtyLocalShellSession : ITerminalSession
 
             var options = new PtyOptions
             {
-                Name = "JxTerminal",
+                Name = $"JxTerminal-{Guid.NewGuid()}",
                 Cols = 80,
                 Rows = 24,
                 Cwd = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
