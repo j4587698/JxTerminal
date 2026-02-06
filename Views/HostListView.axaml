@@ -165,8 +165,8 @@
                                                         <StackPanel Grid.Column="1" Margin="15,0,0,0" Spacing="4">
                                                             <Grid ColumnDefinitions="*, Auto">
                                                                 <TextBlock Text="{Binding Host}" FontWeight="SemiBold" FontSize="15" TextTrimming="CharacterEllipsis"/>
-                                                                <Border Grid.Column="1" Background="{DynamicResource SukiPrimaryColor50}" CornerRadius="4" Padding="4,1" Margin="5,0,0,0">
-                                                                    <TextBlock Text="{Binding Type}" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource SukiPrimaryColor}"/>
+                                                                <Border Grid.Column="1" Background="{DynamicResource SukiPrimaryColor}" CornerRadius="4" Padding="4,2" Margin="5,0,0,0" VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding Type}" FontSize="9" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                                                                 </Border>
                                                             </Grid>
                                                             <TextBlock Text="{Binding Username}" FontSize="12" Opacity="0.6" TextTrimming="CharacterEllipsis"/>

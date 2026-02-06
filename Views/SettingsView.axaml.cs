@@ -59,16 +59,6 @@ public partial class SettingsView : UserControl
             }
         }
     }
-    private void LanguageChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (sender is ComboBox comboBox &&
-            comboBox.SelectedItem is ComboBoxItem item &&
-            item.Tag is string cultureCode)
-        {
-            JxTerminal.Services.LocalizationService.Instance.SetLanguage(cultureCode);
-        }
-    }
-
     private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (sender is ListBox listBox && listBox.SelectedItem is ListBoxItem item && item.Tag is string sectionName)

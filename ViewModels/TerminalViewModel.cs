@@ -4,6 +4,7 @@ using JxTerminal.Controls;
 using JxTerminal.Models;
 using JxTerminal.Services;
 using System;
+using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using System.Linq;
 
@@ -58,21 +59,90 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
     [ObservableProperty]
     private string _uptime = "0d 0h 0m";
 
+    // Overview page data
+    [ObservableProperty] private string _hostname = "Loading...";
+    [ObservableProperty] private string _systemInfo = "Loading...";
+
     // Detailed Hardware Info
     [ObservableProperty] private string _cpuModel = "Loading...";
     [ObservableProperty] private string _cpuClock = "";
     [ObservableProperty] private double _cpuTemp = 0;
+    [ObservableProperty] private int _cpuCoreCount = 0;
+    [ObservableProperty] private int _cpuThreadCount = 0;
+    [ObservableProperty] private double _load1 = 0;
+    [ObservableProperty] private double _load5 = 0;
+    [ObservableProperty] private double _load15 = 0;
     
     [ObservableProperty] private string _gpuModel = "None";
     [ObservableProperty] private double _gpuTemp = 0;
     [ObservableProperty] private int _gpuFanSpeed = 0; // RPM or %
     [ObservableProperty] private double _gpuPower = 0; // Watts
+    [ObservableProperty] private bool _gpuDetected = false;
+    [ObservableProperty] private double _gpuMemoryUsed = 0; // GB
+    [ObservableProperty] private double _gpuMemoryTotal = 0; // GB
     
     [ObservableProperty] private string _diskReadSpeed = "0 B/s";
     [ObservableProperty] private string _diskWriteSpeed = "0 B/s";
+    [ObservableProperty] private long _diskReadIops = 0;
+    [ObservableProperty] private long _diskWriteIops = 0;
+    [ObservableProperty] private string _diskPath = "/";
     
-    [ObservableProperty] private string _netTotalSent = "1.2 GB";
-    [ObservableProperty] private string _netTotalRecv = "4.5 GB";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DiskTotalFormatted))]
+    private double _diskTotal = 0; // GB
+    
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DiskUsedBytesFormatted))]
+    private double _diskUsedBytes = 0; // GB
+    
+    [ObservableProperty] private string _netTotalSent = "0 GB";
+    [ObservableProperty] private string _netTotalRecv = "0 GB";
+    [ObservableProperty] private int _tcpConnections = 0;
+    [ObservableProperty] private long _totalPacketsSent = 0;
+    [ObservableProperty] private long _totalPacketsRecv = 0;
+    
+    // Memory detailed info
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MemTotalFormatted))]
+    private double _memTotal = 0; // GB
+    
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MemUsedFormatted))]
+    private double _memUsed = 0; // GB
+    
+    [ObservableProperty] private double _memBuffers = 0; // GB
+    [ObservableProperty] private double _memFree = 0; // GB
+    
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MemCachedFormatted))]
+    private double _memCached = 0; // GB
+    
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SwapTotalFormatted))]
+    private double _swapTotal = 0; // GB
+    
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SwapUsedFormatted))]
+    private double _swapUsed = 0; // GB
+    
+    // Formatted memory strings for UI (to avoid locale issues)
+    public string MemTotalFormatted => MemTotal.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " GB";
+    public string MemUsedFormatted => MemUsed.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " GB";
+    public string MemCachedFormatted => MemCached.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " GB";
+    public string SwapTotalFormatted => SwapTotal.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " GB";
+    public string SwapUsedFormatted => SwapUsed.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " GB";
+    public string DiskTotalFormatted => DiskTotal.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " GB";
+    public string DiskUsedBytesFormatted => DiskUsedBytes.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " GB";
+    
+    // Ping latency
+    [ObservableProperty] private double _pingLatency = 0; // ms
+    [ObservableProperty] private string _pingStatus = "-";
+    
+    // Process list (top CPU consumers)
+    public ObservableCollection<ProcessInfo> TopProcesses { get; } = new();
+    
+    // Network listening ports
+    public ObservableCollection<PortInfo> ListeningPorts { get; } = new();
 
     [ObservableProperty]
     private int _selectedSidebarIndex = 0;
@@ -184,8 +254,25 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
     {
         try
         {
+            // Get static info once
             var model = await sshSession.ExecuteCommandAsync("grep -m1 'model name' /proc/cpuinfo | cut -d: -f2");
             if (!string.IsNullOrWhiteSpace(model)) CpuModel = model.Trim();
+            
+            var hostname = await sshSession.ExecuteCommandAsync("hostname");
+            if (!string.IsNullOrWhiteSpace(hostname)) Hostname = hostname.Trim();
+            
+            var osInfo = await sshSession.ExecuteCommandAsync("uname -s; cat /etc/os-release 2>/dev/null | grep PRETTY_NAME | cut -d= -f2 | tr -d '\"'");
+            var osLines = osInfo.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            if (osLines.Length >= 2) SystemInfo = $"{osLines[0].Trim()} / {osLines[1].Trim()}";
+            
+            var coreCount = await sshSession.ExecuteCommandAsync("grep -c '^processor' /proc/cpuinfo");
+            if (int.TryParse(coreCount.Trim(), out int cores)) CpuCoreCount = cores;
+            
+            var threadInfo = await sshSession.ExecuteCommandAsync("lscpu | grep '^Thread(s) per core' | awk '{print $4}'");
+            if (int.TryParse(threadInfo.Trim(), out int threadsPerCore)) 
+                CpuThreadCount = CpuCoreCount * threadsPerCore;
+            else 
+                CpuThreadCount = CpuCoreCount; // fallback
         } 
         catch { }
 
@@ -193,10 +280,28 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
         {
             try
             {
-                var cmd = "echo '>>>STAT'; grep '^cpu ' /proc/stat; echo '>>>MEM'; free -b; echo '>>>DISK'; df -h / | tail -n 1; echo '>>>NET'; cat /proc/net/dev; echo '>>>UPTIME'; uptime -p; echo '>>>TEMP'; cat /sys/class/thermal/thermal_zone*/temp 2>/dev/null | head -n 1; echo '>>>DISKIO'; cat /proc/diskstats; echo '>>>GPU'; nvidia-smi --query-gpu=utilization.gpu,temperature.gpu,power.draw,name --format=csv,noheader,nounits 2>/dev/null || echo 'N/A'";
+                // Main monitoring command with process and port info
+                // Use /proc/meminfo instead of free -b for more reliable memory parsing
+                // Use separate markers for df -h (DISK_H) and df -B1 (DISK_B) to avoid parsing confusion
+                var cmd = "echo '>>>STAT'; grep '^cpu ' /proc/stat; echo '>>>MEM'; cat /proc/meminfo | grep -E '^(MemTotal|MemFree|MemAvailable|Buffers|Cached|SwapTotal|SwapFree):'; echo '>>>DISK_H'; df -h / | tail -n 1; echo '>>>DISK_B'; df -B1 / | tail -n 1; echo '>>>NET'; cat /proc/net/dev; cat /proc/net/snmp | grep 'Tcp:' | tail -n 1; ss -tan | grep ESTAB | wc -l; echo '>>>UPTIME'; uptime; echo '>>>TEMP'; cat /sys/class/thermal/thermal_zone*/temp 2>/dev/null | head -n 1; echo '>>>DISKIO'; cat /proc/diskstats; echo '>>>GPU'; nvidia-smi --query-gpu=utilization.gpu,temperature.gpu,power.draw,name,memory.used,memory.total --format=csv,noheader,nounits 2>/dev/null || echo 'N/A'; echo '>>>PROC'; ps aux --sort=-%cpu | head -n 11 | tail -n 10; echo '>>>PORTS'; ss -tlnp 2>/dev/null | tail -n +2 | head -n 20";
                 
                 var output = await sshSession.ExecuteCommandAsync(cmd);
+                
                 ParseSystemInfo(output);
+                
+                // Ping measurement using SSH round-trip time
+                try
+                {
+                    var start = DateTime.Now;
+                    await sshSession.ExecuteCommandAsync("echo");
+                    var elapsed = (DateTime.Now - start).TotalMilliseconds;
+                    PingLatency = Math.Round(elapsed, 1);
+                    PingStatus = $"{PingLatency:0.0} ms";
+                }
+                catch
+                {
+                    PingStatus = "-";
+                }
             }
             catch
             {
@@ -431,12 +536,15 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
         {
             if (line == ">>>STAT") { section = 1; continue; }
             if (line == ">>>MEM") { section = 2; continue; }
-            if (line == ">>>DISK") { section = 3; continue; }
+            if (line == ">>>DISK_H") { section = 3; continue; }  // df -h (human readable)
+            if (line == ">>>DISK_B") { section = 11; continue; } // df -B1 (bytes)
             if (line == ">>>NET") { section = 4; continue; }
             if (line == ">>>UPTIME") { section = 5; continue; }
             if (line == ">>>TEMP") { section = 6; continue; }
             if (line == ">>>DISKIO") { section = 7; continue; }
             if (line == ">>>GPU") { section = 8; continue; }
+            if (line == ">>>PROC") { section = 9; Avalonia.Threading.Dispatcher.UIThread.Post(() => TopProcesses.Clear()); continue; }
+            if (line == ">>>PORTS") { section = 10; Avalonia.Threading.Dispatcher.UIThread.Post(() => ListeningPorts.Clear()); continue; }
 
             try
             {
@@ -466,37 +574,80 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
                             }
                         }
                         break;
-                    case 2: // MEM
-                        if (line.StartsWith("Mem:"))
+                    case 2: // MEM - /proc/meminfo format: "MemTotal:       16384000 kB"
+                        if (line.Contains(":"))
                         {
-                            var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                            if (parts.Length >= 2)
+                            var colonIdx = line.IndexOf(':');
+                            var key = line.Substring(0, colonIdx).Trim();
+                            var valueStr = line.Substring(colonIdx + 1).Trim().Replace("kB", "").Trim();
+                            
+                            if (long.TryParse(valueStr, out long valueKB))
                             {
-                                double total = double.Parse(parts[1]);
-                                double available = 0;
-                                if (parts.Length >= 7) available = double.Parse(parts[6]); 
-                                else if (parts.Length >= 4) available = double.Parse(parts[3]) + (parts.Length >= 6 ? double.Parse(parts[5]) : 0);
-                                
-                                if (total > 0)
-                                    RamUsage = ((total - available) / total) * 100.0;
+                                double valueGB = valueKB / (1024.0 * 1024.0);
+                                switch (key)
+                                {
+                                    case "MemTotal":
+                                        MemTotal = valueGB;
+                                        break;
+                                    case "MemFree":
+                                        MemFree = valueGB;
+                                        break;
+                                    case "MemAvailable":
+                                        // Calculate RAM usage based on available memory
+                                        if (MemTotal > 0)
+                                            RamUsage = ((MemTotal - valueGB) / MemTotal) * 100.0;
+                                        // Also calculate MemUsed here since we have all the info
+                                        MemUsed = MemTotal - valueGB;
+                                        break;
+                                    case "Buffers":
+                                        MemBuffers = valueGB;
+                                        break;
+                                    case "Cached":
+                                        MemCached = valueGB;
+                                        break;
+                                    case "SwapTotal":
+                                        SwapTotal = valueGB;
+                                        break;
+                                    case "SwapFree":
+                                        if (SwapTotal > 0)
+                                            SwapUsed = SwapTotal - valueGB;
+                                        break;
+                                }
                             }
                         }
                         break;
-                    case 3: // DISK
+                    case 3: // DISK_H - df -h (human readable)
                         if (!line.StartsWith("Filesystem"))
                         {
                              var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                             if (parts.Length >= 5)
+                             // df -h output: Filesystem Size Used Avail Use% Mounted
+                             if (parts.Length >= 6 && parts[4].Contains("%"))
                              {
-                                 var useStr = parts[parts.Length - 2].Replace("%", ""); 
+                                 var useStr = parts[4].Replace("%", ""); 
                                  if (double.TryParse(useStr, out double usage))
                                      DiskUsage = usage;
+                                 DiskPath = parts[5]; // Mount point
                              }
                         }
                         break;
-                    case 4: // NET
-                        if (line.Contains(":"))
+                    case 11: // DISK_B - df -B1 (bytes)
+                        if (!line.StartsWith("Filesystem"))
                         {
+                             var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                             // df -B1 output: Filesystem 1B-blocks Used Available Use% Mounted
+                             if (parts.Length >= 4)
+                             {
+                                 if (long.TryParse(parts[1], out long totalBytes))
+                                      DiskTotal = totalBytes / (1024.0 * 1024 * 1024);
+                                 if (long.TryParse(parts[2], out long usedBytes))
+                                      DiskUsedBytes = usedBytes / (1024.0 * 1024 * 1024);
+                              }
+                        }
+                        break;
+                    case 4: // NET
+                        if (line.Contains(":") && !line.Trim().StartsWith("Tcp"))
+                        {
+                             // /proc/net/dev format
                              if (!line.Trim().StartsWith("lo") && !line.Contains("loopback"))
                              {
                                  var raw = line.Substring(line.IndexOf(':') + 1).Trim();
@@ -505,12 +656,53 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
                                  {
                                      currentRx += long.Parse(nums[0]);
                                      currentTx += long.Parse(nums[8]);
+                                     if (nums.Length >= 3) TotalPacketsRecv += long.Parse(nums[1]);
+                                     if (nums.Length >= 10) TotalPacketsSent += long.Parse(nums[9]);
                                  }
                              }
                         }
+                        else if (line.StartsWith("Tcp:") && line.Contains(" "))
+                        {
+                            // /proc/net/snmp Tcp line has connection stats
+                            // Format: Tcp: RtoAlgorithm RtoMin RtoMax MaxConn ActiveOpens PassiveOpens AttemptFails EstabResets CurrEstab ...
+                            // We want CurrEstab (index 9)
+                            var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                            if (parts.Length >= 10 && int.TryParse(parts[9], out int estab))
+                                TcpConnections = estab;
+                        }
+                        else if (!line.Contains(":") && int.TryParse(line.Trim(), out int connCount))
+                        {
+                            // This is from "ss -tan | grep ESTAB | wc -l"
+                            TcpConnections = connCount;
+                        }
                         break;
                     case 5: // UPTIME
-                        Uptime = line;
+                        // uptime output: " 14:26:03 up 2 days,  3:45,  3 users,  load average: 0.52, 0.58, 0.59"
+                        if (line.Contains("load average:"))
+                        {
+                            var loadIdx = line.IndexOf("load average:");
+                            var loadStr = line.Substring(loadIdx + 13).Trim();
+                            var loads = loadStr.Split(',');
+                            if (loads.Length >= 1 && double.TryParse(loads[0].Trim(), out double l1)) Load1 = l1;
+                            if (loads.Length >= 2 && double.TryParse(loads[1].Trim(), out double l5)) Load5 = l5;
+                            if (loads.Length >= 3 && double.TryParse(loads[2].Trim(), out double l15)) Load15 = l15;
+                            
+                            // Parse uptime string
+                            var upIdx = line.IndexOf("up ");
+                            if (upIdx != -1)
+                            {
+                                var endIdx = line.IndexOf(",", upIdx);
+                                if (endIdx == -1) endIdx = line.IndexOf("user", upIdx);
+                                if (endIdx > upIdx)
+                                {
+                                    Uptime = line.Substring(upIdx, endIdx - upIdx).Trim();
+                                }
+                            }
+                        }
+                        else
+                        {
+                            Uptime = line;
+                        }
                         break;
                     case 6: // TEMP
                          if (double.TryParse(line, out double temp))
@@ -551,6 +743,7 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
                     case 8: // GPU
                         if (line != "N/A")
                         {
+                            GpuDetected = true;
                             var gParts = line.Split(',');
                             if (gParts.Length >= 4)
                             {
@@ -558,6 +751,58 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
                                 if(double.TryParse(gParts[1], out double gt)) GpuTemp = gt;
                                 if(double.TryParse(gParts[2], out double gp)) GpuPower = gp;
                                 GpuModel = gParts[3].Trim();
+                                
+                                // Memory if available (indices 4 and 5)
+                                if (gParts.Length >= 6)
+                                {
+                                    if (double.TryParse(gParts[4], out double memUsed)) 
+                                        GpuMemoryUsed = memUsed / 1024.0; // Convert MB to GB
+                                    if (double.TryParse(gParts[5], out double memTotal))
+                                        GpuMemoryTotal = memTotal / 1024.0;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            GpuDetected = false;
+                        }
+                        break;
+                    
+                    case 9: // PROC - ps aux output
+                        // Format: USER PID %CPU %MEM VSZ RSS TTY STAT START TIME COMMAND
+                        var procParts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        if (procParts.Length >= 11)
+                        {
+                            var procInfo = new ProcessInfo
+                            {
+                                User = procParts[0],
+                                Pid = int.TryParse(procParts[1], out int pid) ? pid : 0,
+                                CpuPercent = double.TryParse(procParts[2], out double cpu) ? cpu : 0,
+                                MemPercent = double.TryParse(procParts[3], out double mem) ? mem : 0,
+                                Name = string.Join(" ", procParts.Skip(10))
+                            };
+                            Avalonia.Threading.Dispatcher.UIThread.Post(() => TopProcesses.Add(procInfo));
+                        }
+                        break;
+                    
+                    case 10: // PORTS - ss -tlnp output
+                        // Format: State Recv-Q Send-Q Local Address:Port Peer Address:Port Process
+                        var portParts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                        if (portParts.Length >= 4 && portParts[0] == "LISTEN")
+                        {
+                            var localAddr = portParts[3];
+                            var colonIdx = localAddr.LastIndexOf(':');
+                            if (colonIdx >= 0 && int.TryParse(localAddr.Substring(colonIdx + 1), out int port))
+                            {
+                                var portInfo = new PortInfo
+                                {
+                                    Port = port,
+                                    Protocol = "TCP",
+                                    State = "LISTEN",
+                                    LocalAddress = localAddr.Substring(0, colonIdx),
+                                    Process = portParts.Length > 5 ? portParts[5] : ""
+                                };
+                                Avalonia.Threading.Dispatcher.UIThread.Post(() => ListeningPorts.Add(portInfo));
                             }
                         }
                         break;
@@ -577,13 +822,30 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
                 
                 DiskReadSpeed = FormatSpeed((currentDiskRead - _prevDiskReadSectors) * 512.0 / seconds);
                 DiskWriteSpeed = FormatSpeed((currentDiskWrite - _prevDiskWriteSectors) * 512.0 / seconds);
+                
+                // Calculate IOPS (operations per second)
+                DiskReadIops = (long)((currentDiskRead - _prevDiskReadSectors) / seconds);
+                DiskWriteIops = (long)((currentDiskWrite - _prevDiskWriteSectors) / seconds);
             }
         }
+        
+        // Format network totals
+        NetTotalRecv = FormatSize(currentRx);
+        NetTotalSent = FormatSize(currentTx);
+        
         _prevCheckTime = now;
         _prevRxBytes = currentRx;
         _prevTxBytes = currentTx;
         _prevDiskReadSectors = currentDiskRead;
         _prevDiskWriteSectors = currentDiskWrite;
+    }
+
+    private string FormatSize(double bytes)
+    {
+        if (bytes < 1024) return $"{bytes:0} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024:0.0} KB";
+        if (bytes < 1024 * 1024 * 1024) return $"{bytes / 1024 / 1024:0.0} MB";
+        return $"{bytes / 1024 / 1024 / 1024:0.0} GB";
     }
 
     private string FormatSpeed(double bytesPerSec)

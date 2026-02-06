@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System;
@@ -117,6 +117,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private async void LoadSettings()
     {
         Settings = await JxTerminal.Services.DataStore.LoadSettingsAsync();
+        Settings.ResolveColorScheme();
         // Hook up auto-save
         Settings.PropertyChanged += async (s, e) => {
              // Avoid saving on transient changes if possible, or debounce. 

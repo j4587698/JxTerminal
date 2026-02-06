@@ -26,9 +26,12 @@
                                     <TextBlock Text="{c:Localize Language}" FontWeight="SemiBold"/>
                                     <TextBlock Text="Interface language" FontSize="11" Opacity="0.6"/>
                                 </StackPanel>
-                                <ComboBox SelectedIndex="0" SelectionChanged="LanguageChanged" MinWidth="180" Grid.Column="1">
-                                     <ComboBoxItem Tag="en-US">English</ComboBoxItem>
-                                     <ComboBoxItem Tag="zh-CN">中文</ComboBoxItem>
+                                <ComboBox ItemsSource="{Binding AvailableLanguages}" SelectedItem="{Binding SelectedLanguage}" MinWidth="180" Grid.Column="1">
+                                     <ComboBox.ItemTemplate>
+                                         <DataTemplate>
+                                             <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource SukiText}"/>
+                                         </DataTemplate>
+                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
                             </Grid>
                             
@@ -40,7 +43,7 @@
                                 <ComboBox ItemsSource="{Binding AvailableThemes}" SelectedItem="{Binding SelectedBaseTheme}" MinWidth="180" Grid.Column="1">
                                      <ComboBox.ItemTemplate>
                                          <DataTemplate>
-                                             <TextBlock Text="{Binding DisplayName}"/>
+                                             <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource SukiText}"/>
                                          </DataTemplate>
                                      </ComboBox.ItemTemplate>
                                 </ComboBox>
@@ -56,7 +59,7 @@
                                          <DataTemplate>
                                              <StackPanel Orientation="Horizontal" Spacing="10">
                                                  <Border Background="{Binding Value.Primary, Converter={StaticResource ColorToBrushConverter}}" Width="16" Height="16" CornerRadius="8"/>
-                                                 <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"/>
+                                                 <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" Foreground="{DynamicResource SukiText}"/>
                                              </StackPanel>
                                          </DataTemplate>
                                      </ComboBox.ItemTemplate>
@@ -91,24 +94,176 @@
 
                             <Separator Opacity="0.2"/>
 
-                            <!-- Colors -->
-                            <Grid ColumnDefinitions="*, Auto">
-                                <TextBlock Text="{c:Localize Foreground}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
-                                    <TextBlock Text="{Binding Settings.ForegroundColor, Converter={StaticResource ColorToHexConverter}}" 
-                                               VerticalAlignment="Center" FontFamily="Consolas, Monospace" Opacity="0.6"/>
-                                    <ColorPicker Color="{Binding Settings.ForegroundColor}" />
-                                </StackPanel>
-                            </Grid>
+                            <!-- Color Scheme Selection -->
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="{c:Localize ColorScheme}" FontWeight="SemiBold" FontSize="14"/>
+                                
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <ComboBox ItemsSource="{Binding AvailableColorSchemes}" 
+                                              SelectedItem="{Binding SelectedColorScheme}" 
+                                              MinWidth="200" HorizontalAlignment="Stretch">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="m:TerminalColorScheme">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <!-- Color preview swatches -->
+                                                    <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                                        <Border Background="{Binding Background, Converter={StaticResource ColorToBrushConverter}}" 
+                                                                Width="14" Height="14" CornerRadius="2" BorderBrush="Gray" BorderThickness="0.5"/>
+                                                        <Border Background="{Binding Red, Converter={StaticResource ColorToBrushConverter}}" Width="14" Height="14" CornerRadius="2"/>
+                                                        <Border Background="{Binding Green, Converter={StaticResource ColorToBrushConverter}}" Width="14" Height="14" CornerRadius="2"/>
+                                                        <Border Background="{Binding Blue, Converter={StaticResource ColorToBrushConverter}}" Width="14" Height="14" CornerRadius="2"/>
+                                                        <Border Background="{Binding Yellow, Converter={StaticResource ColorToBrushConverter}}" Width="14" Height="14" CornerRadius="2"/>
+                                                        <Border Background="{Binding Magenta, Converter={StaticResource ColorToBrushConverter}}" Width="14" Height="14" CornerRadius="2"/>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" Foreground="{DynamicResource SukiText}"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" Margin="10,0,0,0">
+                                        <Button Content="{c:Localize DuplicateScheme}" Command="{Binding DuplicateSchemeCommand}" Classes="Flat" ToolTip.Tip="Duplicate as custom scheme"/>
+                                        <Button Content="{c:Localize DeleteScheme}" Command="{Binding DeleteSchemeCommand}" Classes="Flat"
+                                                IsEnabled="{Binding IsSchemeEditable}" ToolTip.Tip="Delete custom scheme"/>
+                                    </StackPanel>
+                                </Grid>
 
-                            <Grid ColumnDefinitions="*, Auto">
-                                <TextBlock Text="{c:Localize Background}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
-                                    <TextBlock Text="{Binding Settings.BackgroundColor, Converter={StaticResource ColorToHexConverter}}" 
-                                               VerticalAlignment="Center" FontFamily="Consolas, Monospace" Opacity="0.6"/>
-                                    <ColorPicker Color="{Binding Settings.BackgroundColor}" />
-                                </StackPanel>
-                            </Grid>
+                                <!-- Color scheme preview: terminal background with foreground text -->
+                                <Border Background="{Binding SelectedColorScheme.Background, Converter={StaticResource ColorToBrushConverter}}" 
+                                        CornerRadius="6" Padding="12,8" MinHeight="40">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="user@host:~$ ls -la" FontFamily="Consolas, Monospace" FontSize="12"
+                                                   Foreground="{Binding SelectedColorScheme.Foreground, Converter={StaticResource ColorToBrushConverter}}"/>
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <TextBlock Text="Documents" FontFamily="Consolas, Monospace" FontSize="12"
+                                                       Foreground="{Binding SelectedColorScheme.Blue, Converter={StaticResource ColorToBrushConverter}}"/>
+                                            <TextBlock Text="script.sh" FontFamily="Consolas, Monospace" FontSize="12"
+                                                       Foreground="{Binding SelectedColorScheme.Green, Converter={StaticResource ColorToBrushConverter}}"/>
+                                            <TextBlock Text="error.log" FontFamily="Consolas, Monospace" FontSize="12"
+                                                       Foreground="{Binding SelectedColorScheme.Red, Converter={StaticResource ColorToBrushConverter}}"/>
+                                            <TextBlock Text="notes.txt" FontFamily="Consolas, Monospace" FontSize="12"
+                                                       Foreground="{Binding SelectedColorScheme.Yellow, Converter={StaticResource ColorToBrushConverter}}"/>
+                                            <TextBlock Text="archive.tar" FontFamily="Consolas, Monospace" FontSize="12"
+                                                       Foreground="{Binding SelectedColorScheme.Magenta, Converter={StaticResource ColorToBrushConverter}}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <Separator Opacity="0.2"/>
+
+                            <!-- Terminal Colors (editable when scheme is custom) -->
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="{c:Localize TerminalColors}" FontWeight="SemiBold" FontSize="14"/>
+                                
+                                <!-- Foreground & Background -->
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <TextBlock Text="{c:Localize Foreground}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                                        <TextBlock Text="{Binding Settings.ColorScheme.Foreground, Converter={StaticResource ColorToHexConverter}}" 
+                                                   VerticalAlignment="Center" FontFamily="Consolas, Monospace" Opacity="0.6"/>
+                                        <ColorPicker Color="{Binding Settings.ColorScheme.Foreground}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <TextBlock Text="{c:Localize Background}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                                        <TextBlock Text="{Binding Settings.ColorScheme.Background, Converter={StaticResource ColorToHexConverter}}" 
+                                                   VerticalAlignment="Center" FontFamily="Consolas, Monospace" Opacity="0.6"/>
+                                        <ColorPicker Color="{Binding Settings.ColorScheme.Background}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <TextBlock Text="{c:Localize SelectionColor}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                                        <TextBlock Text="{Binding Settings.ColorScheme.SelectionBackground, Converter={StaticResource ColorToHexConverter}}" 
+                                                   VerticalAlignment="Center" FontFamily="Consolas, Monospace" Opacity="0.6"/>
+                                        <ColorPicker Color="{Binding Settings.ColorScheme.SelectionBackground}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Separator Opacity="0.2"/>
+
+                                <!-- ANSI 16 Colors Grid -->
+                                <TextBlock Text="{c:Localize AnsiColors}" FontWeight="SemiBold" Opacity="0.8"/>
+                                
+                                <!-- Normal Colors (0-7) -->
+                                <TextBlock Text="{c:Localize NormalColors}" FontSize="11" Opacity="0.6"/>
+                                <WrapPanel Orientation="Horizontal">
+                                    <StackPanel Spacing="2" Margin="0,0,12,8">
+                                        <TextBlock Text="Black" FontSize="10" Opacity="0.5"/>
+                                        <ColorPicker Color="{Binding Settings.ColorScheme.Black}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                    </StackPanel>
+                                    <StackPanel Spacing="2" Margin="0,0,12,8">
+                                        <TextBlock Text="Red" FontSize="10" Opacity="0.5"/>
+                                        <ColorPicker Color="{Binding Settings.ColorScheme.Red}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                    </StackPanel>
+                                    <StackPanel Spacing="2" Margin="0,0,12,8">
+                                        <TextBlock Text="Green" FontSize="10" Opacity="0.5"/>
+                                        <ColorPicker Color="{Binding Settings.ColorScheme.Green}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                    </StackPanel>
+                                    <StackPanel Spacing="2" Margin="0,0,12,8">
+                                        <TextBlock Text="Yellow" FontSize="10" Opacity="0.5"/>
+                                        <ColorPicker Color="{Binding Settings.ColorScheme.Yellow}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                    </StackPanel>
+                                    <StackPanel Spacing="2" Margin="0,0,12,8">
+                                        <TextBlock Text="Blue" FontSize="10" Opacity="0.5"/>
+                                        <ColorPicker Color="{Binding Settings.ColorScheme.Blue}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                    </StackPanel>
+                                    <StackPanel Spacing="2" Margin="0,0,12,8">
+                                        <TextBlock Text="Magenta" FontSize="10" Opacity="0.5"/>
+                                        <ColorPicker Color="{Binding Settings.ColorScheme.Magenta}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                    </StackPanel>
+                                    <StackPanel Spacing="2" Margin="0,0,12,8">
+                                        <TextBlock Text="Cyan" FontSize="10" Opacity="0.5"/>
+                                        <ColorPicker Color="{Binding Settings.ColorScheme.Cyan}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                    </StackPanel>
+                                    <StackPanel Spacing="2" Margin="0,0,12,8">
+                                        <TextBlock Text="White" FontSize="10" Opacity="0.5"/>
+                                        <ColorPicker Color="{Binding Settings.ColorScheme.White}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                    </StackPanel>
+                                </WrapPanel>
+                                
+                                <!-- Bright Colors (8-15) -->
+                                <TextBlock Text="{c:Localize BrightColors}" FontSize="11" Opacity="0.6"/>
+                                <WrapPanel Orientation="Horizontal">
+                                    <StackPanel Spacing="2" Margin="0,0,12,8">
+                                        <TextBlock Text="Bright Black" FontSize="10" Opacity="0.5"/>
+                                        <ColorPicker Color="{Binding Settings.ColorScheme.BrightBlack}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                    </StackPanel>
+                                    <StackPanel Spacing="2" Margin="0,0,12,8">
+                                        <TextBlock Text="Bright Red" FontSize="10" Opacity="0.5"/>
+                                        <ColorPicker Color="{Binding Settings.ColorScheme.BrightRed}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                    </StackPanel>
+                                    <StackPanel Spacing="2" Margin="0,0,12,8">
+                                        <TextBlock Text="Bright Green" FontSize="10" Opacity="0.5"/>
+                                        <ColorPicker Color="{Binding Settings.ColorScheme.BrightGreen}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                    </StackPanel>
+                                    <StackPanel Spacing="2" Margin="0,0,12,8">
+                                        <TextBlock Text="Bright Yellow" FontSize="10" Opacity="0.5"/>
+                                        <ColorPicker Color="{Binding Settings.ColorScheme.BrightYellow}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                    </StackPanel>
+                                    <StackPanel Spacing="2" Margin="0,0,12,8">
+                                        <TextBlock Text="Bright Blue" FontSize="10" Opacity="0.5"/>
+                                        <ColorPicker Color="{Binding Settings.ColorScheme.BrightBlue}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                    </StackPanel>
+                                    <StackPanel Spacing="2" Margin="0,0,12,8">
+                                        <TextBlock Text="Bright Magenta" FontSize="10" Opacity="0.5"/>
+                                        <ColorPicker Color="{Binding Settings.ColorScheme.BrightMagenta}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                    </StackPanel>
+                                    <StackPanel Spacing="2" Margin="0,0,12,8">
+                                        <TextBlock Text="Bright Cyan" FontSize="10" Opacity="0.5"/>
+                                        <ColorPicker Color="{Binding Settings.ColorScheme.BrightCyan}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                    </StackPanel>
+                                    <StackPanel Spacing="2" Margin="0,0,12,8">
+                                        <TextBlock Text="Bright White" FontSize="10" Opacity="0.5"/>
+                                        <ColorPicker Color="{Binding Settings.ColorScheme.BrightWhite}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                    </StackPanel>
+                                </WrapPanel>
+                            </StackPanel>
+
+                            <Separator Opacity="0.2"/>
 
                             <Grid ColumnDefinitions="*, Auto">
                                 <TextBlock Text="{c:Localize EnableColors}" FontWeight="SemiBold" VerticalAlignment="Center"/>

@@ -9,34 +9,97 @@ namespace JxTerminal.Models;
 
 public partial class TerminalSettings : ObservableObject
 {
+    /// <summary>
+    /// The active color scheme. Contains all terminal colors including foreground, background, ANSI 16, selection, etc.
+    /// </summary>
     [ObservableProperty]
     [property: JsonIgnore]
-    private Color _backgroundColor = Color.FromRgb(30, 30, 30);
+    private TerminalColorScheme _colorScheme = (TerminalColorScheme)TerminalColorSchemes.Default.Clone();
 
-    public string BackgroundColorHex
+    /// <summary>
+    /// Name of the active color scheme for serialization. 
+    /// If it matches a built-in preset name, the preset will be loaded on deserialization.
+    /// </summary>
+    [ObservableProperty]
+    private string _colorSchemeName = "Default";
+
+    /// <summary>
+    /// Custom color scheme data for serialization. Only serialized when using a non-built-in scheme.
+    /// </summary>
+    public TerminalColorScheme? CustomColorScheme
     {
-        get => BackgroundColor.ToString();
+        get => ColorScheme.IsBuiltIn ? null : ColorScheme;
         set
         {
-            if (Color.TryParse(value, out var color))
+            if (value != null)
             {
-                BackgroundColor = color;
+                ColorScheme = value;
             }
         }
     }
 
-    [ObservableProperty]
-    [property: JsonIgnore]
-    private Color _foregroundColor = Color.FromRgb(229, 229, 229);
-
-    public string ForegroundColorHex
+    partial void OnColorSchemeChanged(TerminalColorScheme? oldValue, TerminalColorScheme newValue)
     {
-        get => ForegroundColor.ToString();
+        if (oldValue != null)
+        {
+            oldValue.PropertyChanged -= OnColorSchemePropertyChanged;
+        }
+        if (newValue != null)
+        {
+            newValue.PropertyChanged += OnColorSchemePropertyChanged;
+            ColorSchemeName = newValue.Name;
+        }
+        // Notify that derived properties have changed
+        OnPropertyChanged(nameof(BackgroundColor));
+        OnPropertyChanged(nameof(ForegroundColor));
+    }
+
+    private void OnColorSchemePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        // When any color in the scheme changes, propagate notifications
+        if (e.PropertyName == nameof(TerminalColorScheme.Background))
+            OnPropertyChanged(nameof(BackgroundColor));
+        else if (e.PropertyName == nameof(TerminalColorScheme.Foreground))
+            OnPropertyChanged(nameof(ForegroundColor));
+        
+        // Trigger a general change notification for auto-save
+        OnPropertyChanged(nameof(ColorScheme));
+    }
+
+    /// <summary>
+    /// Convenience property: gets the background color from the active color scheme.
+    /// </summary>
+    [JsonIgnore]
+    public Color BackgroundColor => ColorScheme.Background;
+
+    /// <summary>
+    /// Convenience property: gets the foreground color from the active color scheme.
+    /// </summary>
+    [JsonIgnore]
+    public Color ForegroundColor => ColorScheme.Foreground;
+
+    // Legacy hex properties kept for backward compatibility during deserialization
+    public string? BackgroundColorHex
+    {
+        get => null; // No longer serialize individually
         set
         {
-            if (Color.TryParse(value, out var color))
+            // Migration: if old settings had individual color hex, apply to scheme
+            if (value != null && Color.TryParse(value, out var color))
             {
-                ForegroundColor = color;
+                ColorScheme.Background = color;
+            }
+        }
+    }
+
+    public string? ForegroundColorHex
+    {
+        get => null;
+        set
+        {
+            if (value != null && Color.TryParse(value, out var color))
+            {
+                ColorScheme.Foreground = color;
             }
         }
     }
@@ -97,6 +160,45 @@ public partial class TerminalSettings : ObservableObject
         {
             Console.WriteLine($"Error loading background image: {ex.Message}");
             BackgroundImage = null;
+        }
+    }
+
+    /// <summary>
+    /// Apply a color scheme by name. If it matches a built-in preset, use that; otherwise keep current custom scheme.
+    /// </summary>
+    public void ApplyScheme(TerminalColorScheme scheme)
+    {
+        if (scheme.IsBuiltIn)
+        {
+            ColorScheme = (TerminalColorScheme)scheme.Clone();
+            ColorScheme.IsBuiltIn = true;
+        }
+        else
+        {
+            ColorScheme = scheme;
+        }
+    }
+
+    /// <summary>
+    /// Resolve color scheme after deserialization. 
+    /// Called after loading settings from JSON to link scheme name to actual preset.
+    /// </summary>
+    public void ResolveColorScheme()
+    {
+        // If CustomColorScheme was deserialized, it's already set
+        if (ColorScheme != null && !string.IsNullOrEmpty(ColorScheme.Name) && ColorScheme.Name != "Default")
+        {
+            // Already resolved from CustomColorScheme setter
+            return;
+        }
+
+        // Try to find a built-in preset matching the name
+        var preset = TerminalColorSchemes.GetAllPresets()
+            .Find(p => p.Name == ColorSchemeName);
+        if (preset != null)
+        {
+            ColorScheme = (TerminalColorScheme)preset.Clone();
+            ColorScheme.IsBuiltIn = true;
         }
     }
 }

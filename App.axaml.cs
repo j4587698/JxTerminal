@@ -13,6 +13,10 @@ public partial class App : Application
 {
     public override void Initialize()
     {
+        // Set default culture to use dot as decimal separator
+        System.Globalization.CultureInfo.DefaultThreadCurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+        System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = System.Globalization.CultureInfo.InvariantCulture;
+        
         AvaloniaXamlLoader.Load(this);
     }
 

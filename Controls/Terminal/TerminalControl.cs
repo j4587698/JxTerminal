@@ -1,8 +1,11 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.TextInput;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
+using JxTerminal.Models;
 using System;
 using System.Text;
 using System.Threading.Tasks;
@@ -10,6 +13,60 @@ using XTerm.Buffer;
 using XTerm.Common;
 
 namespace JxTerminal.Controls;
+
+/// <summary>
+/// TextInputMethodClient implementation for terminal IME support.
+/// </summary>
+internal class TerminalTextInputMethodClient : TextInputMethodClient
+{
+    private TerminalControl? _control;
+    private string _preeditText = "";
+    
+    public void SetControl(TerminalControl? control)
+    {
+        _control = control;
+        RaiseTextViewVisualChanged();
+    }
+    
+    public override Visual TextViewVisual => _control!;
+    
+    public override bool SupportsPreedit => true;
+    
+    public override bool SupportsSurroundingText => false;
+    
+    public override string SurroundingText => "";
+    
+    public override Rect CursorRectangle
+    {
+        get
+        {
+            if (_control == null) return default;
+            return _control.GetCursorRectangle();
+        }
+    }
+    
+    public override TextSelection Selection
+    {
+        get => new TextSelection(0, 0);
+        set { }
+    }
+    
+    public override void SetPreeditText(string? preeditText)
+    {
+        _preeditText = preeditText ?? "";
+        _control?.SetPreeditText(_preeditText);
+    }
+    
+    public override void SetPreeditText(string? preeditText, int? cursorPos)
+    {
+        SetPreeditText(preeditText);
+    }
+    
+    public void NotifyCursorRectangleChanged()
+    {
+        RaiseCursorRectangleChanged();
+    }
+}
 
 public class TerminalControl : Control
 {
@@ -24,8 +81,17 @@ public class TerminalControl : Control
     private Point? _selectionEnd;
     private bool _isSelecting;
 
-    // ANSI 256 color palette
-    private static readonly Color[] AnsiColors = CreateAnsiColorPalette();
+    // Cursor blink state
+    private DispatcherTimer? _cursorBlinkTimer;
+    private bool _cursorVisible = true;
+    private const int CursorBlinkIntervalMs = 500;
+    
+    // IME support
+    private readonly TerminalTextInputMethodClient _imClient = new();
+    private string _preeditText = "";
+
+    // ANSI 256 color palette (instance-level, updated from color scheme)
+    private Color[] _ansiColors = TerminalColorSchemes.Default.BuildAnsiPalette();
 
     public static readonly StyledProperty<string> FontFamilyProperty = 
         AvaloniaProperty.Register<TerminalControl, string>(nameof(FontFamily), "DejaVu Sans Mono, Consolas, Courier New, monospace");
@@ -102,6 +168,12 @@ public class TerminalControl : Control
     public static readonly StyledProperty<int> ScrollbackLinesProperty = 
         AvaloniaProperty.Register<TerminalControl, int>(nameof(ScrollbackLines), 1000);
 
+    public static readonly StyledProperty<TerminalColorScheme?> ColorSchemeProperty = 
+        AvaloniaProperty.Register<TerminalControl, TerminalColorScheme?>(nameof(ColorScheme), null);
+
+    public static readonly StyledProperty<Color> SelectionBackgroundProperty = 
+        AvaloniaProperty.Register<TerminalControl, Color>(nameof(SelectionBackground), Color.FromArgb(77, 255, 255, 255));
+
     public Color BackgroundColor
     {
         get => GetValue(BackgroundColorProperty);
@@ -138,10 +210,35 @@ public class TerminalControl : Control
         set => SetValue(ScrollbackLinesProperty, value);
     }
 
+    public TerminalColorScheme? ColorScheme
+    {
+        get => GetValue(ColorSchemeProperty);
+        set => SetValue(ColorSchemeProperty, value);
+    }
+
+    public Color SelectionBackground
+    {
+        get => GetValue(SelectionBackgroundProperty);
+        set => SetValue(SelectionBackgroundProperty, value);
+    }
+
+    static TerminalControl()
+    {
+        // Register IME handler
+        TextInputMethodClientRequestedEvent.AddClassHandler<TerminalControl>((terminal, e) =>
+        {
+            e.Client = terminal._imClient;
+        });
+    }
+    
     public TerminalControl()
     {
         Focusable = true;
         UpdateTypeface();
+        InitializeCursorBlinkTimer();
+        
+        // Initialize IME client
+        _imClient.SetControl(this);
 
         // Context Menu
         var contextMenu = new ContextMenu();
@@ -156,55 +253,68 @@ public class TerminalControl : Control
         this.ContextMenu = contextMenu;
     }
 
-    /// <summary>
-    /// Creates the standard ANSI 256-color palette.
-    /// </summary>
-    private static Color[] CreateAnsiColorPalette()
+    private void InitializeCursorBlinkTimer()
     {
-        var palette = new Color[256];
-
-        // Standard 16 colors (0-15)
-        palette[0] = Color.FromRgb(0, 0, 0);       // Black
-        palette[1] = Color.FromRgb(205, 0, 0);     // Red
-        palette[2] = Color.FromRgb(0, 205, 0);     // Green
-        palette[3] = Color.FromRgb(205, 205, 0);   // Yellow
-        palette[4] = Color.FromRgb(0, 0, 238);     // Blue
-        palette[5] = Color.FromRgb(205, 0, 205);   // Magenta
-        palette[6] = Color.FromRgb(0, 205, 205);   // Cyan
-        palette[7] = Color.FromRgb(229, 229, 229); // White
-        palette[8] = Color.FromRgb(127, 127, 127); // Bright Black (Gray)
-        palette[9] = Color.FromRgb(255, 0, 0);     // Bright Red
-        palette[10] = Color.FromRgb(0, 255, 0);    // Bright Green
-        palette[11] = Color.FromRgb(255, 255, 0);  // Bright Yellow
-        palette[12] = Color.FromRgb(92, 92, 255);  // Bright Blue
-        palette[13] = Color.FromRgb(255, 0, 255);  // Bright Magenta
-        palette[14] = Color.FromRgb(0, 255, 255);  // Bright Cyan
-        palette[15] = Color.FromRgb(255, 255, 255);// Bright White
-
-        // 216 color cube (16-231): 6x6x6 cube
-        for (int r = 0; r < 6; r++)
+        _cursorBlinkTimer = new DispatcherTimer
         {
-            for (int g = 0; g < 6; g++)
-            {
-                for (int b = 0; b < 6; b++)
-                {
-                    int index = 16 + (36 * r) + (6 * g) + b;
-                    byte rv = (byte)(r == 0 ? 0 : 55 + r * 40);
-                    byte gv = (byte)(g == 0 ? 0 : 55 + g * 40);
-                    byte bv = (byte)(b == 0 ? 0 : 55 + b * 40);
-                    palette[index] = Color.FromRgb(rv, gv, bv);
-                }
-            }
-        }
-
-        // Grayscale (232-255): 24 shades
-        for (int i = 0; i < 24; i++)
+            Interval = TimeSpan.FromMilliseconds(CursorBlinkIntervalMs)
+        };
+        _cursorBlinkTimer.Tick += (s, e) =>
         {
-            byte v = (byte)(8 + i * 10);
-            palette[232 + i] = Color.FromRgb(v, v, v);
-        }
+            _cursorVisible = !_cursorVisible;
+            InvalidateVisual();
+        };
+    }
 
-        return palette;
+    protected override void OnGotFocus(GotFocusEventArgs e)
+    {
+        base.OnGotFocus(e);
+        // Reset cursor to visible and start blinking
+        _cursorVisible = true;
+        _cursorBlinkTimer?.Start();
+        
+        // Enable IME
+        _imClient.SetControl(this);
+        
+        InvalidateVisual();
+    }
+
+    protected override void OnLostFocus(RoutedEventArgs e)
+    {
+        base.OnLostFocus(e);
+        // Stop blinking and keep cursor visible (but as hollow)
+        _cursorBlinkTimer?.Stop();
+        _cursorVisible = true;
+        
+        // Clear preedit text and disable IME
+        _preeditText = "";
+        _imClient.SetControl(null);
+        
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Handles property changes within the color scheme (e.g. individual color changed).
+    /// </summary>
+    private void OnColorSchemePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        UpdateAnsiPalette();
+        Dispatcher.UIThread.InvokeAsync(InvalidateVisual);
+    }
+
+    /// <summary>
+    /// Rebuilds the ANSI color palette from the current color scheme.
+    /// </summary>
+    private void UpdateAnsiPalette()
+    {
+        if (ColorScheme != null)
+        {
+            _ansiColors = ColorScheme.BuildAnsiPalette();
+        }
+        else
+        {
+            _ansiColors = TerminalColorSchemes.Default.BuildAnsiPalette();
+        }
     }
 
     private void OnScreenUpdated()
@@ -258,8 +368,22 @@ public class TerminalControl : Control
                  change.Property == ForegroundColorProperty ||
                  change.Property == BackgroundImageProperty ||
                  change.Property == BackgroundImageOpacityProperty ||
-                 change.Property == EnableColorsProperty)
+                 change.Property == EnableColorsProperty ||
+                 change.Property == SelectionBackgroundProperty)
         {
+            InvalidateVisual();
+        }
+        else if (change.Property == ColorSchemeProperty)
+        {
+            if (change.OldValue is TerminalColorScheme oldScheme)
+            {
+                oldScheme.PropertyChanged -= OnColorSchemePropertyChanged;
+            }
+            if (change.NewValue is TerminalColorScheme newScheme)
+            {
+                newScheme.PropertyChanged += OnColorSchemePropertyChanged;
+            }
+            UpdateAnsiPalette();
             InvalidateVisual();
         }
     }
@@ -293,6 +417,51 @@ public class TerminalControl : Control
         
         _charWidth = formatted.WidthIncludingTrailingWhitespace;
         _charHeight = formatted.Height;
+    }
+
+    /// <summary>
+    /// Calculates the vertical offset to center terminal content within the control.
+    /// </summary>
+    private double GetVerticalOffset()
+    {
+        var terminal = Controller?.Terminal;
+        if (terminal == null || _charHeight <= 0) return 0;
+        
+        double usedHeight = terminal.Rows * _charHeight;
+        return (Bounds.Height - usedHeight) / 2;
+    }
+
+    /// <summary>
+    /// Gets the cursor rectangle for IME positioning.
+    /// </summary>
+    internal Rect GetCursorRectangle()
+    {
+        var terminal = Controller?.Terminal;
+        if (terminal?.Buffer == null || _charWidth <= 0 || _charHeight <= 0)
+            return default;
+        
+        var buffer = terminal.Buffer;
+        int absoluteCursorY = buffer.YBase + buffer.Y;
+        int viewportY = buffer.YDisp;
+        int screenY = absoluteCursorY - viewportY;
+        
+        if (screenY < 0 || screenY >= terminal.Rows)
+            return default;
+        
+        double verticalOffset = GetVerticalOffset();
+        double cursorX = buffer.X * _charWidth;
+        double cursorY = verticalOffset + screenY * _charHeight;
+        
+        return new Rect(cursorX, cursorY, _charWidth, _charHeight);
+    }
+    
+    /// <summary>
+    /// Sets the preedit text for IME composition.
+    /// </summary>
+    internal void SetPreeditText(string preeditText)
+    {
+        _preeditText = preeditText;
+        InvalidateVisual();
     }
 
     protected override void OnSizeChanged(SizeChangedEventArgs e)
@@ -341,7 +510,7 @@ public class TerminalControl : Control
         {
             if (isBackground && colorValue == 0) return defaultColor;
             if (isBold && !isBackground && colorValue >= 0 && colorValue < 8) colorValue += 8;
-            if (colorValue >= 0 && colorValue < 256) return AnsiColors[colorValue];
+            if (colorValue >= 0 && colorValue < 256) return _ansiColors[colorValue];
         }
         else if (colorMode == (int)ColorMode.RGB)
         {
@@ -355,7 +524,7 @@ public class TerminalControl : Control
         {
              if (isBackground && colorValue == 0) return defaultColor;
              if (isBold && !isBackground && colorValue >= 0 && colorValue < 8) colorValue += 8;
-             return AnsiColors[colorValue];
+             return _ansiColors[colorValue];
         }
 
         return defaultColor;
@@ -377,80 +546,136 @@ public class TerminalControl : Control
         if (terminal == null) return;
 
         var buffer = terminal.Buffer;
-
-        for (int row = 0; row < terminal.Rows; row++)
+        double verticalOffset = GetVerticalOffset();
+        double terminalHeight = terminal.Rows * _charHeight;
+        
+        // Create clip region for terminal content area
+        var clipRect = new Rect(0, verticalOffset, Bounds.Width, terminalHeight);
+        using (context.PushClip(clipRect))
         {
-            int lineIndex = buffer.YDisp + row;
-            if (lineIndex >= buffer.Lines.Length) break;
-
-            var bufferLine = buffer.Lines[lineIndex];
-            if (bufferLine is not BufferLine bl) continue;
-
-            double yPos = row * _charHeight;
-
-            for (int col = 0; col < terminal.Cols && col < bl.Length; col++)
+            for (int row = 0; row < terminal.Rows; row++)
             {
-                var cell = bl[col];
-                if (cell.Width == 0) continue;
+                int lineIndex = buffer.YDisp + row;
+                if (lineIndex >= buffer.Lines.Length) break;
 
-                var attrs = cell.Attributes;
-                bool isBold = attrs.IsBold();
-                bool isInverse = attrs.IsInverse();
-                
-                int fgColorValue = attrs.GetFgColor();
-                int bgColorValue = attrs.GetBgColor();
-                int fgColorMode = attrs.GetFgColorMode();
-                int bgColorMode = attrs.GetBgColorMode();
+                var bufferLine = buffer.Lines[lineIndex];
+                if (bufferLine is not BufferLine bl) continue;
 
-                Color fgColor = GetColor(fgColorValue, fgColorMode, ForegroundColor, isBold, isBackground: false);
-                Color bgColor = GetColor(bgColorValue, bgColorMode, BackgroundColor, isBold: false, isBackground: true);
+                double yPos = verticalOffset + row * _charHeight;
 
-                if (isInverse) (fgColor, bgColor) = (bgColor, fgColor);
-
-                double xPos = col * _charWidth;
-                double width = cell.Width * _charWidth;
-
-                if (bgColor != BackgroundColor)
+                for (int col = 0; col < terminal.Cols && col < bl.Length; col++)
                 {
-                    context.FillRectangle(new SolidColorBrush(bgColor), new Rect(xPos, yPos, width, _charHeight));
-                }
+                    var cell = bl[col];
+                    if (cell.Width == 0) continue;
 
-                // Draw text
-                string content = cell.Content;
-                if (!string.IsNullOrEmpty(content))
-                {
-                    var typeface = isBold ? new Typeface(_typeface.FontFamily, FontStyle.Normal, FontWeight.Bold) : _typeface;
-                    var fgBrush = new SolidColorBrush(fgColor);
+                    var attrs = cell.Attributes;
+                    bool isBold = attrs.IsBold();
+                    bool isInverse = attrs.IsInverse();
                     
-                    var formatted = new FormattedText(content, System.Globalization.CultureInfo.CurrentCulture,
-                        FlowDirection.LeftToRight, typeface, FontSize, fgBrush);
+                    int fgColorValue = attrs.GetFgColor();
+                    int bgColorValue = attrs.GetBgColor();
+                    int fgColorMode = attrs.GetFgColorMode();
+                    int bgColorMode = attrs.GetBgColorMode();
+
+                    Color fgColor = GetColor(fgColorValue, fgColorMode, ForegroundColor, isBold, isBackground: false);
+                    Color bgColor = GetColor(bgColorValue, bgColorMode, BackgroundColor, isBold: false, isBackground: true);
+
+                    if (isInverse) (fgColor, bgColor) = (bgColor, fgColor);
+
+                    double xPos = col * _charWidth;
+                    double width = cell.Width * _charWidth;
+
+                    if (bgColor != BackgroundColor)
+                    {
+                        context.FillRectangle(new SolidColorBrush(bgColor), new Rect(xPos, yPos, width, _charHeight));
+                    }
+
+                    // Draw text
+                    string content = cell.Content;
+                    if (!string.IsNullOrEmpty(content))
+                    {
+                        var typeface = isBold ? new Typeface(_typeface.FontFamily, FontStyle.Normal, FontWeight.Bold) : _typeface;
+                        var fgBrush = new SolidColorBrush(fgColor);
                         
-                    // Vertically center content within the cell
-                    double verticalOffset = (_charHeight - formatted.Height) / 2;
+                        var formatted = new FormattedText(content, System.Globalization.CultureInfo.CurrentCulture,
+                            FlowDirection.LeftToRight, typeface, FontSize, fgBrush);
+                            
+                        // Vertically center content within the cell
+                        double textVerticalOffset = (_charHeight - formatted.Height) / 2;
+                        
+                        context.DrawText(formatted, new Point(xPos, yPos + textVerticalOffset));
+                    }
+                }
+            }
+
+            if (_selectionStart.HasValue && _selectionEnd.HasValue)
+            {
+                RenderSelection(context, buffer, verticalOffset);
+            }
+
+            int absoluteCursorY = buffer.YBase + buffer.Y;
+            int viewportY = buffer.YDisp;
+            int screenY = absoluteCursorY - viewportY;
+
+            if (screenY >= 0 && screenY < terminal.Rows)
+            {
+                double cursorX = buffer.X * _charWidth;
+                double rowY = verticalOffset + screenY * _charHeight;
+                var cursorColor = ForegroundColor;
+                
+                // Draw preedit text (IME composition text) if present
+                if (!string.IsNullOrEmpty(_preeditText))
+                {
+                    // Draw preedit background
+                    var preeditFormatted = new FormattedText(_preeditText, System.Globalization.CultureInfo.CurrentCulture,
+                        FlowDirection.LeftToRight, _typeface, FontSize, new SolidColorBrush(ForegroundColor));
+                    double preeditWidth = preeditFormatted.WidthIncludingTrailingWhitespace;
+                    double textVerticalOffset = (_charHeight - preeditFormatted.Height) / 2;
                     
-                    context.DrawText(formatted, new Point(xPos, yPos + verticalOffset));
+                    // Background for preedit text
+                    context.FillRectangle(new SolidColorBrush(BackgroundColor), 
+                        new Rect(cursorX, rowY, preeditWidth, _charHeight));
+                    
+                    // Draw underline to indicate composition
+                    var underlineY = rowY + _charHeight - 2;
+                    var pen = new Pen(new SolidColorBrush(ForegroundColor), 1);
+                    context.DrawLine(pen, new Point(cursorX, underlineY), new Point(cursorX + preeditWidth, underlineY));
+                    
+                    // Draw preedit text
+                    context.DrawText(preeditFormatted, new Point(cursorX, rowY + textVerticalOffset));
+                    
+                    // Move cursor position after preedit text for display
+                    cursorX += preeditWidth;
+                }
+                
+                // Calculate cursor height and position to match text rendering
+                // The cursor should match the actual text height (FontSize), not the line height (_charHeight)
+                double cursorHeight = FontSize;
+                // Center the cursor vertically within the cell, same as text
+                double cursorVerticalOffset = (_charHeight - cursorHeight) / 2;
+                double cursorY = rowY + cursorVerticalOffset;
+                
+                var cursorRect = new Rect(cursorX, cursorY, _charWidth, cursorHeight);
+
+                if (IsFocused)
+                {
+                    // Focused: blinking solid cursor
+                    if (_cursorVisible)
+                    {
+                        context.FillRectangle(new SolidColorBrush(cursorColor), cursorRect);
+                    }
+                }
+                else
+                {
+                    // Not focused: static hollow cursor (outline only)
+                    var pen = new Pen(new SolidColorBrush(cursorColor), 1.5);
+                    context.DrawRectangle(null, pen, cursorRect);
                 }
             }
         }
-
-        if (_selectionStart.HasValue && _selectionEnd.HasValue)
-        {
-            RenderSelection(context, buffer);
-        }
-
-        int absoluteCursorY = buffer.YBase + buffer.Y;
-        int viewportY = buffer.YDisp;
-        int screenY = absoluteCursorY - viewportY;
-
-        if (screenY >= 0 && screenY < terminal.Rows)
-        {
-            double cursorX = buffer.X * _charWidth;
-            double cursorY = screenY * _charHeight;
-            context.FillRectangle(new SolidColorBrush(Color.FromRgb(0, 255, 0)), new Rect(cursorX, cursorY, _charWidth, _charHeight));
-        }
     }
 
-    private void RenderSelection(DrawingContext context, TerminalBuffer buffer)
+    private void RenderSelection(DrawingContext context, TerminalBuffer buffer, double verticalOffset)
     {
         var terminal = Controller?.Terminal;
         if (terminal == null) return;
@@ -489,12 +714,12 @@ public class TerminalControl : Control
             if (c1 >= c2) continue;
 
             double selX = c1 * _charWidth;
-            double selY = (r - buffer.YDisp) * _charHeight;
+            double selY = verticalOffset + (r - buffer.YDisp) * _charHeight;
             double w = (c2 - c1) * _charWidth;
 
             if (selY >= 0 && selY < Bounds.Height && w > 0)
             {
-                context.FillRectangle(new SolidColorBrush(Colors.White, 0.3), new Rect(selX, selY, w, _charHeight));
+                context.FillRectangle(new SolidColorBrush(SelectionBackground), new Rect(selX, selY, w, _charHeight));
             }
         }
     }
@@ -630,8 +855,10 @@ public class TerminalControl : Control
         if (terminal?.Buffer == null) return new Point(0, 0);
 
         var buffer = terminal.Buffer;
+        double verticalOffset = GetVerticalOffset();
+        
         int col = (int)(p.X / _charWidth);
-        int row = (int)(p.Y / _charHeight) + buffer.YDisp;
+        int row = (int)((p.Y - verticalOffset) / _charHeight) + buffer.YDisp;
 
         col = Math.Max(0, Math.Min(col, terminal.Cols - 1));
         row = Math.Max(0, Math.Min(row, buffer.Lines.Length - 1));

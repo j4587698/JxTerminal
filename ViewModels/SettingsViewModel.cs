@@ -10,6 +10,7 @@ using JxTerminal.Views;
 using SukiUI;
 using SukiUI.Dialogs;
 using SukiUI.Models;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 
@@ -34,9 +35,23 @@ public partial class SettingsViewModel : ViewModelBase
     public TerminalSettings Settings { get; }
     private readonly ISukiDialogManager _dialogManager;
 
+    /// <summary>
+    /// Guard flag to prevent re-entrant updates when SukiUI theme changes trigger control rebuilds.
+    /// </summary>
+    private bool _isUpdating;
+
     public ObservableCollection<LocalizedWrapper<SukiColorTheme>> AvailableColors { get; }
     public ObservableCollection<LocalizedWrapper<ThemeVariant>> AvailableThemes { get; }
+    public ObservableCollection<LocalizedWrapper<string>> AvailableLanguages { get; }
     public ObservableCollection<string> AvailableFonts { get; }
+
+    /// <summary>
+    /// All available color schemes (built-in presets + user custom schemes).
+    /// </summary>
+    public ObservableCollection<TerminalColorScheme> AvailableColorSchemes { get; }
+
+    [ObservableProperty]
+    private TerminalColorScheme? _selectedColorScheme;
 
     [ObservableProperty]
     private LocalizedWrapper<SukiColorTheme> _selectedColor;
@@ -45,7 +60,16 @@ public partial class SettingsViewModel : ViewModelBase
     private LocalizedWrapper<ThemeVariant> _selectedBaseTheme;
 
     [ObservableProperty]
+    private LocalizedWrapper<string> _selectedLanguage;
+
+    [ObservableProperty]
     private string _selectedSection = "General"; // "General" or "Terminal"
+
+    /// <summary>
+    /// Whether the current color scheme is editable (user-defined, not built-in).
+    /// </summary>
+    [ObservableProperty]
+    private bool _isSchemeEditable;
 
     public SettingsViewModel(TerminalSettings settings, ISukiDialogManager dialogManager)
     {
@@ -54,6 +78,17 @@ public partial class SettingsViewModel : ViewModelBase
         
         var theme = SukiTheme.GetInstance();
         
+        // Wrap Languages
+        AvailableLanguages = new ObservableCollection<LocalizedWrapper<string>>
+        {
+            new LocalizedWrapper<string>("en-US", "English"),
+            new LocalizedWrapper<string>("zh-CN", "Chinese")
+        };
+        
+        var currentCulture = LocalizationService.Instance.CultureCode;
+        _selectedLanguage = AvailableLanguages.FirstOrDefault(l => l.Value == currentCulture)
+                            ?? AvailableLanguages[0];
+
         // Wrap Colors
         AvailableColors = new ObservableCollection<LocalizedWrapper<SukiColorTheme>>(
             theme.ColorThemes.Select(c => new LocalizedWrapper<SukiColorTheme>(c, c.DisplayName)));
@@ -77,31 +112,121 @@ public partial class SettingsViewModel : ViewModelBase
         // Ensure current font is in the list (or add it if it's a fallback/custom string)
         if (!AvailableFonts.Contains(Settings.FontFamily))
         {
-             // If the current setting is a list (e.g. "Consolas, Monospace"), we might just want to keep it as is, 
-             // but ComboBox selection might fail. 
-             // Ideally we pick the first match or add it. 
-             // For now, let's add it so it shows up.
              AvailableFonts.Insert(0, Settings.FontFamily);
         }
+
+        // Color Schemes
+        AvailableColorSchemes = new ObservableCollection<TerminalColorScheme>(
+            TerminalColorSchemes.GetAllPresets());
+
+        // If current settings have a custom (non-built-in) scheme, add it to the list
+        if (Settings.ColorScheme != null && !Settings.ColorScheme.IsBuiltIn)
+        {
+            AvailableColorSchemes.Add(Settings.ColorScheme);
+        }
+
+        // Select the current scheme
+        _selectedColorScheme = AvailableColorSchemes.FirstOrDefault(s => s.Name == Settings.ColorSchemeName)
+                               ?? AvailableColorSchemes[0];
+        _isSchemeEditable = _selectedColorScheme != null && !_selectedColorScheme.IsBuiltIn;
 
         System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] Settings HashCode: {Settings.GetHashCode()}");
     }
 
+    partial void OnSelectedColorSchemeChanged(TerminalColorScheme? value)
+    {
+        if (_isUpdating || value == null) return;
+        
+        Settings.ApplyScheme(value);
+        IsSchemeEditable = !value.IsBuiltIn;
+    }
 
+    partial void OnSelectedLanguageChanged(LocalizedWrapper<string> value)
+    {
+        if (_isUpdating || value == null) return;
+
+        _isUpdating = true;
+        try
+        {
+            LocalizationService.Instance.SetLanguage(value.Value);
+        }
+        finally
+        {
+            _isUpdating = false;
+        }
+    }
 
     partial void OnSelectedColorChanged(LocalizedWrapper<SukiColorTheme> value)
     {
-        if (value != null)
+        if (_isUpdating || value == null) return;
+
+        _isUpdating = true;
+        try
+        {
             SukiTheme.GetInstance().ChangeColorTheme(value.Value);
+        }
+        finally
+        {
+            _isUpdating = false;
+        }
     }
 
     partial void OnSelectedBaseThemeChanged(LocalizedWrapper<ThemeVariant> value)
     {
-        if (value != null)
+        if (_isUpdating || value == null) return;
+
+        _isUpdating = true;
+        try
         {
-            // Application.Current!.RequestedThemeVariant = value.Value;
-            SukiTheme.GetInstance().ChangeBaseTheme(value.Value);
+            var theme = SukiTheme.GetInstance();
+            var currentColor = theme.ActiveColorTheme;
+            theme.ChangeBaseTheme(value.Value);
+            // SukiUI's ChangeBaseTheme resets ActiveColorTheme to the default ThemeColor (Blue).
+            // Re-apply the user's selected color theme to preserve it.
+            if (currentColor != null)
+                theme.ChangeColorTheme(currentColor);
         }
+        finally
+        {
+            _isUpdating = false;
+        }
+    }
+
+    /// <summary>
+    /// Duplicate the currently selected scheme as a custom editable scheme.
+    /// </summary>
+    [RelayCommand]
+    private void DuplicateScheme()
+    {
+        if (SelectedColorScheme == null) return;
+
+        var clone = (TerminalColorScheme)SelectedColorScheme.Clone();
+        clone.Name = SelectedColorScheme.Name + " (Custom)";
+        clone.IsBuiltIn = false;
+
+        // Ensure unique name
+        int suffix = 1;
+        string baseName = clone.Name;
+        while (AvailableColorSchemes.Any(s => s.Name == clone.Name))
+        {
+            clone.Name = $"{baseName} {suffix++}";
+        }
+
+        AvailableColorSchemes.Add(clone);
+        SelectedColorScheme = clone;
+    }
+
+    /// <summary>
+    /// Delete the currently selected custom scheme (only non-built-in).
+    /// </summary>
+    [RelayCommand]
+    private void DeleteScheme()
+    {
+        if (SelectedColorScheme == null || SelectedColorScheme.IsBuiltIn) return;
+
+        var toRemove = SelectedColorScheme;
+        SelectedColorScheme = AvailableColorSchemes.FirstOrDefault(s => s.IsBuiltIn) ?? AvailableColorSchemes[0];
+        AvailableColorSchemes.Remove(toRemove);
     }
 
     [RelayCommand]
@@ -116,10 +241,7 @@ public partial class SettingsViewModel : ViewModelBase
         {
              vm.RequestClose -= OnClose;
              
-             // If user clicked confirm (indicated by the fact that we are in OnClose via event)
-             // but selectedFont is null/empty, we can either keep current or reset.
-             // The user specifically asked to go back to default if nothing is selected.
-             if (selectedFont != null) // selectedFont is null on Cancel, but empty string could mean "nothing selected"
+             if (selectedFont != null)
              {
                  if (string.IsNullOrWhiteSpace(selectedFont))
                  {
@@ -146,4 +268,3 @@ public partial class SettingsViewModel : ViewModelBase
         dialog = builder.Dialog;
     }
 }
-
