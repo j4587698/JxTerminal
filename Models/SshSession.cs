@@ -115,7 +115,7 @@ public class SshSession : ITerminalSession
                     var cmd = _sshClient.CreateCommand(command);
                     return cmd.Execute();
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     // Log or handle? For now return empty or error
                     return string.Empty;

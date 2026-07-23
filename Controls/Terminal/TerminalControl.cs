@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Input.TextInput;
 using Avalonia.Interactivity;
 using Avalonia.Media;
@@ -266,7 +267,7 @@ public class TerminalControl : Control
         };
     }
 
-    protected override void OnGotFocus(GotFocusEventArgs e)
+    protected override void OnGotFocus(FocusChangedEventArgs e)
     {
         base.OnGotFocus(e);
         // Reset cursor to visible and start blinking
@@ -279,7 +280,7 @@ public class TerminalControl : Control
         InvalidateVisual();
     }
 
-    protected override void OnLostFocus(RoutedEventArgs e)
+    protected override void OnLostFocus(FocusChangedEventArgs e)
     {
         base.OnLostFocus(e);
         // Stop blinking and keep cursor visible (but as hollow)
@@ -873,24 +874,28 @@ public class TerminalControl : Control
         if (!string.IsNullOrEmpty(text))
         {
             var topLevel = TopLevel.GetTopLevel(this);
+#pragma warning disable CS0618 // IClipboard is obsolete in Avalonia 11 but has no replacement yet
             if (topLevel?.Clipboard != null)
             {
                 await topLevel.Clipboard.SetTextAsync(text);
             }
+#pragma warning restore CS0618
         }
     }
 
     private async Task PasteText()
     {
         var topLevel = TopLevel.GetTopLevel(this);
+#pragma warning disable CS0618 // IClipboard is obsolete in Avalonia 11 but has no replacement yet
         if (topLevel?.Clipboard != null)
         {
-            var text = await topLevel.Clipboard.GetTextAsync();
+            var text = await topLevel.Clipboard.TryGetTextAsync();
             if (!string.IsNullOrEmpty(text) && Controller != null)
             {
                 Controller.SendInput(text);
             }
         }
+#pragma warning restore CS0618
     }
 
     private string GetSelectedText()

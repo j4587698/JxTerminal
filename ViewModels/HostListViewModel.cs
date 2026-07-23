@@ -10,8 +10,6 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using JxTerminal.Models;
 using JxTerminal.Services;
-using SukiUI.Controls;
-using SukiUI.Dialogs;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using JxTerminal.Views;
@@ -217,28 +215,18 @@ public partial class HostListViewModel : ViewModelBase
     {
         var vm = new AddGroupViewModel();
         var view = new AddGroupView() { DataContext = vm };
+        view.Margin = new Thickness(24);
         var tcs = new TaskCompletionSource<string?>();
-
-        ISukiDialog? dialog = null;
 
         void OnClose(object? sender, object? result)
         {
              vm.RequestClose -= OnClose;
              tcs.TrySetResult(result as string);
-             if (dialog != null) _mainViewModel.DialogManager.TryDismissDialog(dialog);
+             _mainViewModel.CloseDialog();
         }
         vm.RequestClose += OnClose;
 
-        var builder = _mainViewModel.DialogManager.CreateDialog();
-        builder.SetContent(view);
-        builder.SetCanDismissWithBackgroundClick(true);
-        builder.SetOnDismissed(_ => {
-             vm.RequestClose -= OnClose;
-             tcs.TrySetResult(null);
-        });
-
-        builder.TryShow();
-        dialog = builder.Dialog;
+        _mainViewModel.ShowDialog(view);
 
         var resultName = await tcs.Task;
 
@@ -288,28 +276,18 @@ public partial class HostListViewModel : ViewModelBase
             : new AddConnectionViewModel(groupNames);
 
         var view = new AddConnectionView() { DataContext = vm };
+        view.Margin = new Thickness(24);
         var tcs = new TaskCompletionSource<SavedConnection?>();
-
-        ISukiDialog? dialog = null;
 
         void OnClose(object? sender, object? result)
         {
              vm.RequestClose -= OnClose;
              tcs.TrySetResult(result as SavedConnection);
-             if (dialog != null) _mainViewModel.DialogManager.TryDismissDialog(dialog);
+             _mainViewModel.CloseDialog();
         }
         vm.RequestClose += OnClose;
 
-        var builder = _mainViewModel.DialogManager.CreateDialog();
-        builder.SetContent(view);
-        builder.SetCanDismissWithBackgroundClick(true);
-        builder.SetOnDismissed(_ => {
-             vm.RequestClose -= OnClose;
-             tcs.TrySetResult(null);
-        });
-
-        builder.TryShow();
-        dialog = builder.Dialog;
+        _mainViewModel.ShowDialog(view);
 
         var connection = await tcs.Task;
 

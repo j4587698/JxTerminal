@@ -7,9 +7,7 @@ using CommunityToolkit.Mvvm.Input;
 using JxTerminal.Models;
 using JxTerminal.Services;
 using JxTerminal.Views;
-using SukiUI;
-using SukiUI.Dialogs;
-using SukiUI.Models;
+using LuminaUI.Theming;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -30,17 +28,33 @@ public class LocalizedWrapper<T> : ObservableObject
     }
 }
 
+public class AccentColorOption : ObservableObject
+{
+    public string Key { get; }
+    public string Hex { get; }
+    public Color Color { get; }
+    public string DisplayName => LocalizationService.Instance[Key];
+
+    public AccentColorOption(string key, string hex)
+    {
+        Key = key;
+        Hex = hex;
+        Color = Color.Parse(hex);
+        LocalizationService.Instance.PropertyChanged += (_, _) => OnPropertyChanged(nameof(DisplayName));
+    }
+}
+
 public partial class SettingsViewModel : ViewModelBase
 {
     public TerminalSettings Settings { get; }
-    private readonly ISukiDialogManager _dialogManager;
+    private readonly MainWindowViewModel _mainViewModel;
 
     /// <summary>
-    /// Guard flag to prevent re-entrant updates when SukiUI theme changes trigger control rebuilds.
+    /// Guard flag to prevent re-entrant updates when theme changes trigger control rebuilds.
     /// </summary>
     private bool _isUpdating;
 
-    public ObservableCollection<LocalizedWrapper<SukiColorTheme>> AvailableColors { get; }
+    public ObservableCollection<AccentColorOption> AvailableColors { get; }
     public ObservableCollection<LocalizedWrapper<ThemeVariant>> AvailableThemes { get; }
     public ObservableCollection<LocalizedWrapper<string>> AvailableLanguages { get; }
     public ObservableCollection<string> AvailableFonts { get; }
@@ -54,7 +68,7 @@ public partial class SettingsViewModel : ViewModelBase
     private TerminalColorScheme? _selectedColorScheme;
 
     [ObservableProperty]
-    private LocalizedWrapper<SukiColorTheme> _selectedColor;
+    private AccentColorOption _selectedColor;
 
     [ObservableProperty]
     private LocalizedWrapper<ThemeVariant> _selectedBaseTheme;
@@ -71,12 +85,10 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isSchemeEditable;
 
-    public SettingsViewModel(TerminalSettings settings, ISukiDialogManager dialogManager)
+    public SettingsViewModel(TerminalSettings settings, MainWindowViewModel mainViewModel)
     {
         Settings = settings;
-        _dialogManager = dialogManager;
-        
-        var theme = SukiTheme.GetInstance();
+        _mainViewModel = mainViewModel;
         
         // Wrap Languages
         AvailableLanguages = new ObservableCollection<LocalizedWrapper<string>>
@@ -90,10 +102,18 @@ public partial class SettingsViewModel : ViewModelBase
                             ?? AvailableLanguages[0];
 
         // Wrap Colors
-        AvailableColors = new ObservableCollection<LocalizedWrapper<SukiColorTheme>>(
-            theme.ColorThemes.Select(c => new LocalizedWrapper<SukiColorTheme>(c, c.DisplayName)));
-            
-        _selectedColor = AvailableColors.FirstOrDefault(c => c.Value.DisplayName == theme.ActiveColorTheme?.DisplayName) 
+        AvailableColors = new ObservableCollection<AccentColorOption>
+        {
+            new("Blue", "#2563EB"),
+            new("Green", "#16A34A"),
+            new("Orange", "#F97316"),
+            new("Red", "#E11D48"),
+            new("Purple", "#7C3AED"),
+            new("Cyan", "#0891B2")
+        };
+
+        var currentAccent = LuminaThemeManager.ToHex(LuminaThemeManager.CurrentAccentColor);
+        _selectedColor = AvailableColors.FirstOrDefault(c => c.Hex.Equals(currentAccent, System.StringComparison.OrdinalIgnoreCase))
                          ?? AvailableColors[0];
 
         // Wrap Themes
@@ -103,7 +123,7 @@ public partial class SettingsViewModel : ViewModelBase
             new LocalizedWrapper<ThemeVariant>(ThemeVariant.Light, "Light")
         };
         
-        _selectedBaseTheme = AvailableThemes.FirstOrDefault(t => t.Value == theme.ActiveBaseTheme) 
+        _selectedBaseTheme = AvailableThemes.FirstOrDefault(t => t.Value == Application.Current?.RequestedThemeVariant)
                              ?? AvailableThemes[0];
 
         // Load System Fonts
@@ -156,14 +176,14 @@ public partial class SettingsViewModel : ViewModelBase
         }
     }
 
-    partial void OnSelectedColorChanged(LocalizedWrapper<SukiColorTheme> value)
+    partial void OnSelectedColorChanged(AccentColorOption value)
     {
         if (_isUpdating || value == null) return;
 
         _isUpdating = true;
         try
         {
-            SukiTheme.GetInstance().ChangeColorTheme(value.Value);
+            LuminaThemeManager.TrySetAccentColor(value.Hex);
         }
         finally
         {
@@ -178,13 +198,10 @@ public partial class SettingsViewModel : ViewModelBase
         _isUpdating = true;
         try
         {
-            var theme = SukiTheme.GetInstance();
-            var currentColor = theme.ActiveColorTheme;
-            theme.ChangeBaseTheme(value.Value);
-            // SukiUI's ChangeBaseTheme resets ActiveColorTheme to the default ThemeColor (Blue).
-            // Re-apply the user's selected color theme to preserve it.
-            if (currentColor != null)
-                theme.ChangeColorTheme(currentColor);
+            Application.Current!.RequestedThemeVariant = value.Value;
+            LuminaThemeManager.SetThemeMode(value.Value == ThemeVariant.Light
+                ? LuminaThemeMode.Light
+                : LuminaThemeMode.Dark);
         }
         finally
         {
@@ -234,8 +251,7 @@ public partial class SettingsViewModel : ViewModelBase
     {
         var vm = new FontPickerViewModel(AvailableFonts, Settings.FontFamily);
         var view = new FontPickerView() { DataContext = vm };
-
-        ISukiDialog? dialog = null;
+        view.Margin = new Thickness(24);
 
         void OnClose(object? sender, string? selectedFont)
         {
@@ -253,18 +269,10 @@ public partial class SettingsViewModel : ViewModelBase
                  }
              }
              
-             if (dialog != null) _dialogManager.TryDismissDialog(dialog);
+             _mainViewModel.CloseDialog();
         }
         vm.RequestClose += OnClose;
 
-        var builder = _dialogManager.CreateDialog();
-        builder.SetContent(view);
-        builder.SetCanDismissWithBackgroundClick(true);
-        builder.SetOnDismissed(_ => {
-             vm.RequestClose -= OnClose;
-        });
-
-        builder.TryShow();
-        dialog = builder.Dialog;
+        _mainViewModel.ShowDialog(view);
     }
 }

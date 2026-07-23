@@ -5,7 +5,7 @@
              xmlns:m="using:JxTerminal.Models"
              xmlns:vm="using:JxTerminal.ViewModels"
              xmlns:c="using:JxTerminal.Converters"
-             xmlns:suki="https://github.com/kikipoulet/SukiUI"
+             xmlns:lumina="clr-namespace:LuminaUI.Controls;assembly=LuminaUI"
              xmlns:generic="clr-namespace:System.Collections.Generic;assembly=System.Collections"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
              x:Class="JxTerminal.Views.SettingsView"
@@ -14,12 +14,19 @@
         <c:ColorToHexConverter x:Key="ColorToHexConverter"/>
         <c:ColorToBrushConverter x:Key="ColorToBrushConverter"/>
         <c:StringLocalizationConverter x:Key="LocalizeConverter"/>
+    </UserControl.Resources>
 
-        <generic:List x:Key="SettingsItems" x:TypeArguments="suki:SettingsLayoutItem">
+    <Grid RowDefinitions="Auto, *">
+        <TextBlock Text="{c:Localize Settings}"
+                   FontSize="24"
+                   FontWeight="Bold"
+                   Margin="24,24,24,16"/>
+
+        <TabControl Grid.Row="1" TabStripPlacement="Left" Margin="10,0,24,24">
             <!-- General Section -->
-            <suki:SettingsLayoutItem Header="{c:Localize General}">
-                <suki:SettingsLayoutItem.Content>
-                    <suki:GlassCard Margin="0,0,20,0">
+            <TabItem Header="{c:Localize General}">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Padding="0,0,16,0">
+                    <lumina:LuminaCard Classes="Glass" Margin="16,0,0,0" Padding="24" CornerRadius="12" VerticalAlignment="Top">
                         <StackPanel Spacing="20">
                             <Grid ColumnDefinitions="*, Auto">
                                 <StackPanel Spacing="2">
@@ -29,7 +36,7 @@
                                 <ComboBox ItemsSource="{Binding AvailableLanguages}" SelectedItem="{Binding SelectedLanguage}" MinWidth="180" Grid.Column="1">
                                      <ComboBox.ItemTemplate>
                                          <DataTemplate>
-                                             <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource SukiText}"/>
+                                             <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource LuminaTextForegroundBrush}"/>
                                          </DataTemplate>
                                      </ComboBox.ItemTemplate>
                                 </ComboBox>
@@ -43,7 +50,7 @@
                                 <ComboBox ItemsSource="{Binding AvailableThemes}" SelectedItem="{Binding SelectedBaseTheme}" MinWidth="180" Grid.Column="1">
                                      <ComboBox.ItemTemplate>
                                          <DataTemplate>
-                                             <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource SukiText}"/>
+                                             <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource LuminaTextForegroundBrush}"/>
                                          </DataTemplate>
                                      </ComboBox.ItemTemplate>
                                 </ComboBox>
@@ -58,22 +65,22 @@
                                      <ComboBox.ItemTemplate>
                                          <DataTemplate>
                                              <StackPanel Orientation="Horizontal" Spacing="10">
-                                                 <Border Background="{Binding Value.Primary, Converter={StaticResource ColorToBrushConverter}}" Width="16" Height="16" CornerRadius="8"/>
-                                                 <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" Foreground="{DynamicResource SukiText}"/>
+                                                 <Border Background="{Binding Color, Converter={StaticResource ColorToBrushConverter}}" Width="16" Height="16" CornerRadius="8"/>
+                                                 <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextForegroundBrush}"/>
                                              </StackPanel>
                                          </DataTemplate>
                                      </ComboBox.ItemTemplate>
                                 </ComboBox>
                             </Grid>
                         </StackPanel>
-                    </suki:GlassCard>
-                </suki:SettingsLayoutItem.Content>
-            </suki:SettingsLayoutItem>
+                    </lumina:LuminaCard>
+                </ScrollViewer>
+            </TabItem>
 
             <!-- Terminal Section -->
-            <suki:SettingsLayoutItem Header="{c:Localize Terminal}">
-                <suki:SettingsLayoutItem.Content>
-                    <suki:GlassCard Margin="0,0,20,0">
+            <TabItem Header="{c:Localize Terminal}">
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Padding="0,0,16,0">
+                    <lumina:LuminaCard Classes="Glass" Margin="16,0,0,0" Padding="24" CornerRadius="12" VerticalAlignment="Top">
                         <StackPanel Spacing="20">
                             <!-- Font -->
                             <Grid ColumnDefinitions="*, Auto">
@@ -82,8 +89,8 @@
                                     <TextBlock Text="{c:Localize MonospaceRecommended}" FontSize="11" Opacity="0.6"/>
                                 </StackPanel>
                                 <Grid Grid.Column="1" ColumnDefinitions="*, Auto">
-                                    <TextBox Text="{Binding Settings.FontFamily}" MinWidth="200" VerticalAlignment="Center"/>
-                                    <Button Grid.Column="1" Content="..." Command="{Binding PickFontCommand}" Margin="5,0,0,0" Classes="Flat"/>
+                                    <TextBox Text="{Binding Settings.FontFamily}" MinWidth="180" VerticalAlignment="Center"/>
+                                    <Button Grid.Column="1" Content="..." Command="{Binding PickFontCommand}" Margin="5,0,0,0" Classes="Outline"/>
                                 </Grid>
                             </Grid>
                             
@@ -92,7 +99,7 @@
                                 <NumericUpDown Value="{Binding Settings.FontSize}" Minimum="8" Maximum="72" Increment="1" MinWidth="120" Grid.Column="1"/>
                             </Grid>
 
-                            <Separator Opacity="0.2"/>
+                            <Border Height="1" Background="{DynamicResource LuminaDividerBrush}" Margin="0,10"/>
 
                             <!-- Color Scheme Selection -->
                             <StackPanel Spacing="12">
@@ -115,21 +122,21 @@
                                                         <Border Background="{Binding Yellow, Converter={StaticResource ColorToBrushConverter}}" Width="14" Height="14" CornerRadius="2"/>
                                                         <Border Background="{Binding Magenta, Converter={StaticResource ColorToBrushConverter}}" Width="14" Height="14" CornerRadius="2"/>
                                                     </StackPanel>
-                                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" Foreground="{DynamicResource SukiText}"/>
+                                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextForegroundBrush}"/>
                                                 </StackPanel>
                                             </DataTemplate>
                                         </ComboBox.ItemTemplate>
                                     </ComboBox>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" Margin="10,0,0,0">
-                                        <Button Content="{c:Localize DuplicateScheme}" Command="{Binding DuplicateSchemeCommand}" Classes="Flat" ToolTip.Tip="Duplicate as custom scheme"/>
-                                        <Button Content="{c:Localize DeleteScheme}" Command="{Binding DeleteSchemeCommand}" Classes="Flat"
+                                        <Button Content="{c:Localize DuplicateScheme}" Command="{Binding DuplicateSchemeCommand}" Classes="Outline" ToolTip.Tip="Duplicate as custom scheme"/>
+                                        <Button Content="{c:Localize DeleteScheme}" Command="{Binding DeleteSchemeCommand}" Classes="Outline"
                                                 IsEnabled="{Binding IsSchemeEditable}" ToolTip.Tip="Delete custom scheme"/>
                                     </StackPanel>
                                 </Grid>
 
                                 <!-- Color scheme preview: terminal background with foreground text -->
                                 <Border Background="{Binding SelectedColorScheme.Background, Converter={StaticResource ColorToBrushConverter}}" 
-                                        CornerRadius="6" Padding="12,8" MinHeight="40">
+                                        CornerRadius="6" Padding="12,8" MinHeight="40" BorderBrush="{DynamicResource LuminaBorderBrush}" BorderThickness="1">
                                     <StackPanel Spacing="2">
                                         <TextBlock Text="user@host:~$ ls -la" FontFamily="Consolas, Monospace" FontSize="12"
                                                    Foreground="{Binding SelectedColorScheme.Foreground, Converter={StaticResource ColorToBrushConverter}}"/>
@@ -149,7 +156,7 @@
                                 </Border>
                             </StackPanel>
 
-                            <Separator Opacity="0.2"/>
+                            <Border Height="1" Background="{DynamicResource LuminaDividerBrush}" Margin="0,10"/>
 
                             <!-- Terminal Colors (editable when scheme is custom) -->
                             <StackPanel Spacing="12">
@@ -183,7 +190,7 @@
                                     </StackPanel>
                                 </Grid>
 
-                                <Separator Opacity="0.2"/>
+                                <Border Height="1" Background="{DynamicResource LuminaDividerBrush}" Margin="0,10"/>
 
                                 <!-- ANSI 16 Colors Grid -->
                                 <TextBlock Text="{c:Localize AnsiColors}" FontWeight="SemiBold" Opacity="0.8"/>
@@ -263,14 +270,14 @@
                                 </WrapPanel>
                             </StackPanel>
 
-                            <Separator Opacity="0.2"/>
+                            <Border Height="1" Background="{DynamicResource LuminaDividerBrush}" Margin="0,10"/>
 
                             <Grid ColumnDefinitions="*, Auto">
                                 <TextBlock Text="{c:Localize EnableColors}" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                 <ToggleSwitch IsChecked="{Binding Settings.EnableColors}" Grid.Column="1"/>
                             </Grid>
 
-                            <Separator Opacity="0.2"/>
+                            <Border Height="1" Background="{DynamicResource LuminaDividerBrush}" Margin="0,10"/>
 
                             <!-- Behavior -->
                             <Grid ColumnDefinitions="*, Auto">
@@ -282,8 +289,8 @@
                             <StackPanel Spacing="10">
                                 <TextBlock Text="{c:Localize BackgroundImage}" FontWeight="SemiBold"/>
                                 <Grid ColumnDefinitions="*, Auto">
-                                    <TextBox Text="{Binding Settings.BackgroundImagePath}" Watermark="{c:Localize ImagePathWatermark}"/>
-                                    <Button Grid.Column="1" Content="..." Margin="5,0,0,0" Click="BrowseFile_Click" Classes="Flat"/>
+                                    <TextBox Text="{Binding Settings.BackgroundImagePath}" PlaceholderText="{c:Localize ImagePathWatermark}"/>
+                                    <Button Grid.Column="1" Content="..." Margin="5,0,0,0" Click="BrowseFile_Click" Classes="Outline"/>
                                 </Grid>
                                 <Grid ColumnDefinitions="Auto, *, Auto">
                                     <TextBlock Text="{c:Localize Opacity}" VerticalAlignment="Center" Margin="0,0,10,0" Opacity="0.6"/>
@@ -292,12 +299,9 @@
                                 </Grid>
                             </StackPanel>
                         </StackPanel>
-                    </suki:GlassCard>
-                </suki:SettingsLayoutItem.Content>
-            </suki:SettingsLayoutItem>
-        </generic:List>
-    </UserControl.Resources>
-
-    <!-- Set StackSummaryWidth to control sidebar width -->
-    <suki:SettingsLayout Items="{StaticResource SettingsItems}" StackSummaryWidth="220" />
+                    </lumina:LuminaCard>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+    </Grid>
 </UserControl>

@@ -85,3 +85,8 @@ _ReSharper*/
 # Other
 Thumbs.db
 *.ds_store
+
+# Gemini & Agent working directories
+.gemini/
+.spec-workflow/
+

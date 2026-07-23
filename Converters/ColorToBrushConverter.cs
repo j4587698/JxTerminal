@@ -2,7 +2,6 @@ using Avalonia.Data.Converters;
 using Avalonia.Media;
 using System;
 using System.Globalization;
-using SukiUI;
 
 namespace JxTerminal.Converters;
 
@@ -27,5 +26,5 @@ public class ColorToBrushConverter : IValueConverter
     }
 
     public static IValueConverter BooleanToGreenRed { get; } = new FuncValueConverter<bool, IBrush>(b => b ? Brushes.Green : Brushes.Red);
-    public static IValueConverter BooleanToPrimary { get; } = new FuncValueConverter<bool, IBrush>(b => b ? SukiUI.SukiTheme.GetInstance().ActiveColorTheme?.PrimaryBrush ?? Brushes.Blue : Brushes.Gray);
+    public static IValueConverter BooleanToPrimary { get; } = new FuncValueConverter<bool, IBrush>(b => b ? new SolidColorBrush(Color.Parse("#2563EB")) : Brushes.Gray);
 }

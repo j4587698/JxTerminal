@@ -5,7 +5,7 @@
              xmlns:vm="using:JxTerminal.ViewModels"
              xmlns:c="using:JxTerminal.Converters"
              xmlns:avalonia="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
-             xmlns:suki="https://github.com/kikipoulet/SukiUI"
+             xmlns:lumina="clr-namespace:LuminaUI.Controls;assembly=LuminaUI"
              mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="600"
              x:Class="JxTerminal.Views.HostListView"
              x:DataType="vm:HostListViewModel"
@@ -14,13 +14,20 @@
         <c:StringLocalizationConverter x:Key="LocalizeConverter"/>
     </UserControl.Resources>
 
-    <Grid ColumnDefinitions="250, *">
+
+
+    <Grid ColumnDefinitions="250, 8, *"
+          Background="Transparent"
+          Margin="12,16,18,18">
         <!-- Left Sidebar: Tree Navigation -->
-        <Border Background="{DynamicResource SukiBackground}" BorderBrush="{DynamicResource SukiBorderBrush}" BorderThickness="0,0,1,0" Padding="10,15,10,15">
+        <lumina:LuminaCard Grid.Column="0"
+                Classes="Glass"
+                Padding="14"
+                CornerRadius="12">
             <Grid RowDefinitions="Auto, *, Auto">
                 <!-- Title -->
-                <StackPanel Orientation="Horizontal" Spacing="10" Margin="10,0,0,20">
-                    <avalonia:MaterialIcon Kind="ServerNetwork" Width="24" Height="24" Foreground="{DynamicResource SukiPrimaryColor}"/>
+                <StackPanel Orientation="Horizontal" Spacing="10" Margin="2,0,0,18">
+                    <avalonia:MaterialIcon Kind="ServerNetwork" Width="24" Height="24" Foreground="{DynamicResource LuminaPrimaryBrush}"/>
                     <TextBlock Text="{c:Localize HostManagement}" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
                 </StackPanel>
 
@@ -47,11 +54,11 @@
                                 </Grid.ContextMenu>
                                 
                                 <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                                    <avalonia:MaterialIcon Kind="{Binding Icon}" Width="18" Height="18" Opacity="0.8"/>
-                                    <TextBlock Text="{Binding Title}" VerticalAlignment="Center"/>
+                                    <avalonia:MaterialIcon Kind="{Binding Icon}" Width="18" Height="18" Foreground="{DynamicResource LuminaTextMutedBrush}"/>
+                                    <TextBlock Text="{Binding Title}" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextForegroundBrush}"/>
                                 </StackPanel>
                                 
-                                <Border Background="{DynamicResource SukiControlBorderBrush}" 
+                                <Border Background="{DynamicResource LuminaDividerBrush}" 
                                         CornerRadius="10" 
                                         MinWidth="20" Height="20"
                                         Padding="4,0"
@@ -70,64 +77,69 @@
                     </TreeView.ItemTemplate>
                 </TreeView>
                 
-                <Button Grid.Row="2" Command="{Binding AddGroupCommand}" Classes="Flat" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="10,8" Margin="0,10,0,0" Opacity="0.7">
+                <Button Grid.Row="2" Command="{Binding AddGroupCommand}" Classes="Ghost" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="10,8" Margin="0,10,0,0" Opacity="0.7">
                     <StackPanel Orientation="Horizontal" Spacing="10">
                         <avalonia:MaterialIcon Kind="Plus" Width="18" Height="18"/>
                         <TextBlock Text="{c:Localize AddGroup}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
             </Grid>
-        </Border>
+        </lumina:LuminaCard>
+
+        <!-- Grid Splitter -->
+        <GridSplitter Grid.Column="1" Background="Transparent" ResizeDirection="Columns" MinWidth="8"/>
 
         <!-- Right Content: Host List -->
-        <Grid Grid.Column="1" RowDefinitions="Auto, *">
+        <Grid Grid.Column="2" RowDefinitions="Auto, Auto, *" Margin="10,0,0,0">
             <!-- Top Toolbar -->
-            <Grid ColumnDefinitions="*, Auto" Margin="20">
+            <Grid ColumnDefinitions="*, Auto">
                 <!-- Search & Protocol -->
                 <StackPanel Orientation="Horizontal" Spacing="10">
-                    <TextBox Text="{Binding SearchText}" Watermark="{c:Localize SearchPlaceholder}" Width="250" Classes="Rounded">
+                    <TextBox Text="{Binding SearchText}"
+                             PlaceholderText="{c:Localize SearchPlaceholder}"
+                             MinWidth="180"
+                             MaxWidth="360"
+                             HorizontalAlignment="Stretch"
+                             Classes="Rounded">
                         <TextBox.InnerLeftContent>
                             <avalonia:MaterialIcon Kind="Magnify" Width="16" Height="16" Margin="10,0,0,0" Opacity="0.5"/>
                         </TextBox.InnerLeftContent>
                     </TextBox>
                     <ComboBox ItemsSource="{Binding ProtocolFilters}" SelectedItem="{Binding SelectedProtocolFilter}" Width="120" />
                 </StackPanel>
-
-                <!-- Action Buttons -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
-                    <!-- Secondary Actions (Outlined for consistency) -->
-                    <Button Classes="Outlined" ToolTip.Tip="{c:Localize PrivacyMode}" BorderBrush="{DynamicResource SukiBorderBrush}">
-                        <avalonia:MaterialIcon Kind="EyeOffOutline" Width="20" Height="20"/>
-                    </Button>
-                    <Button Classes="Outlined" ToolTip.Tip="{c:Localize CloudSync}" BorderBrush="{DynamicResource SukiBorderBrush}">
-                        <avalonia:MaterialIcon Kind="CloudSyncOutline" Width="20" Height="20"/>
-                    </Button>
-                    
-                    <!-- Quick Local (Outlined, not colored) -->
-                    <Button Command="{Binding QuickConnectLocalCommand}" Classes="Outlined" BorderBrush="{DynamicResource SukiBorderBrush}">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <avalonia:MaterialIcon Kind="Console" Width="16" Height="16"/>
-                            <TextBlock Text="{c:Localize QuickLocal}"/>
-                        </StackPanel>
-                    </Button>
-
-                    <!-- Add Connection (Primary, Filled, Colored) -->
-                    <Button Command="{Binding AddConnectionCommand}" Classes="Flat Primary">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <avalonia:MaterialIcon Kind="Plus" Width="16" Height="16"/>
-                            <TextBlock Text="{c:Localize AddConnection}"/>
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
             </Grid>
 
+            <!-- Action Buttons -->
+            <WrapPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,18">
+                <Button Classes="Outline" ToolTip.Tip="{c:Localize PrivacyMode}" BorderBrush="{DynamicResource LuminaBorderBrush}" Margin="0,0,10,0">
+                    <avalonia:MaterialIcon Kind="EyeOffOutline" Width="20" Height="20"/>
+                </Button>
+                <Button Classes="Outline" ToolTip.Tip="{c:Localize CloudSync}" BorderBrush="{DynamicResource LuminaBorderBrush}" Margin="0,0,10,0">
+                    <avalonia:MaterialIcon Kind="CloudSyncOutline" Width="20" Height="20"/>
+                </Button>
+                
+                <Button Command="{Binding QuickConnectLocalCommand}" Classes="Outline" BorderBrush="{DynamicResource LuminaBorderBrush}" Margin="0,0,10,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <avalonia:MaterialIcon Kind="Console" Width="16" Height="16"/>
+                        <TextBlock Text="{c:Localize QuickLocal}"/>
+                    </StackPanel>
+                </Button>
+
+                <Button Command="{Binding AddConnectionCommand}" Classes="Primary">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <avalonia:MaterialIcon Kind="Plus" Width="16" Height="16"/>
+                        <TextBlock Text="{c:Localize AddConnection}"/>
+                    </StackPanel>
+                </Button>
+            </WrapPanel>
+
             <!-- Content Area -->
-            <ScrollViewer Grid.Row="1" Padding="20,0,20,20">
+            <ScrollViewer Grid.Row="2" Padding="0">
                 <ItemsControl ItemsSource="{Binding DisplayGroups}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <StackPanel Margin="0,0,0,20">
-                                <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="14" Opacity="0.5" Margin="5,0,0,10"/>
+                                <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="14" Foreground="{DynamicResource LuminaTextMutedBrush}" Margin="5,0,0,10"/>
                                 <ItemsControl ItemsSource="{Binding Connections}">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
@@ -137,8 +149,8 @@
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <!-- Host Card -->
-                                            <Border Width="280" Margin="0,0,15,15" CornerRadius="8" Background="{DynamicResource SukiCardBackground}" BoxShadow="0 1 3 0 #15000000">
-                                                <Border.ContextMenu>
+                                            <lumina:LuminaCard Classes="Interactive Glass" Width="280" Margin="0,0,16,16" CornerRadius="12" Padding="0">
+                                                <lumina:LuminaCard.ContextMenu>
                                                     <ContextMenu>
                                                         <MenuItem Header="{c:Localize Edit}" 
                                                                   Command="{Binding #Root.DataContext.EditConnectionCommand}" 
@@ -152,45 +164,45 @@
                                                             <MenuItem.Icon><avalonia:MaterialIcon Kind="Delete"/></MenuItem.Icon>
                                                         </MenuItem>
                                                     </ContextMenu>
-                                                </Border.ContextMenu>
+                                                </lumina:LuminaCard.ContextMenu>
                                                 
                                                 <Grid RowDefinitions="*, Auto" Height="130">
                                                     <Grid ColumnDefinitions="Auto, *" Margin="16">
                                                         <!-- Icon (Use Dynamic Color based on type? For now just uniform) -->
-                                                        <Border Width="48" Height="48" CornerRadius="10" Background="#15808080" VerticalAlignment="Top">
-                                                            <avalonia:MaterialIcon Kind="ConsoleLine" Width="24" Height="24" Opacity="0.8"/>
+                                                        <Border Width="48" Height="48" CornerRadius="8" Background="{DynamicResource LuminaPrimaryBrush}" VerticalAlignment="Top">
+                                                            <avalonia:MaterialIcon Kind="ConsoleLine" Width="24" Height="24" Foreground="White"/>
                                                         </Border>
                                                         
                                                         <!-- Info -->
                                                         <StackPanel Grid.Column="1" Margin="15,0,0,0" Spacing="4">
                                                             <Grid ColumnDefinitions="*, Auto">
                                                                 <TextBlock Text="{Binding Host}" FontWeight="SemiBold" FontSize="15" TextTrimming="CharacterEllipsis"/>
-                                                                <Border Grid.Column="1" Background="{DynamicResource SukiPrimaryColor}" CornerRadius="4" Padding="4,2" Margin="5,0,0,0" VerticalAlignment="Center">
+                                                                <Border Grid.Column="1" Background="{DynamicResource LuminaPrimaryBrush}" CornerRadius="4" Padding="4,2" Margin="5,0,0,0" VerticalAlignment="Center">
                                                                     <TextBlock Text="{Binding Type}" FontSize="9" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                                                                 </Border>
                                                             </Grid>
-                                                            <TextBlock Text="{Binding Username}" FontSize="12" Opacity="0.6" TextTrimming="CharacterEllipsis"/>
-                                                            <TextBlock Text="{c:Localize NoMemo}" FontSize="11" Opacity="0.4" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
+                                                            <TextBlock Text="{Binding Username}" FontSize="12" Foreground="{DynamicResource LuminaTextMutedBrush}" TextTrimming="CharacterEllipsis"/>
+                                                            <TextBlock Text="{c:Localize NoMemo}" FontSize="11" Foreground="{DynamicResource LuminaTextMutedBrush}" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
                                                         </StackPanel>
                                                     </Grid>
                                                     
                                                     <!-- Footer Action -->
                                                     <!-- Use a subtle divider line -->
-                                                    <Border Grid.Row="1" BorderBrush="{DynamicResource SukiControlBorderBrush}" BorderThickness="0,1,0,0">
+                                                    <Border Grid.Row="1" BorderBrush="{DynamicResource LuminaDividerBrush}" BorderThickness="0,1,0,0">
                                                         <Button Command="{Binding #Root.DataContext.ConnectCommand}" 
                                                                 CommandParameter="{Binding}"
-                                                                Classes="Flat" 
+                                                                Classes="Ghost" 
                                                                 HorizontalAlignment="Stretch" 
                                                                 CornerRadius="0,0,8,8"
                                                                 Height="36">
-                                                            <StackPanel Orientation="Horizontal" Spacing="6" Opacity="0.8">
+                                                            <StackPanel Orientation="Horizontal" Spacing="6" TextElement.Foreground="{DynamicResource LuminaTextMutedBrush}">
                                                                 <avalonia:MaterialIcon Kind="LightningBolt" Width="14" Height="14"/>
                                                                 <TextBlock Text="{c:Localize Connect}" FontSize="12" FontWeight="SemiBold"/>
                                                             </StackPanel>
                                                         </Button>
                                                     </Border>
                                                 </Grid>
-                                            </Border>
+                                            </lumina:LuminaCard>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>

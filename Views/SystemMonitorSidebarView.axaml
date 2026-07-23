@@ -1,0 +1,456 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:JxTerminal.ViewModels"
+             xmlns:c="using:JxTerminal.Converters"
+             xmlns:lumina="clr-namespace:LuminaUI.Controls;assembly=LuminaUI"
+             xmlns:avalonia="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="800"
+             x:Class="JxTerminal.Views.SystemMonitorSidebarView"
+             x:DataType="vm:TerminalViewModel">
+    <UserControl.Styles>
+        <Style Selector="RadioButton.MenuTab">
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Name="PART_Background" Background="{TemplateBinding Background}" CornerRadius="8">
+                        <avalonia:MaterialIcon Kind="{TemplateBinding Content}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextForegroundBrush}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="RadioButton.MenuTab:checked /template/ Border#PART_Background">
+            <Setter Property="Background" Value="{DynamicResource LuminaPrimaryBrush}"/>
+        </Style>
+        <Style Selector="RadioButton.MenuTab:checked /template/ avalonia|MaterialIcon">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="TextBlock.PropLabel">
+            <Setter Property="Opacity" Value="0.5"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.PropValue">
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </UserControl.Styles>
+    <lumina:LuminaCard CornerRadius="12" Padding="0" ClipToBounds="True" Background="{DynamicResource LuminaSurfaceBrush}" BorderThickness="1" BorderBrush="{DynamicResource LuminaBorderBrush}">
+        <!-- 主布局：强约束上下！ -->
+        <Grid RowDefinitions="Auto, *">
+            
+            <Border Margin="15" CornerRadius="8" Background="{DynamicResource LuminaBackgroundBrush}" Padding="6">
+                <Grid ColumnDefinitions="*, Auto">
+                    <!-- 改用 ScrollViewer 保证在一行且可滑动 -->
+                    <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <RadioButton Classes="MenuTab" Content="ViewDashboard" IsChecked="True" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="0"/>
+                            <RadioButton Classes="MenuTab" Content="Cpu64Bit" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="1"/>
+                            <RadioButton Classes="MenuTab" Content="ExpansionCard" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="2"/>
+                            <RadioButton Classes="MenuTab" Content="Memory" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="3"/>
+                            <RadioButton Classes="MenuTab" Content="Harddisk" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="4"/>
+                            <RadioButton Classes="MenuTab" Content="Network" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="5"/>
+                            <RadioButton Classes="MenuTab" Content="FolderNetwork" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="6"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                    <Button Grid.Column="1" Command="{Binding ToggleSftpCommand}" Classes="Ghost" Width="36" Height="36" CornerRadius="8" Margin="10,0,0,0" Padding="0" VerticalAlignment="Center">
+                        <avalonia:MaterialIcon Kind="Close" Width="18" Height="18" Foreground="{DynamicResource LuminaTextForegroundBrush}"/>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- 所有的卡片面板区，绝不使用 Carousel！ -->
+            <Grid Grid.Row="1">
+                
+                <!-- 0. OVERVIEW -->
+                <ScrollViewer IsVisible="{Binding IsTabOverview}" Padding="20,0,20,20">
+                    <!-- 全面采用 Grid 强排版代替松散的 StackPanel！ -->
+                    <Grid RowDefinitions="Auto, 15, Auto, 15, Auto, 15, Auto, 15, Auto">
+                        <TextBlock Grid.Row="0" Text="{c:Localize SystemOverview}" FontSize="18" FontWeight="Bold"/>
+                        
+                        <lumina:LuminaCard Classes="Glass" Grid.Row="2" Padding="20" HorizontalAlignment="Stretch">
+                            <Grid RowDefinitions="Auto, Auto, Auto" ColumnDefinitions="Auto, *">
+                                <avalonia:MaterialIcon Kind="Server" Width="48" Height="48" Grid.RowSpan="3" Opacity="0.3" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="1" Grid.Row="0" Text="{Binding Hostname}" FontSize="20" FontWeight="Bold" Margin="15,0,0,5"/>
+                                <TextBlock Grid.Column="1" Grid.Row="1" Text="{Binding SystemInfo}" FontSize="13" Opacity="0.7" Margin="15,0,0,5"/>
+                                <TextBlock Grid.Column="1" Grid.Row="2" Text="{Binding Uptime}" FontSize="12" Opacity="0.6" Margin="15,0,0,0"/>
+                            </Grid>
+                        </lumina:LuminaCard>
+                        
+                        <Grid Grid.Row="4" ColumnDefinitions="*, 12, *" RowDefinitions="Auto, 12, Auto">
+                            <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource LuminaSurfaceBrush}" CornerRadius="12" Padding="15" ClipToBounds="True">
+                                <Grid RowDefinitions="Auto, 10, Auto, 5, Auto">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <avalonia:MaterialIcon Kind="Cpu64Bit" Width="18" Height="18" Foreground="{DynamicResource LuminaWarningBrush}"/>
+                                        <TextBlock Text="CPU" Classes="PropLabel" FontWeight="Bold"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="2" Text="{Binding CpuUsage, StringFormat='{}{0:0.0}%'}" FontSize="26" FontWeight="Bold"/>
+                                    <ProgressBar Grid.Row="4" Value="{Binding CpuUsage}" Minimum="0" Maximum="100" Height="4" Foreground="{DynamicResource LuminaWarningBrush}" Background="#20FFC107"/>
+                                </Grid>
+                            </Border>
+                            
+                            <Border Grid.Row="0" Grid.Column="2" Background="{DynamicResource LuminaSurfaceBrush}" CornerRadius="12" Padding="15" ClipToBounds="True">
+                                <Grid RowDefinitions="Auto, 10, Auto, 5, Auto">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <avalonia:MaterialIcon Kind="Memory" Width="18" Height="18" Foreground="{DynamicResource LuminaDangerBrush}"/>
+                                        <TextBlock Text="{c:Localize Memory}" Classes="PropLabel" FontWeight="Bold"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="2" Text="{Binding RamUsage, StringFormat='{}{0:0.0}%'}" FontSize="26" FontWeight="Bold"/>
+                                    <ProgressBar Grid.Row="4" Value="{Binding RamUsage}" Minimum="0" Maximum="100" Height="4" Foreground="{DynamicResource LuminaDangerBrush}" Background="#20E91E63"/>
+                                </Grid>
+                            </Border>
+                            
+                            <Border Grid.Row="2" Grid.Column="0" Background="{DynamicResource LuminaSurfaceBrush}" CornerRadius="12" Padding="15" ClipToBounds="True">
+                                <Grid RowDefinitions="Auto, 10, Auto, 5, Auto">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <avalonia:MaterialIcon Kind="ArrowDown" Width="18" Height="18" Foreground="{DynamicResource LuminaSuccessBrush}"/>
+                                        <TextBlock Text="{c:Localize Download}" Classes="PropLabel" FontWeight="Bold"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="2" Text="{Binding NetworkDown}" FontSize="26" FontWeight="Bold"/>
+                                    <TextBlock Grid.Row="4" Text="{Binding NetTotalRecv, StringFormat='{}{0}'}" FontSize="11" Opacity="0.5"/>
+                                </Grid>
+                            </Border>
+                            
+                            <Border Grid.Row="2" Grid.Column="2" Background="{DynamicResource LuminaSurfaceBrush}" CornerRadius="12" Padding="15" ClipToBounds="True">
+                                <Grid RowDefinitions="Auto, 10, Auto, 5, Auto">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <avalonia:MaterialIcon Kind="ArrowUp" Width="18" Height="18" Foreground="{DynamicResource LuminaInfoBrush}"/>
+                                        <TextBlock Text="{c:Localize Upload}" Classes="PropLabel" FontWeight="Bold"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="2" Text="{Binding NetworkUp}" FontSize="26" FontWeight="Bold"/>
+                                    <TextBlock Grid.Row="4" Text="{Binding NetTotalSent, StringFormat='{}{0}'}" FontSize="11" Opacity="0.5"/>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                        
+                        <Grid Grid.Row="6" ColumnDefinitions="*, 12, *">
+                            <Border Grid.Column="0" Background="{DynamicResource LuminaSurfaceBrush}" CornerRadius="12" Padding="15">
+                                <Grid RowDefinitions="Auto, 10, Auto, 5, Auto">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <avalonia:MaterialIcon Kind="ChartLine" Width="18" Height="18" Foreground="{DynamicResource LuminaPrimaryBrush}"/>
+                                        <TextBlock Text="{c:Localize Load}" Classes="PropLabel" FontWeight="Bold"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="2" Text="{Binding Load1, StringFormat='{}{0:0.00}'}" FontSize="26" FontWeight="Bold"/>
+                                    <TextBlock Grid.Row="4" FontSize="11" Opacity="0.5">
+                                        <Run Text="5m: "/><Run Text="{Binding Load5, StringFormat='{}{0:0.00}'}"/>
+                                        <Run Text=" / 15m: "/><Run Text="{Binding Load15, StringFormat='{}{0:0.00}'}"/>
+                                    </TextBlock>
+                                </Grid>
+                            </Border>
+                            
+                            <Border Grid.Column="2" Background="{DynamicResource LuminaSurfaceBrush}" CornerRadius="12" Padding="15" ClipToBounds="True">
+                                <Grid RowDefinitions="Auto, 10, Auto, 5, Auto">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <avalonia:MaterialIcon Kind="Harddisk" Width="18" Height="18" Foreground="{DynamicResource LuminaWarningBrush}"/>
+                                        <TextBlock Text="{c:Localize Disk}" Classes="PropLabel" FontWeight="Bold"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="2" Text="{Binding DiskUsage, StringFormat='{}{0:0.0}%'}" FontSize="26" FontWeight="Bold"/>
+                                    <ProgressBar Grid.Row="4" Value="{Binding DiskUsage}" Minimum="0" Maximum="100" Height="4" Foreground="{DynamicResource LuminaWarningBrush}" Background="#20FF9800"/>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                        
+                        <lumina:LuminaCard Classes="Glass" Grid.Row="8" Padding="15" HorizontalAlignment="Stretch">
+                            <Grid RowDefinitions="Auto, 10, Auto, 10, Auto">
+                                <TextBlock Grid.Row="0" Text="{c:Localize DiskMountPoint}" FontWeight="Bold" FontSize="14"/>
+                                <Grid Grid.Row="2" ColumnDefinitions="Auto, *, Auto">
+                                    <avalonia:MaterialIcon Grid.Column="0" Kind="Harddisk" Width="20" Height="20" Opacity="0.5"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding DiskPath}" FontWeight="SemiBold" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding DiskUsedBytesFormatted}" FontSize="12" Opacity="0.6"/>
+                                        <TextBlock Text=" / " FontSize="12" Opacity="0.6"/>
+                                        <TextBlock Text="{Binding DiskTotalFormatted}" FontSize="12" Opacity="0.6"/>
+                                    </StackPanel>
+                                </Grid>
+                                <ProgressBar Grid.Row="4" Value="{Binding DiskUsage}" Height="6" Foreground="{DynamicResource LuminaWarningBrush}" Margin="30,0,0,0"/>
+                            </Grid>
+                        </lumina:LuminaCard>
+                    </Grid>
+                </ScrollViewer>
+
+                <!-- 1. CPU -->
+                <ScrollViewer IsVisible="{Binding IsTabCpu}" Padding="20,0,20,20">
+                    <Grid RowDefinitions="Auto, 20, Auto, 20, Auto, 10, Auto">
+                        <TextBlock Grid.Row="0" Text="{c:Localize Processor}" FontSize="18" FontWeight="Bold"/>
+                        <lumina:LuminaCard Classes="Glass" Grid.Row="2" Padding="20" HorizontalAlignment="Stretch">
+                            <Grid RowDefinitions="Auto, 20, Auto">
+                                <TextBlock Grid.Row="0" Text="{Binding CpuModel}" FontWeight="Bold" FontSize="14" TextWrapping="Wrap"/>
+                                <Grid Grid.Row="2" ColumnDefinitions="Auto, *">
+                                    <Grid Grid.Column="0" Width="120" Height="120" RowDefinitions="*, Auto">
+                                        <Border Grid.RowSpan="2"
+                                                CornerRadius="60"
+                                                BorderBrush="{DynamicResource LuminaPrimaryBrush}"
+                                                BorderThickness="2"
+                                                Opacity="0.85"/>
+                                        <TextBlock Grid.RowSpan="2"
+                                                   Text="{Binding CpuUsage, StringFormat='{}{0:0}%'}"
+                                                   FontSize="24"
+                                                   FontWeight="Bold"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                        <ProgressBar Grid.Row="1"
+                                                     Minimum="0"
+                                                     Maximum="100"
+                                                     Value="{Binding CpuUsage}"
+                                                     Height="6"
+                                                     Margin="18,0,18,18"
+                                                     Foreground="{DynamicResource LuminaPrimaryBrush}"/>
+                                    </Grid>
+                                    <Grid Grid.Column="1" Margin="25,0,0,0" RowDefinitions="Auto, 10, Auto, 10, Auto, 10, Auto" ColumnDefinitions="*, Auto">
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="PropLabel" Text="{c:Localize CoreCount}"/><TextBlock Grid.Row="0" Grid.Column="1" Classes="PropValue" Text="{Binding CpuCoreCount}"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Classes="PropLabel" Text="{c:Localize ThreadCount}"/><TextBlock Grid.Row="2" Grid.Column="1" Classes="PropValue" Text="{Binding CpuThreadCount}"/>
+                                        <TextBlock Grid.Row="4" Grid.Column="0" Classes="PropLabel" Text="{c:Localize Temperature}"/><TextBlock Grid.Row="4" Grid.Column="1" Classes="PropValue" Text="{Binding CpuTemp, StringFormat='{}{0}°C'}" />
+                                        <TextBlock Grid.Row="6" Grid.Column="0" Classes="PropLabel" Text="{c:Localize LoadAverage}" />
+                                        <TextBlock Grid.Row="6" Grid.Column="1" Classes="PropValue">
+                                            <Run Text="{Binding Load1, StringFormat='{}{0:0.00}'}"/><Run Text=" / "/><Run Text="{Binding Load5, StringFormat='{}{0:0.00}'}"/><Run Text=" / "/><Run Text="{Binding Load15, StringFormat='{}{0:0.00}'}"/>
+                                        </TextBlock>
+                                    </Grid>
+                                </Grid>
+                            </Grid>
+                        </lumina:LuminaCard>
+                        
+                        <TextBlock Grid.Row="4" Text="{c:Localize TopProcesses}" FontSize="16" FontWeight="Bold"/>
+                        <lumina:LuminaCard Classes="Glass" Grid.Row="6" Padding="15" HorizontalAlignment="Stretch">
+                            <Grid RowDefinitions="Auto, 10, *">
+                                <Grid Grid.Row="0" ColumnDefinitions="60, *, 60, 60">
+                                    <TextBlock Grid.Column="0" Text="PID" FontWeight="Bold" FontSize="11" Opacity="0.6"/>
+                                    <TextBlock Grid.Column="1" Text="{c:Localize Name}" FontWeight="Bold" FontSize="11" Opacity="0.6"/>
+                                    <TextBlock Grid.Column="2" Text="CPU" FontWeight="Bold" FontSize="11" Opacity="0.6" HorizontalAlignment="Right"/>
+                                    <TextBlock Grid.Column="3" Text="MEM" FontWeight="Bold" FontSize="11" Opacity="0.6" HorizontalAlignment="Right"/>
+                                </Grid>
+                                <ItemsControl Grid.Row="2" ItemsSource="{Binding TopProcesses}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid ColumnDefinitions="60, *, 60, 60" Margin="0,3">
+                                                <TextBlock Grid.Column="0" Text="{Binding Pid}" FontSize="11" Opacity="0.8"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="11" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Grid.Column="2" Text="{Binding DisplayCpu}" FontSize="11" HorizontalAlignment="Right" Foreground="{DynamicResource LuminaWarningBrush}"/>
+                                                <TextBlock Grid.Column="3" Text="{Binding DisplayMem}" FontSize="11" HorizontalAlignment="Right" Foreground="{DynamicResource LuminaDangerBrush}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Grid>
+                        </lumina:LuminaCard>
+                    </Grid>
+                </ScrollViewer>
+
+                <!-- 2. GPU -->
+                <ScrollViewer IsVisible="{Binding IsTabGpu}" Padding="20,0,20,20">
+                    <Grid RowDefinitions="Auto, 20, *">
+                        <TextBlock Grid.Row="0" Text="{c:Localize GraphicsCard}" FontSize="18" FontWeight="Bold"/>
+                        
+                        <lumina:LuminaCard Classes="Glass" Grid.Row="2" Padding="25" IsVisible="{Binding GpuDetected}" HorizontalAlignment="Stretch">
+                            <Grid RowDefinitions="Auto, 20, Auto, 20, Auto">
+                                <TextBlock Grid.Row="0" Text="{Binding GpuModel}" FontWeight="Bold" FontSize="15"/>
+                                <Grid Grid.Row="2" ColumnDefinitions="Auto, 15, *">
+                                    <avalonia:MaterialIcon Grid.Column="0" Kind="ExpansionCard" Width="32" Height="32" Opacity="0.3"/>
+                                    <Grid Grid.Column="2" RowDefinitions="Auto, 5, Auto">
+                                        <Grid Grid.Row="0" ColumnDefinitions="*, Auto">
+                                            <TextBlock Grid.Column="0" Classes="PropLabel" Text="{c:Localize Utilization}"/>
+                                            <TextBlock Grid.Column="1" Classes="PropValue" Text="{Binding GpuUsage, StringFormat='{}{0:0.0}%'}" Foreground="{DynamicResource LuminaDangerBrush}"/>
+                                        </Grid>
+                                        <ProgressBar Grid.Row="2" Value="{Binding GpuUsage}" Height="6" Foreground="{DynamicResource LuminaDangerBrush}"/>
+                                    </Grid>
+                                </Grid>
+                                <Grid Grid.Row="4" RowDefinitions="Auto, 10, Auto, 10, Auto" ColumnDefinitions="*, Auto">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Classes="PropLabel" Text="{c:Localize PowerConsumption}"/><TextBlock Grid.Row="0" Grid.Column="1" Classes="PropValue" Text="{Binding GpuPower, StringFormat='{}{0} W'}" />
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Classes="PropLabel" Text="{c:Localize Temperature}"/><TextBlock Grid.Row="2" Grid.Column="1" Classes="PropValue" Text="{Binding GpuTemp, StringFormat='{}{0}°C'}" />
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Classes="PropLabel" Text="{c:Localize VideoMemory}"/><TextBlock Grid.Row="4" Grid.Column="1" Classes="PropValue">
+                                        <Run Text="{Binding GpuMemoryUsed, StringFormat='{}{0:0.1}'}"/><Run Text=" / "/><Run Text="{Binding GpuMemoryTotal, StringFormat='{}{0:0.1} GB'}"/>
+                                    </TextBlock>
+                                </Grid>
+                            </Grid>
+                        </lumina:LuminaCard>
+                        
+                        <lumina:LuminaCard Classes="Glass" Grid.Row="2" Padding="30" IsVisible="{Binding !GpuDetected}" HorizontalAlignment="Stretch">
+                            <Grid RowDefinitions="Auto, 15, Auto, 15, Auto" HorizontalAlignment="Center">
+                                <avalonia:MaterialIcon Grid.Row="0" Kind="AlertCircleOutline" Width="60" Height="60" Opacity="0.3" HorizontalAlignment="Center"/>
+                                <TextBlock Grid.Row="2" Text="{c:Localize NoNvidiaGpu}" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+                                <TextBlock Grid.Row="4" Text="{c:Localize InstallNvidiaDriver}" FontSize="12" Opacity="0.7" HorizontalAlignment="Center"/>
+                            </Grid>
+                        </lumina:LuminaCard>
+                    </Grid>
+                </ScrollViewer>
+
+                <!-- 3. MEMORY -->
+                <ScrollViewer IsVisible="{Binding IsTabMemory}" Padding="20,0,20,20">
+                    <Grid RowDefinitions="Auto, 20, Auto, 20, Auto">
+                        <TextBlock Grid.Row="0" Text="{c:Localize MemoryTitle}" FontSize="18" FontWeight="Bold"/>
+                        <Grid Grid.Row="2" ColumnDefinitions="Auto, *">
+                            <Grid Grid.Column="0" Width="140" Height="140" RowDefinitions="*, Auto">
+                                <Border Grid.RowSpan="2"
+                                        CornerRadius="70"
+                                        BorderBrush="{DynamicResource LuminaPrimaryBrush}"
+                                        BorderThickness="2"
+                                        Opacity="0.85"/>
+                                <TextBlock Grid.RowSpan="2"
+                                           Text="{Binding RamUsage, StringFormat='{}{0:0}%'}"
+                                           FontSize="24"
+                                           FontWeight="Bold"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                                <ProgressBar Grid.Row="1"
+                                             Minimum="0"
+                                             Maximum="100"
+                                             Value="{Binding RamUsage}"
+                                             Height="6"
+                                             Margin="20,0,20,20"
+                                             Foreground="{DynamicResource LuminaPrimaryBrush}"/>
+                            </Grid>
+                            <Grid Grid.Column="1" Margin="20,0,0,0" RowDefinitions="Auto, 10, Auto" VerticalAlignment="Center">
+                                <TextBlock Grid.Row="0" Text="{Binding MemUsedFormatted}" FontSize="28" FontWeight="Bold"/>
+                                <StackPanel Grid.Row="2" Orientation="Horizontal" Opacity="0.5">
+                                    <TextBlock Text="{c:Localize TotalCapacity}" FontSize="12"/>
+                                    <TextBlock Text="{Binding MemTotalFormatted}" FontSize="12"/>
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
+                        <lumina:LuminaCard Classes="Glass" Grid.Row="4" Padding="15" HorizontalAlignment="Stretch">
+                            <Grid RowDefinitions="Auto, 10, Auto" ColumnDefinitions="*, Auto">
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="{c:Localize Cache}" Classes="PropLabel"/><TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding MemCachedFormatted}" Classes="PropValue"/>
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="{c:Localize SwapPartition}" Classes="PropLabel"/>
+                                <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Classes="PropValue">
+                                    <TextBlock Text="{Binding SwapUsedFormatted}"/><TextBlock Text=" / "/><TextBlock Text="{Binding SwapTotalFormatted}"/>
+                                </StackPanel>
+                            </Grid>
+                        </lumina:LuminaCard>
+                    </Grid>
+                </ScrollViewer>
+
+                <!-- 4. DISK -->
+                <ScrollViewer IsVisible="{Binding IsTabDisk}" Padding="20,0,20,20">
+                    <Grid RowDefinitions="Auto, 20, Auto, 20, Auto">
+                        <TextBlock Grid.Row="0" Text="{c:Localize DiskTitle}" FontSize="18" FontWeight="Bold"/>
+                        <Grid Grid.Row="2" ColumnDefinitions="*, 15, *" RowDefinitions="Auto, 15, Auto, 15, Auto">
+                            <lumina:LuminaCard Classes="Glass" Grid.Row="0" Grid.Column="0" Padding="15"><Grid RowDefinitions="Auto, 5, Auto"><TextBlock Grid.Row="0" Text="{c:Localize ReadSpeed}" Classes="PropLabel" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Row="2" Text="{Binding DiskReadSpeed}" FontSize="16" FontWeight="Bold"/></Grid></lumina:LuminaCard>
+                            <lumina:LuminaCard Classes="Glass" Grid.Row="0" Grid.Column="2" Padding="15"><Grid RowDefinitions="Auto, 5, Auto"><TextBlock Grid.Row="0" Text="{c:Localize WriteSpeed}" Classes="PropLabel" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Row="2" Text="{Binding DiskWriteSpeed}" FontSize="16" FontWeight="Bold"/></Grid></lumina:LuminaCard>
+                            
+                            <lumina:LuminaCard Classes="Glass" Grid.Row="2" Grid.Column="0" Padding="15"><Grid RowDefinitions="Auto, 5, Auto"><TextBlock Grid.Row="0" Text="{c:Localize ReadIOPS}" Classes="PropLabel" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Row="2" Text="{Binding DiskReadIops}" FontSize="16" FontWeight="Bold"/></Grid></lumina:LuminaCard>
+                            <lumina:LuminaCard Classes="Glass" Grid.Row="2" Grid.Column="2" Padding="15"><Grid RowDefinitions="Auto, 5, Auto"><TextBlock Grid.Row="0" Text="{c:Localize WriteIOPS}" Classes="PropLabel" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Row="2" Text="{Binding DiskWriteIops}" FontSize="16" FontWeight="Bold"/></Grid></lumina:LuminaCard>
+                            
+                            <lumina:LuminaCard Classes="Glass" Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3" Padding="15">
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <Grid Grid.Column="0" RowDefinitions="Auto, 5, Auto"><TextBlock Grid.Row="0" Text="{c:Localize DiskPath}" Classes="PropLabel" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Row="2" Text="{Binding DiskPath}" FontSize="16" FontWeight="Bold"/></Grid>
+                                    <Grid Grid.Column="1" RowDefinitions="Auto, 5, Auto"><TextBlock Grid.Row="0" Text="{c:Localize DiskTotalCapacity}" Classes="PropLabel" TextTrimming="CharacterEllipsis" HorizontalAlignment="Right"/><TextBlock Grid.Row="2" Text="{Binding DiskTotalFormatted}" FontSize="16" FontWeight="Bold" HorizontalAlignment="Right"/></Grid>
+                                </Grid>
+                            </lumina:LuminaCard>
+                        </Grid>
+                        <lumina:LuminaCard Classes="Glass" Grid.Row="4" Padding="15" HorizontalAlignment="Stretch">
+                            <Grid RowDefinitions="Auto, 10, Auto, 5, Auto">
+                                <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto">
+                                    <avalonia:MaterialIcon Grid.Column="0" Kind="Harddisk" Width="20" Height="20" Opacity="0.5"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding DiskPath}" FontWeight="Bold" Margin="10,0"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding DiskUsage, StringFormat='{}{0:0}%'}" Foreground="{DynamicResource LuminaWarningBrush}" FontWeight="Bold"/>
+                                </Grid>
+                                <ProgressBar Grid.Row="2" Value="{Binding DiskUsage}" Height="6" Foreground="{DynamicResource LuminaWarningBrush}"/>
+                                <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <TextBlock Text="{Binding DiskUsedBytesFormatted}" FontSize="10" Opacity="0.5"/>
+                                    <TextBlock Text=" / " FontSize="10" Opacity="0.5"/>
+                                    <TextBlock Text="{Binding DiskTotalFormatted}" FontSize="10" Opacity="0.5"/>
+                                </StackPanel>
+                            </Grid>
+                        </lumina:LuminaCard>
+                    </Grid>
+                </ScrollViewer>
+
+                <!-- 5. NETWORK -->
+                <ScrollViewer IsVisible="{Binding IsTabNetwork}" Padding="20,0,20,20">
+                    <Grid RowDefinitions="Auto, 20, Auto, 20, Auto, 20, Auto, 10, *">
+                        <TextBlock Grid.Row="0" Text="{c:Localize NetworkTitle}" FontSize="18" FontWeight="Bold"/>
+                        
+                        <Grid Grid.Row="2" ColumnDefinitions="*, 15, *" RowDefinitions="Auto, 15, Auto">
+                            <lumina:LuminaCard Classes="Glass" Grid.Row="0" Grid.Column="0" Padding="15"><Grid RowDefinitions="Auto, 5, Auto"><StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="5"><avalonia:MaterialIcon Kind="ArrowDown" Foreground="{DynamicResource LuminaSuccessBrush}"/><TextBlock Text="{c:Localize Download}" Classes="PropLabel"/></StackPanel><TextBlock Grid.Row="2" Text="{Binding NetworkDown}" FontSize="18" FontWeight="Bold"/></Grid></lumina:LuminaCard>
+                            <lumina:LuminaCard Classes="Glass" Grid.Row="0" Grid.Column="2" Padding="15"><Grid RowDefinitions="Auto, 5, Auto"><StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="5"><avalonia:MaterialIcon Kind="ArrowUp" Foreground="{DynamicResource LuminaInfoBrush}"/><TextBlock Text="{c:Localize Upload}" Classes="PropLabel"/></StackPanel><TextBlock Grid.Row="2" Text="{Binding NetworkUp}" FontSize="18" FontWeight="Bold"/></Grid></lumina:LuminaCard>
+                            <lumina:LuminaCard Classes="Glass" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Padding="15"><Grid RowDefinitions="Auto, 5, Auto"><StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="5"><avalonia:MaterialIcon Kind="Timer" Foreground="{DynamicResource LuminaPrimaryBrush}"/><TextBlock Text="{c:Localize Latency}" Classes="PropLabel"/></StackPanel><TextBlock Grid.Row="2" Text="{Binding PingStatus}" FontSize="18" FontWeight="Bold"/></Grid></lumina:LuminaCard>
+                        </Grid>
+                        
+                        <lumina:LuminaCard Classes="Glass" Grid.Row="4" Padding="15" HorizontalAlignment="Stretch">
+                            <Grid RowDefinitions="Auto, 10, Auto, 10, Auto, 10, Auto">
+                                <TextBlock Grid.Row="0" Text="{c:Localize Statistics}" FontWeight="Bold" FontSize="14"/>
+                                <Grid Grid.Row="2" ColumnDefinitions="*, Auto">
+                                    <TextBlock Grid.Column="0" Text="{c:Localize TcpConnections}" Classes="PropLabel"/><TextBlock Grid.Column="1" Text="{Binding TcpConnections}" Classes="PropValue"/>
+                                </Grid>
+                                <Grid Grid.Row="4" ColumnDefinitions="*, Auto">
+                                    <TextBlock Grid.Column="0" Text="{c:Localize TotalSent}" Classes="PropLabel"/><TextBlock Grid.Column="1" Text="{Binding NetTotalSent}" Classes="PropValue"/>
+                                </Grid>
+                                <Grid Grid.Row="6" ColumnDefinitions="*, Auto">
+                                    <TextBlock Grid.Column="0" Text="{c:Localize TotalReceived}" Classes="PropLabel"/><TextBlock Grid.Column="1" Text="{Binding NetTotalRecv}" Classes="PropValue"/>
+                                </Grid>
+                            </Grid>
+                        </lumina:LuminaCard>
+                        
+                        <TextBlock Grid.Row="6" Text="{c:Localize ListeningPorts}" FontSize="16" FontWeight="Bold"/>
+                        <lumina:LuminaCard Classes="Glass" Grid.Row="8" Padding="15" HorizontalAlignment="Stretch">
+                            <Grid RowDefinitions="Auto, 10, *">
+                                <Grid Grid.Row="0" ColumnDefinitions="80, *, 100">
+                                    <TextBlock Grid.Column="0" Text="{c:Localize PortColumn}" FontWeight="Bold" FontSize="11" Opacity="0.6"/>
+                                    <TextBlock Grid.Column="1" Text="{c:Localize Address}" FontWeight="Bold" FontSize="11" Opacity="0.6"/>
+                                    <TextBlock Grid.Column="2" Text="{c:Localize Process}" FontWeight="Bold" FontSize="11" Opacity="0.6"/>
+                                </Grid>
+                                <ItemsControl Grid.Row="2" ItemsSource="{Binding ListeningPorts}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid ColumnDefinitions="80, *, 100" Margin="0,3">
+                                                <TextBlock Grid.Column="0" Text="{Binding Display}" FontSize="11" Foreground="{DynamicResource LuminaSuccessBrush}"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding LocalAddress}" FontSize="11" TextTrimming="CharacterEllipsis" Opacity="0.8"/>
+                                                <TextBlock Grid.Column="2" Text="{Binding Process}" FontSize="11" TextTrimming="CharacterEllipsis" Opacity="0.6"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Grid>
+                        </lumina:LuminaCard>
+                    </Grid>
+                </ScrollViewer>
+
+                <!-- 6. SFTP -->
+                <Grid IsVisible="{Binding IsTabSftp}" RowDefinitions="Auto, 10, Auto, 10, *" Margin="15">
+                    <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto">
+                        <TextBlock Grid.Column="0" Text="{c:Localize FileManager}" FontWeight="Bold" FontSize="16" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="3">
+                            <Button Classes="Ghost" Command="{Binding Sftp.NavigateUpCommand}" ToolTip.Tip="{c:Localize ParentDirectory}" Padding="8">
+                                <avalonia:MaterialIcon Kind="ArrowUp" Width="16" Height="16"/>
+                            </Button>
+                            <Button Classes="Ghost" Command="{Binding Sftp.RefreshFilesCommand}" ToolTip.Tip="{c:Localize Refresh}" Padding="8">
+                                <avalonia:MaterialIcon Kind="Refresh" Width="16" Height="16"/>
+                            </Button>
+                            <Button Classes="Ghost" Command="{Binding Sftp.UploadFileCommand}" ToolTip.Tip="{c:Localize Upload}" Padding="8">
+                                <avalonia:MaterialIcon Kind="Upload" Width="16" Height="16"/>
+                            </Button>
+                            <Button Classes="Ghost" Command="{Binding Sftp.DownloadFileCommand}" ToolTip.Tip="{c:Localize Download}" Padding="8">
+                                <avalonia:MaterialIcon Kind="Download" Width="16" Height="16"/>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                    
+                    <TextBox Grid.Row="2" Text="{Binding Sftp.CurrentPath, Mode=TwoWay}" Classes="Small" KeyDown="SftpPathTextBox_KeyDown"/>
+                    
+                    <ListBox Grid.Row="4" ItemsSource="{Binding Sftp.Files}" Background="Transparent" Padding="0" DoubleTapped="SftpFileList_DoubleTapped">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="Auto, *, Auto" Height="32">
+                                    <avalonia:MaterialIcon Grid.Column="0" Kind="{Binding Icon}" Width="18" Height="18" Opacity="0.7" Margin="0,0,10,0"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding DisplaySize}" FontSize="10" Opacity="0.5" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    
+                    <Grid Grid.Row="4" Background="#80000000" IsVisible="{Binding Sftp.IsLoading}">
+                        <ProgressBar IsIndeterminate="True" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    </Grid>
+                </Grid>
+            </Grid>
+        </Grid>
+    </lumina:LuminaCard>
+</UserControl>

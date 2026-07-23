@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
@@ -13,24 +13,28 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="11.3.11" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.3.11" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.11" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.11" />
-    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.11">
+    <PackageReference Include="Avalonia" Version="12.0.4" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.0.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.0.4" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.0.4" />
+    <PackageReference Include="Avalonia.Controls.ColorPicker" Version="12.0.4" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" Version="12.0.0" />
+    <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.2">
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Avalonia.Controls.ColorPicker" Version="11.3.11" />
-    <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.3.11" />
-    <PackageReference Include="Avalonia.Xaml.Interactions" Version="11.3.0.6" />
-    <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.1.1" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.1" />
-    <PackageReference Include="Material.Icons.Avalonia" Version="2.4.1" />
+    <PackageReference Include="LuminaUI" Version="0.3.4" />
+    <PackageReference Include="LuminaUI.ColorPicker" Version="0.3.3" />
+    <PackageReference Include="LuminaUI.DataGrid" Version="0.3.3" />
+    <PackageReference Include="Material.Icons.Avalonia" Version="3.0.2" />
     <PackageReference Include="Porta.Pty" Version="1.0.6" />
     <PackageReference Include="SSH.NET" Version="2025.1.0" />
-    <PackageReference Include="SukiUI" Version="6.0.3" />
     <PackageReference Include="XTerm.NET" Version="1.0.10" />
     <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <PackageReference Include="LuminaUI.Diagnostics" Version="0.1.2" />
   </ItemGroup>
 </Project>

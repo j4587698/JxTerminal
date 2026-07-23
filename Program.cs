@@ -1,5 +1,6 @@
 ﻿using Avalonia;
 using System;
+using LuminaUI.Diagnostics;
 
 namespace JxTerminal;
 
@@ -29,6 +30,7 @@ sealed class Program
             .WithInterFont()
 #if DEBUG
             .WithDeveloperTools()
+            .UseLuminaUIDiagnostics()
 #endif
             .LogToTrace();
 }

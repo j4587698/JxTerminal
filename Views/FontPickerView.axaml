@@ -12,7 +12,7 @@
         <TextBlock Text="{c:Localize SelectFont}" FontSize="20" FontWeight="Bold" Margin="0,0,0,15"/>
         
         <Grid Grid.Row="1" RowDefinitions="Auto, *">
-            <TextBox Text="{Binding SearchText}" Watermark="{c:Localize Search}" Margin="0,0,0,10"/>
+            <TextBox Text="{Binding SearchText}" PlaceholderText="{c:Localize Search}" Margin="0,0,0,10"/>
             <ListBox Grid.Row="1" ItemsSource="{Binding FilteredFonts}" SelectedItem="{Binding SelectedFont}" Background="Transparent">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
@@ -23,8 +23,9 @@
         </Grid>
         
         <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" Margin="0,15,0,0">
-            <Button Content="{c:Localize Cancel}" Command="{Binding CancelCommand}" Classes="Flat"/>
-            <Button Content="{c:Localize Confirm}" Command="{Binding ConfirmCommand}" Classes="Accent"/>
+            <Button Content="{c:Localize Cancel}" Command="{Binding CancelCommand}" Classes="Ghost"/>
+            <Button Content="{c:Localize Confirm}" Command="{Binding ConfirmCommand}" Classes="Primary"/>
         </StackPanel>
     </Grid>
 </UserControl>
+

@@ -4,10 +4,11 @@ using CommunityToolkit.Mvvm.Input;
 using System;
 using System.Threading.Tasks;
 using JxTerminal.Models;
-using Avalonia.Media;
-using SukiUI.Dialogs;
-using SukiUI.Controls;
 using System.Linq;
+using Avalonia.Controls;
+using Avalonia.Layout;
+using Avalonia.Media;
+using LuminaUI.Controls;
 using Material.Icons;
 
 namespace JxTerminal.ViewModels;
@@ -15,25 +16,42 @@ namespace JxTerminal.ViewModels;
 public partial class MainWindowViewModel : ViewModelBase
 {
     [ObservableProperty]
-    private ViewModelBase _activeContent;
+    private ViewModelBase _activeContent = null!;
 
     partial void OnActiveContentChanged(ViewModelBase value)
     {
         if (value is HostListViewModel)
+        {
             SelectedMenuItem = MenuItems.FirstOrDefault(m => m.Key == "HostList");
+            SelectedNavigationKey = "HostList";
+        }
         else if (value is TerminalListViewModel)
+        {
             SelectedMenuItem = MenuItems.FirstOrDefault(m => m.Key == "Terminal");
+            SelectedNavigationKey = "Terminal";
+        }
+        else if (value is SettingsViewModel)
+        {
+            SelectedNavigationKey = "Settings";
+        }
     }
 
-    public HostListViewModel HostList { get; }
-    public TerminalListViewModel TerminalList { get; }
+    public HostListViewModel HostList { get; } = null!;
+    public TerminalListViewModel TerminalList { get; } = null!;
 
     public ObservableCollection<MenuItemViewModel> MenuItems { get; } = new();
 
     [ObservableProperty]
     private MenuItemViewModel? _selectedMenuItem;
 
-    public ISukiDialogManager DialogManager { get; } = new SukiDialogManager();
+    [ObservableProperty]
+    private string? _selectedNavigationKey = "HostList";
+
+    [ObservableProperty]
+    private object? _dialogContent;
+
+    [ObservableProperty]
+    private bool _isDialogOpen;
 
     [ObservableProperty]
     private TerminalSettings _settings;
@@ -109,10 +127,44 @@ public partial class MainWindowViewModel : ViewModelBase
     public void NavigateToTerminal() => ActiveContent = TerminalList;
 
     [RelayCommand]
-    public void NavigateToSettings() => ActiveContent = new SettingsViewModel(Settings, DialogManager);
+    public void NavigateToSettings() => ActiveContent = new SettingsViewModel(Settings, this);
 
     [RelayCommand]
-    public void NavigateToPlaceholder(string title) => ActiveContent = new PlaceholderViewModel(JxTerminal.Services.LocalizationService.Instance[title]);
+    public void NavigateToPlaceholder(string title)
+    {
+        SelectedNavigationKey = title;
+        ActiveContent = new PlaceholderViewModel(JxTerminal.Services.LocalizationService.Instance[title]);
+    }
+
+    public void ShowDialog(Control content, string? title = null)
+    {
+        DialogContent = new LuminaDialog
+        {
+            Title = title,
+            Content = content
+        };
+        IsDialogOpen = true;
+    }
+
+    public void ShowMessageDialog(string title, string message)
+    {
+        ShowDialog(
+            new TextBlock
+            {
+                Text = message,
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 520,
+                Margin = new Avalonia.Thickness(4),
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            },
+            title);
+    }
+
+    public void CloseDialog()
+    {
+        IsDialogOpen = false;
+        DialogContent = null;
+    }
 
     private async void LoadSettings()
     {
@@ -202,12 +254,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            var dialog = DialogManager.CreateDialog()
-                .WithTitle("Connection Failed")
-                .WithContent($"Failed to connect to host: {ex.Message}");
-            
-            dialog.SetCanDismissWithBackgroundClick(true);
-            dialog.TryShow();
+            ShowMessageDialog("Connection Failed", $"Failed to connect to host: {ex.Message}");
         }
         finally
         {
@@ -217,13 +264,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void OnConnectionError(Exception ex)
     {
-         Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () => {
-             var dialog = DialogManager.CreateDialog()
-                .WithTitle("Connection Error")
-                .WithContent(ex.Message);
-             
-             dialog.SetCanDismissWithBackgroundClick(true);
-             dialog.TryShow();
-         });
+         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+             ShowMessageDialog("Connection Error", ex.Message));
     }
 }

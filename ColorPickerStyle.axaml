@@ -1,10 +1,10 @@
-﻿<ResourceDictionary xmlns="https://github.com/avaloniaui"
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:controls="using:Avalonia.Controls"
                     xmlns:primitives="using:Avalonia.Controls.Primitives"
                     xmlns:c="using:JxTerminal.Converters"
                     xmlns:sys="using:System"
-                    xmlns:suki="https://github.com/kikipoulet/SukiUI">
+                    xmlns:lumina="clr-namespace:LuminaUI.Controls;assembly=LuminaUI">
 
   <ResourceDictionary.MergedDictionaries>
       <ResourceDictionary>
@@ -25,9 +25,9 @@
           <StreamGeometry x:Key="ColorViewComponentsIconGeometry">M3,6 C3,5.44772 3.44772,5 4,5 L20,5 C20.5523,5 21,5.44772 21,6 C21,6.55228 20.5523,7 20,7 L4,7 C3.44772,7 3,6.55228 3,6 Z M3,12 C3,11.4477 3.44772,11 4,11 L20,11 C20.5523,11 21,11.4477 21,12 C21,12.5523 20.5523,13 20,13 L4,13 C3.44772,13 3,12.5523 3,12 Z M3,18 C3,17.4477 3.44772,17 4,17 L20,17 C20.5523,17 21,17.4477 21,18 C21,18.5523 20.5523,19 20,19 L4,19 C3.44772,19 3,18.5523 3,18 Z M6,4 C6,3.44772 6.44772,3 7,3 C7.55228,3 8,3.44772 8,4 L8,8 C8,8.55228 7.55228,9 7,9 C6.44772,9 6,8.55228 6,8 L6,4 Z M13,10 C13,9.44772 13.4477,9 14,9 C14.5523,9 15,9.44772 15,10 L15,14 C15,14.5523 14.5523,15 14,15 C13.4477,15 13,14.5523 13,14 L13,10 Z M10,16 C10,15.4477 10.4477,15 11,15 C11.5523,15 12,15.4477 12,16 L12,20 C12,20.5523 11.5523,21 11,21 C10.4477,21 10,20.5523 10,20 L10,16 Z</StreamGeometry>
 
           <SolidColorBrush x:Key="ColorViewTabBorderBrush" Color="Transparent" />
-          <SolidColorBrush x:Key="ColorViewContentBackgroundBrush" Color="{DynamicResource SukiCardBackground}" />
-          <SolidColorBrush x:Key="ColorViewContentBorderBrush" Color="{DynamicResource SukiBorderColor}" />
-          <SolidColorBrush x:Key="SystemControlBackgroundBaseLowBrush" Color="{DynamicResource SukiCardBackground}" />
+          <SolidColorBrush x:Key="ColorViewContentBackgroundBrush" Color="{DynamicResource LuminaSurface}" />
+          <SolidColorBrush x:Key="ColorViewContentBorderBrush" Color="{DynamicResource LuminaBorder}" />
+          <SolidColorBrush x:Key="SystemControlBackgroundBaseLowBrush" Color="{DynamicResource LuminaSurface}" />
       </ResourceDictionary>
   </ResourceDictionary.MergedDictionaries>
   
@@ -59,7 +59,7 @@
                         UseLayoutRounding="False">
           <DropDownButton.Content>
              <Panel>
-                <suki:GlassCard Opacity="0"></suki:GlassCard>
+                <lumina:LuminaCard Classes="Glass" Opacity="0"></lumina:LuminaCard>
                 <Border Background="{Binding $parent[ColorPicker].HsvColor, Converter={StaticResource ToBrushConverter}}"
                         CornerRadius="7"
                         HorizontalAlignment="Stretch" 
@@ -280,7 +280,7 @@
                           </Grid.ColumnDefinitions>
                           <Border Grid.Column="0"
                                   Height="36"
-                                  Background="{DynamicResource SukiControlBorderBrush}"
+                                  Background="{DynamicResource LuminaDividerBrush}"
                                   BorderBrush="{DynamicResource ThemeBorderMidBrush}"
                                   BorderThickness="0"
                                   CornerRadius="12,0,0,12">
@@ -309,7 +309,7 @@
                               Grid.Row="2"
                               Height="{Binding ElementName=Component1NumericUpDown, Path=Bounds.Height}"
                               Width="{DynamicResource ColorViewComponentLabelWidth}"
-                              Background="{DynamicResource SukiControlBorderBrush}"
+                              Background="{DynamicResource LuminaDividerBrush}"
                               BorderBrush="{DynamicResource ThemeBorderMidBrush}"
                               BorderThickness="0"
                               CornerRadius="12,0,0,12"
@@ -360,7 +360,7 @@
                               Grid.Row="3"
                               Width="{DynamicResource ColorViewComponentLabelWidth}"
                               Height="{Binding ElementName=Component2NumericUpDown, Path=Bounds.Height}"
-                              Background="{DynamicResource SukiControlBorderBrush}"
+                              Background="{DynamicResource LuminaDividerBrush}"
                               BorderBrush="{DynamicResource ThemeBorderMidBrush}"
                               BorderThickness="0"
                               CornerRadius="12,0,0,12"
@@ -411,7 +411,7 @@
                               Grid.Row="4"
                               Width="{DynamicResource ColorViewComponentLabelWidth}"
                               Height="{Binding ElementName=Component3NumericUpDown, Path=Bounds.Height}"
-                              Background="{DynamicResource SukiControlBorderBrush}"
+                              Background="{DynamicResource LuminaDividerBrush}"
                               BorderBrush="{DynamicResource ThemeBorderMidBrush}"
                               BorderThickness="0"
                               CornerRadius="12,0,0,12"
@@ -462,7 +462,7 @@
                               Grid.Row="5"
                               Width="{DynamicResource ColorViewComponentLabelWidth}"
                               Height="{Binding ElementName=AlphaComponentNumericUpDown, Path=Bounds.Height}"
-                              Background="{DynamicResource SukiControlBorderBrush}"
+                              Background="{DynamicResource LuminaDividerBrush}"
                               BorderBrush="{DynamicResource ThemeBorderMidBrush}"
                               BorderThickness="0"
                               CornerRadius="12,0,0,12"

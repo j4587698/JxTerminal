@@ -1,28 +1,21 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:JxTerminal"
-             xmlns:suki="https://github.com/kikipoulet/SukiUI"
+             xmlns:lumina="clr-namespace:LuminaUI;assembly=LuminaUI"
+             xmlns:luminaColorPicker="using:LuminaUI.ColorPicker"
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="JxTerminal.App"
-             RequestedThemeVariant="Dark">
+             RequestedThemeVariant="Default">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
 
     <Application.DataTemplates>
         <local:ViewLocator/>
     </Application.DataTemplates>
 
-    <Application.Resources>
-        <ResourceDictionary>
-            <ResourceDictionary.MergedDictionaries>
-                <ResourceInclude Source="/ColorPickerStyle.axaml"/>
-            </ResourceDictionary.MergedDictionaries>
-        </ResourceDictionary>
-    </Application.Resources>
-
     <Application.Styles>
-        <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml" />
-        <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+        <FluentTheme />
+        <lumina:LuminaTheme />
+        <luminaColorPicker:LuminaColorPickerTheme />
         <materialIcons:MaterialIconStyles />
-        <suki:SukiTheme ThemeColor="Blue" />
     </Application.Styles>
 </Application>

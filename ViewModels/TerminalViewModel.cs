@@ -5,6 +5,8 @@ using JxTerminal.Models;
 using JxTerminal.Services;
 using System;
 using System.Collections.ObjectModel;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Linq;
 
@@ -73,7 +75,7 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
     [ObservableProperty] private double _load5 = 0;
     [ObservableProperty] private double _load15 = 0;
     
-    [ObservableProperty] private string _gpuModel = "None";
+    [ObservableProperty] private string _gpuModel = "N/A";
     [ObservableProperty] private double _gpuTemp = 0;
     [ObservableProperty] private int _gpuFanSpeed = 0; // RPM or %
     [ObservableProperty] private double _gpuPower = 0; // Watts
@@ -145,7 +147,22 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
     public ObservableCollection<PortInfo> ListeningPorts { get; } = new();
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsTabOverview))]
+    [NotifyPropertyChangedFor(nameof(IsTabCpu))]
+    [NotifyPropertyChangedFor(nameof(IsTabGpu))]
+    [NotifyPropertyChangedFor(nameof(IsTabMemory))]
+    [NotifyPropertyChangedFor(nameof(IsTabDisk))]
+    [NotifyPropertyChangedFor(nameof(IsTabNetwork))]
+    [NotifyPropertyChangedFor(nameof(IsTabSftp))]
     private int _selectedSidebarIndex = 0;
+
+    public bool IsTabOverview => SelectedSidebarIndex == 0;
+    public bool IsTabCpu => SelectedSidebarIndex == 1;
+    public bool IsTabGpu => SelectedSidebarIndex == 2;
+    public bool IsTabMemory => SelectedSidebarIndex == 3;
+    public bool IsTabDisk => SelectedSidebarIndex == 4;
+    public bool IsTabNetwork => SelectedSidebarIndex == 5;
+    public bool IsTabSftp => SelectedSidebarIndex == 6;
 
     [RelayCommand]
     private void SelectTab(string indexStr)
@@ -224,6 +241,8 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
     private long _prevDiskReadSectors = 0;
     private long _prevDiskWriteSectors = 0;
     private DateTime _prevCheckTime = DateTime.MinValue;
+    private string _gpuVendor = "";
+    private int _intelGpuLineIndex = 0;
 
     private async Task MonitorSystemInfo()
     {
@@ -283,19 +302,19 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
                 // Main monitoring command with process and port info
                 // Use /proc/meminfo instead of free -b for more reliable memory parsing
                 // Use separate markers for df -h (DISK_H) and df -B1 (DISK_B) to avoid parsing confusion
-                var cmd = "echo '>>>STAT'; grep '^cpu ' /proc/stat; echo '>>>MEM'; cat /proc/meminfo | grep -E '^(MemTotal|MemFree|MemAvailable|Buffers|Cached|SwapTotal|SwapFree):'; echo '>>>DISK_H'; df -h / | tail -n 1; echo '>>>DISK_B'; df -B1 / | tail -n 1; echo '>>>NET'; cat /proc/net/dev; cat /proc/net/snmp | grep 'Tcp:' | tail -n 1; ss -tan | grep ESTAB | wc -l; echo '>>>UPTIME'; uptime; echo '>>>TEMP'; cat /sys/class/thermal/thermal_zone*/temp 2>/dev/null | head -n 1; echo '>>>DISKIO'; cat /proc/diskstats; echo '>>>GPU'; nvidia-smi --query-gpu=utilization.gpu,temperature.gpu,power.draw,name,memory.used,memory.total --format=csv,noheader,nounits 2>/dev/null || echo 'N/A'; echo '>>>PROC'; ps aux --sort=-%cpu | head -n 11 | tail -n 10; echo '>>>PORTS'; ss -tlnp 2>/dev/null | tail -n +2 | head -n 20";
+                var cmd = "echo '>>>STAT'; grep '^cpu ' /proc/stat; echo '>>>MEM'; cat /proc/meminfo | grep -E '^(MemTotal|MemFree|MemAvailable|Buffers|Cached|SwapTotal|SwapFree):'; echo '>>>DISK_H'; df -h / | tail -n 1; echo '>>>DISK_B'; df -B1 / | tail -n 1; echo '>>>NET'; cat /proc/net/dev; cat /proc/net/snmp | grep 'Tcp:' | tail -n 1; ss -tan | grep ESTAB | wc -l; echo '>>>UPTIME'; uptime; echo '>>>TEMP'; cat /sys/class/thermal/thermal_zone*/temp 2>/dev/null | head -n 1; echo '>>>DISKIO'; cat /proc/diskstats; echo '>>>GPU'; if command -v nvidia-smi >/dev/null 2>&1; then echo 'NVIDIA'; nvidia-smi --query-gpu=utilization.gpu,temperature.gpu,power.draw,name,memory.used,memory.total,fan.speed --format=csv,noheader,nounits 2>/dev/null; elif command -v rocm-smi >/dev/null 2>&1; then echo 'AMD'; rocm-smi --showuse --showtemp --showmeminfo vram --showpower --showproductname --csv 2>/dev/null; elif [ -d /sys/class/drm/card0/device ]; then echo 'INTEL'; cat /sys/class/drm/card0/device/vendor 2>/dev/null; cat /sys/class/drm/card0/gt/gt_cur_freq_mhz 2>/dev/null || echo '0'; cat /sys/class/drm/card0/device/mem_info_vram_used 2>/dev/null || echo '0'; cat /sys/class/drm/card0/device/mem_info_vram_total 2>/dev/null || echo '0'; else echo 'N/A'; fi; echo '>>>PROC'; ps aux --sort=-%cpu | head -n 11 | tail -n 10; echo '>>>PORTS'; ss -tlnp 2>/dev/null | tail -n +2 | head -n 20";
                 
                 var output = await sshSession.ExecuteCommandAsync(cmd);
                 
                 ParseSystemInfo(output);
                 
-                // Ping measurement using SSH round-trip time
+                // Ping measurement using SSH round-trip time with high-precision Stopwatch
                 try
                 {
-                    var start = DateTime.Now;
+                    var sw = Stopwatch.StartNew();
                     await sshSession.ExecuteCommandAsync("echo");
-                    var elapsed = (DateTime.Now - start).TotalMilliseconds;
-                    PingLatency = Math.Round(elapsed, 1);
+                    sw.Stop();
+                    PingLatency = Math.Round(sw.Elapsed.TotalMilliseconds, 1);
                     PingStatus = $"{PingLatency:0.0} ms";
                 }
                 catch
@@ -339,6 +358,20 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
                 
                 var output = await sshSession.ExecuteCommandAsync(cmd);
                 ParseMacSystemInfo(output);
+                
+                // Ping measurement using SSH round-trip time with high-precision Stopwatch
+                try
+                {
+                    var sw = Stopwatch.StartNew();
+                    await sshSession.ExecuteCommandAsync("echo");
+                    sw.Stop();
+                    PingLatency = Math.Round(sw.Elapsed.TotalMilliseconds, 1);
+                    PingStatus = $"{PingLatency:0.0} ms";
+                }
+                catch
+                {
+                    PingStatus = "-";
+                }
             }
             catch
             {
@@ -531,6 +564,10 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
         long currentTx = 0;
         long currentDiskRead = 0;
         long currentDiskWrite = 0;
+        
+        // 临时列表：先收集，解析完毕后统一做差量更新
+        var newProcesses = new List<ProcessInfo>();
+        var newPorts = new List<PortInfo>();
 
         foreach (var line in lines)
         {
@@ -542,9 +579,9 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
             if (line == ">>>UPTIME") { section = 5; continue; }
             if (line == ">>>TEMP") { section = 6; continue; }
             if (line == ">>>DISKIO") { section = 7; continue; }
-            if (line == ">>>GPU") { section = 8; continue; }
-            if (line == ">>>PROC") { section = 9; Avalonia.Threading.Dispatcher.UIThread.Post(() => TopProcesses.Clear()); continue; }
-            if (line == ">>>PORTS") { section = 10; Avalonia.Threading.Dispatcher.UIThread.Post(() => ListeningPorts.Clear()); continue; }
+            if (line == ">>>GPU") { section = 8; _gpuVendor = ""; _intelGpuLineIndex = 0; continue; }
+            if (line == ">>>PROC") { section = 9; continue; }
+            if (line == ">>>PORTS") { section = 10; continue; }
 
             try
             {
@@ -741,9 +778,18 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
                         }
                         break;
                     case 8: // GPU
-                        if (line != "N/A")
+                        if (line == "N/A")
                         {
+                            GpuDetected = false;
+                        }
+                        else if (line == "NVIDIA" || line == "AMD" || line == "INTEL")
+                        {
+                            _gpuVendor = line;
                             GpuDetected = true;
+                        }
+                        else if (_gpuVendor == "NVIDIA")
+                        {
+                            // Format: utilization.gpu, temperature.gpu, power.draw, name, memory.used, memory.total, fan.speed
                             var gParts = line.Split(',');
                             if (gParts.Length >= 4)
                             {
@@ -752,7 +798,6 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
                                 if(double.TryParse(gParts[2], out double gp)) GpuPower = gp;
                                 GpuModel = gParts[3].Trim();
                                 
-                                // Memory if available (indices 4 and 5)
                                 if (gParts.Length >= 6)
                                 {
                                     if (double.TryParse(gParts[4], out double memUsed)) 
@@ -760,11 +805,22 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
                                     if (double.TryParse(gParts[5], out double memTotal))
                                         GpuMemoryTotal = memTotal / 1024.0;
                                 }
+                                if (gParts.Length >= 7)
+                                {
+                                    // fan.speed may return "[Not Supported]" for some cards
+                                    if (int.TryParse(gParts[6].Trim(), out int fan))
+                                        GpuFanSpeed = fan;
+                                }
                             }
                         }
-                        else
+                        else if (_gpuVendor == "AMD")
                         {
-                            GpuDetected = false;
+                            // rocm-smi CSV output: parse key-value lines
+                            ParseAmdGpuLine(line);
+                        }
+                        else if (_gpuVendor == "INTEL")
+                        {
+                            ParseIntelGpuLine(line);
                         }
                         break;
                     
@@ -781,7 +837,7 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
                                 MemPercent = double.TryParse(procParts[3], out double mem) ? mem : 0,
                                 Name = string.Join(" ", procParts.Skip(10))
                             };
-                            Avalonia.Threading.Dispatcher.UIThread.Post(() => TopProcesses.Add(procInfo));
+                            newProcesses.Add(procInfo);
                         }
                         break;
                     
@@ -802,7 +858,7 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
                                     LocalAddress = localAddr.Substring(0, colonIdx),
                                     Process = portParts.Length > 5 ? portParts[5] : ""
                                 };
-                                Avalonia.Threading.Dispatcher.UIThread.Post(() => ListeningPorts.Add(portInfo));
+                                newPorts.Add(portInfo);
                             }
                         }
                         break;
@@ -838,6 +894,183 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
         _prevTxBytes = currentTx;
         _prevDiskReadSectors = currentDiskRead;
         _prevDiskWriteSectors = currentDiskWrite;
+        
+        // 差量更新进程列表和端口列表（在 UI 线程一次性完成，避免 Clear 导致滚动重置）
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            DiffUpdateProcesses(newProcesses);
+            DiffUpdatePorts(newPorts);
+        });
+    }
+
+    /// <summary>
+    /// 按位置更新进程列表：逐索引就地更新属性，多余删除，不足添加。
+    /// 保持新数据的排序顺序，不触发 CollectionChanged.Reset，ScrollViewer 滚动位置不丢失。
+    /// 必须在 UI 线程调用。
+    /// </summary>
+    private void DiffUpdateProcesses(List<ProcessInfo> newItems)
+    {
+        // 1. 就地更新已有位置
+        int commonCount = Math.Min(TopProcesses.Count, newItems.Count);
+        for (int i = 0; i < commonCount; i++)
+        {
+            TopProcesses[i].UpdateFrom(newItems[i]);
+        }
+        
+        // 2. 如果新数据更少，从末尾删除多余项
+        while (TopProcesses.Count > newItems.Count)
+        {
+            TopProcesses.RemoveAt(TopProcesses.Count - 1);
+        }
+        
+        // 3. 如果新数据更多，添加新项
+        for (int i = commonCount; i < newItems.Count; i++)
+        {
+            TopProcesses.Add(newItems[i]);
+        }
+    }
+
+    /// <summary>
+    /// 按位置更新端口列表：逐索引就地更新属性，多余删除，不足添加。
+    /// 必须在 UI 线程调用。
+    /// </summary>
+    private void DiffUpdatePorts(List<PortInfo> newItems)
+    {
+        // 1. 就地更新已有位置
+        int commonCount = Math.Min(ListeningPorts.Count, newItems.Count);
+        for (int i = 0; i < commonCount; i++)
+        {
+            ListeningPorts[i].UpdateFrom(newItems[i]);
+        }
+        
+        // 2. 如果新数据更少，从末尾删除多余项
+        while (ListeningPorts.Count > newItems.Count)
+        {
+            ListeningPorts.RemoveAt(ListeningPorts.Count - 1);
+        }
+        
+        // 3. 如果新数据更多，添加新项
+        for (int i = commonCount; i < newItems.Count; i++)
+        {
+            ListeningPorts.Add(newItems[i]);
+        }
+    }
+
+    private void ParseAmdGpuLine(string line)
+    {
+        // rocm-smi CSV output format varies, try to extract key metrics
+        // Typical output contains lines like: "card0, 85.0, 72.0, 150.0, ..."
+        // or key-value pairs from different flags
+        if (line.Contains("GPU use") || line.Contains("GPU Activity"))
+        {
+            // Extract percentage
+            var parts = line.Split(new[] { ':', ',' }, StringSplitOptions.TrimEntries);
+            foreach (var part in parts)
+            {
+                var trimmed = part.Trim().TrimEnd('%');
+                if (double.TryParse(trimmed, out double val) && val >= 0 && val <= 100)
+                {
+                    GpuUsage = val;
+                    break;
+                }
+            }
+        }
+        else if (line.Contains("Temperature") || line.Contains("Temp"))
+        {
+            var parts = line.Split(new[] { ':', ',' }, StringSplitOptions.TrimEntries);
+            foreach (var part in parts)
+            {
+                var trimmed = part.Trim().TrimEnd('C', 'c', ' ');
+                if (double.TryParse(trimmed, out double val) && val > 0 && val < 200)
+                {
+                    GpuTemp = val;
+                    break;
+                }
+            }
+        }
+        else if (line.Contains("Power") || line.Contains("Average Graphics Package Power"))
+        {
+            var parts = line.Split(new[] { ':', ',' }, StringSplitOptions.TrimEntries);
+            foreach (var part in parts)
+            {
+                var trimmed = part.Trim().TrimEnd('W', 'w', ' ');
+                if (double.TryParse(trimmed, out double val) && val > 0)
+                {
+                    GpuPower = val;
+                    break;
+                }
+            }
+        }
+        else if (line.Contains("Card series") || line.Contains("Card model") || (line.Contains("GPU") && line.Contains("Radeon")))
+        {
+            var parts = line.Split(new[] { ':' }, 2);
+            if (parts.Length == 2)
+                GpuModel = parts[1].Trim();
+            else if (line.Contains("Radeon"))
+                GpuModel = line.Trim();
+        }
+        else if (line.Contains("VRAM Total Memory") || line.Contains("vram Total"))
+        {
+            var parts = line.Split(new[] { ':', ',' }, StringSplitOptions.TrimEntries);
+            foreach (var part in parts)
+            {
+                if (long.TryParse(part.Trim(), out long val) && val > 0)
+                {
+                    GpuMemoryTotal = val / (1024.0 * 1024.0 * 1024.0); // Bytes to GB
+                    break;
+                }
+            }
+        }
+        else if (line.Contains("VRAM Total Used Memory") || line.Contains("vram Used"))
+        {
+            var parts = line.Split(new[] { ':', ',' }, StringSplitOptions.TrimEntries);
+            foreach (var part in parts)
+            {
+                if (long.TryParse(part.Trim(), out long val) && val > 0)
+                {
+                    GpuMemoryUsed = val / (1024.0 * 1024.0 * 1024.0); // Bytes to GB
+                    break;
+                }
+            }
+        }
+    }
+
+    private void ParseIntelGpuLine(string line)
+    {
+        // Intel GPU via sysfs: 4 lines in order:
+        // Line 0: vendor (e.g. "0x8086")
+        // Line 1: current frequency MHz
+        // Line 2: VRAM used bytes
+        // Line 3: VRAM total bytes
+        switch (_intelGpuLineIndex)
+        {
+            case 0:
+                if (line.Contains("8086"))
+                    GpuModel = "Intel Integrated Graphics";
+                else
+                    GpuModel = "Intel GPU";
+                _intelGpuLineIndex++;
+                break;
+            case 1:
+                if (double.TryParse(line.Trim(), out double freq) && freq > 0)
+                {
+                    // Use frequency as a rough "usage" indicator (higher freq = more usage)
+                    // Not a real percentage, but gives some information
+                    GpuModel = $"Intel GPU @ {freq:0} MHz";
+                }
+                _intelGpuLineIndex++;
+                break;
+            case 2:
+                if (long.TryParse(line.Trim(), out long vramUsed) && vramUsed > 0)
+                    GpuMemoryUsed = vramUsed / (1024.0 * 1024.0 * 1024.0);
+                _intelGpuLineIndex++;
+                break;
+            case 3:
+                if (long.TryParse(line.Trim(), out long vramTotal) && vramTotal > 0)
+                    GpuMemoryTotal = vramTotal / (1024.0 * 1024.0 * 1024.0);
+                _intelGpuLineIndex = 0;
+                break;
+        }
     }
 
     private string FormatSize(double bytes)

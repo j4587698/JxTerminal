@@ -4,74 +4,78 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:JxTerminal.ViewModels"
              xmlns:c="using:JxTerminal.Converters"
+             xmlns:lumina="clr-namespace:LuminaUI.Controls;assembly=LuminaUI"
              mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="450"
              x:Class="JxTerminal.Views.AddConnectionView"
              x:DataType="vm:AddConnectionViewModel">
-    <StackPanel Spacing="15">
-        <TextBlock Text="{c:Localize ConnectionDetails}" FontSize="18" FontWeight="Bold"/>
+    <lumina:LuminaCard Classes="Glass" CornerRadius="12" Padding="24" Margin="24" VerticalAlignment="Center" HorizontalAlignment="Center" MinWidth="360">
+        <StackPanel Spacing="15">
+            <TextBlock Text="{c:Localize ConnectionDetails}" FontSize="18" FontWeight="Bold"/>
 
-        <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto, Auto">
-             <TextBlock Text="{c:Localize Name}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-             <TextBox Grid.Column="1" Text="{Binding Name}" />
-             
-             <TextBlock Grid.Row="1" Text="{c:Localize Group}" VerticalAlignment="Center" Margin="0,10,10,0"/>
-             <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding AvailableGroups}" SelectedItem="{Binding SelectedGroup}" Margin="0,10,0,0" HorizontalAlignment="Stretch"/>
+            <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto, Auto">
+                 <TextBlock Text="{c:Localize Name}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                 <TextBox Grid.Column="1" Text="{Binding Name}" />
+                 
+                 <TextBlock Grid.Row="1" Text="{c:Localize Group}" VerticalAlignment="Center" Margin="0,10,10,0"/>
+                 <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding AvailableGroups}" SelectedItem="{Binding SelectedGroup}" Margin="0,10,0,0" HorizontalAlignment="Stretch"/>
 
-             <TextBlock Grid.Row="2" Text="{c:Localize Protocol}" VerticalAlignment="Center" Margin="0,10,10,0"/>
-             <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
-                 <RadioButton Content="SSH" IsChecked="{Binding IsSsh, Mode=TwoWay}" />
-                 <RadioButton Content="Telnet" IsChecked="{Binding IsTelnet, Mode=TwoWay}" />
-                 <RadioButton Content="{c:Localize Serial}" IsChecked="{Binding IsSerial, Mode=TwoWay}" />
-             </StackPanel>
-        </Grid>
-        
-        <Separator />
-
-        <!-- Host/Port (SSH/Telnet) -->
-        <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto" IsVisible="{Binding !IsSerial}">
-            <TextBox Grid.Row="0" Text="{Binding Host}" Watermark="{c:Localize Host}" />
-            <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding Port}" Minimum="1" Maximum="65535" Margin="10,0,0,0" Width="100"/>
-        </Grid>
-
-        <!-- Serial Fields -->
-        <StackPanel IsVisible="{Binding IsSerial}" Spacing="10">
-            <Grid ColumnDefinitions="*, Auto">
-                <TextBlock Text="{c:Localize PortName}" VerticalAlignment="Center"/>
-                <Button Grid.Column="1" Command="{Binding RefreshSerialPortsCommand}" Content="{c:Localize Refresh}" Classes="Flat" />
+                 <TextBlock Grid.Row="2" Text="{c:Localize Protocol}" VerticalAlignment="Center" Margin="0,10,10,0"/>
+                 <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
+                     <RadioButton Content="SSH" IsChecked="{Binding IsSsh, Mode=TwoWay}" />
+                     <RadioButton Content="Telnet" IsChecked="{Binding IsTelnet, Mode=TwoWay}" />
+                     <RadioButton Content="{c:Localize Serial}" IsChecked="{Binding IsSerial, Mode=TwoWay}" />
+                 </StackPanel>
             </Grid>
-            <ComboBox ItemsSource="{Binding AvailableSerialPorts}" SelectedItem="{Binding SerialPortName}" HorizontalAlignment="Stretch" IsEditable="True" />
             
-            <TextBlock Text="{c:Localize BaudRate}" />
-            <ComboBox ItemsSource="{Binding AvailableBaudRates}" SelectedItem="{Binding BaudRate}" HorizontalAlignment="Stretch" />
-        </StackPanel>
+            <Border Height="1" Background="{DynamicResource LuminaDividerBrush}" Margin="0,5"/>
 
-        <!-- SSH Fields -->
-        <StackPanel IsVisible="{Binding IsSsh}" Spacing="10">
-            <TextBox Text="{Binding Username}" Watermark="{c:Localize Username}" />
-            
-            <TextBlock Text="{c:Localize AuthenticationMethod}" Margin="0,5,0,0"/>
-            <ComboBox SelectedIndex="{Binding AuthenticationType}" HorizontalAlignment="Stretch">
-                <ComboBoxItem Content="{c:Localize Password}"/>
-                <ComboBoxItem Content="{c:Localize PrivateKey}"/>
-                <ComboBoxItem Content="{c:Localize AskInteractive}"/>
-            </ComboBox>
+            <!-- Host/Port (SSH/Telnet) -->
+            <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto" IsVisible="{Binding !IsSerial}">
+                <TextBox Grid.Row="0" Text="{Binding Host}" PlaceholderText="{c:Localize Host}" />
+                <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding Port}" Minimum="1" Maximum="65535" Margin="10,0,0,0" MinWidth="100"/>
+            </Grid>
 
-            <TextBox Text="{Binding Password}" Watermark="{c:Localize Password}" PasswordChar="*" IsVisible="{Binding IsPasswordAuth}" />
-            
-            <StackPanel IsVisible="{Binding IsKeyAuth}" Spacing="5">
+            <!-- Serial Fields -->
+            <StackPanel IsVisible="{Binding IsSerial}" Spacing="10">
                 <Grid ColumnDefinitions="*, Auto">
-                    <TextBox Text="{Binding KeyFilePath}" Watermark="{c:Localize KeyPath}" />
-                    <Button Command="{Binding SelectKeyFileCommand}" Content="..." Margin="5,0,0,0"/>
+                    <TextBlock Text="{c:Localize PortName}" VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Command="{Binding RefreshSerialPortsCommand}" Content="{c:Localize Refresh}" Classes="Outline" />
                 </Grid>
-                <TextBox Text="{Binding Passphrase}" Watermark="{c:Localize Passphrase}" PasswordChar="*" />
+                <ComboBox ItemsSource="{Binding AvailableSerialPorts}" SelectedItem="{Binding SerialPortName}" HorizontalAlignment="Stretch" IsEditable="True" />
+                
+                <TextBlock Text="{c:Localize BaudRate}" />
+                <ComboBox ItemsSource="{Binding AvailableBaudRates}" SelectedItem="{Binding BaudRate}" HorizontalAlignment="Stretch" />
+            </StackPanel>
+
+            <!-- SSH Fields -->
+            <StackPanel IsVisible="{Binding IsSsh}" Spacing="10">
+                <TextBox Text="{Binding Username}" PlaceholderText="{c:Localize Username}" />
+                
+                <TextBlock Text="{c:Localize AuthenticationMethod}" Margin="0,5,0,0"/>
+                <ComboBox SelectedIndex="{Binding AuthenticationType}" HorizontalAlignment="Stretch">
+                    <ComboBoxItem Content="{c:Localize Password}"/>
+                    <ComboBoxItem Content="{c:Localize PrivateKey}"/>
+                    <ComboBoxItem Content="{c:Localize AskInteractive}"/>
+                </ComboBox>
+
+                <TextBox Text="{Binding Password}" PlaceholderText="{c:Localize Password}" PasswordChar="*" IsVisible="{Binding IsPasswordAuth}" />
+                
+                <StackPanel IsVisible="{Binding IsKeyAuth}" Spacing="5">
+                    <Grid ColumnDefinitions="*, Auto">
+                        <TextBox Text="{Binding KeyFilePath}" PlaceholderText="{c:Localize KeyPath}" />
+                        <Button Command="{Binding SelectKeyFileCommand}" Content="..." Margin="5,0,0,0" Classes="Outline"/>
+                    </Grid>
+                    <TextBox Text="{Binding Passphrase}" PlaceholderText="{c:Localize Passphrase}" PasswordChar="*" />
+                </StackPanel>
+                
+                <TextBlock Text="{c:Localize AskPasswordTip}" IsVisible="{Binding IsAskAuth}" FontStyle="Italic" Opacity="0.7"/>
             </StackPanel>
             
-            <TextBlock Text="{c:Localize AskPasswordTip}" IsVisible="{Binding IsAskAuth}" FontStyle="Italic" Opacity="0.7"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,20,0,0">
+                <Button Command="{Binding CancelCommand}" Content="{c:Localize Cancel}" Classes="Outline"/>
+                <Button Command="{Binding SaveCommand}" Content="{c:Localize Save}" Classes="Primary"/>
+            </StackPanel>
         </StackPanel>
-        
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,20,0,0">
-            <Button Command="{Binding CancelCommand}" Content="{c:Localize Cancel}" Classes="Flat"/>
-            <Button Command="{Binding SaveCommand}" Content="{c:Localize Save}" Classes="Accent"/>
-        </StackPanel>
-    </StackPanel>
+    </lumina:LuminaCard>
 </UserControl>
+

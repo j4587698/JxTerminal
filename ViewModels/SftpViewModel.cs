@@ -138,18 +138,19 @@ public partial class SftpViewModel : ObservableObject
                 SuggestedFileName = fileItem.Name
             });
 
-            if (file != null)
+            if (file != null && _session.SftpClient != null)
             {
                 IsLoading = true;
+                var sftpClient = _session.SftpClient;
                 await Task.Run(async () =>
                 {
-                    using var remoteStream = _session.SftpClient.OpenRead(fileItem.Path);
+                    using var remoteStream = sftpClient.OpenRead(fileItem.Path);
                     using var localStream = await file.OpenWriteAsync();
                     await remoteStream.CopyToAsync(localStream);
                 });
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // Show error
         }
@@ -175,15 +176,19 @@ public partial class SftpViewModel : ObservableObject
             if (files.Any())
             {
                 IsLoading = true;
-                await Task.Run(async () =>
+                if (_session.SftpClient != null)
                 {
-                    foreach (var file in files)
+                    var sftpClient = _session.SftpClient;
+                    await Task.Run(async () =>
                     {
-                        using var localStream = await file.OpenReadAsync();
-                        string remotePath = Path.Combine(CurrentPath, file.Name).Replace("\\", "/");
-                        _session.SftpClient.UploadFile(localStream, remotePath);
-                    }
-                });
+                        foreach (var file in files)
+                        {
+                            using var localStream = await file.OpenReadAsync();
+                            string remotePath = Path.Combine(CurrentPath, file.Name).Replace("\\", "/");
+                            sftpClient.UploadFile(localStream, remotePath);
+                        }
+                    });
+                }
                 await RefreshFiles();
             }
         }

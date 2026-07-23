@@ -1,76 +1,146 @@
-<suki:SukiWindow xmlns="https://github.com/avaloniaui"
-                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-                 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-                 xmlns:suki="https://github.com/kikipoulet/SukiUI"
-                 xmlns:vm="using:JxTerminal.ViewModels"
-                 xmlns:v="using:JxTerminal.Views"
-                 xmlns:c="using:JxTerminal.Converters"
-                 xmlns:avalonia="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
-                 mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
-                 x:Class="JxTerminal.Views.MainWindow"
-                 x:DataType="vm:MainWindowViewModel"
-                 Icon="/Assets/avalonia-logo.ico"
-                 Title="{c:Localize AppName}">
+<lumina:LuminaWindow xmlns="https://github.com/avaloniaui"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                     xmlns:lumina="clr-namespace:LuminaUI.Controls;assembly=LuminaUI"
+                     xmlns:vm="using:JxTerminal.ViewModels"
+                     xmlns:c="using:JxTerminal.Converters"
+                     xmlns:avalonia="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+                     xmlns:icons="clr-namespace:Material.Icons;assembly=Material.Icons"
+                     mc:Ignorable="d"
+                     d:DesignWidth="1200"
+                     d:DesignHeight="800"
+                     x:Class="JxTerminal.Views.MainWindow"
+                     x:DataType="vm:MainWindowViewModel"
+                     Icon="/Assets/avalonia-logo.ico"
+                     Title="{c:Localize AppName}"
+                     WindowChromeMode="Extended"
+                     ExtendedSystemButtonMode="Auto"
+                     UseWindowGlass="True">
+    <lumina:LuminaWindow.DataTemplates>
+        <DataTemplate DataType="icons:MaterialIconKind">
+            <avalonia:MaterialIcon Kind="{Binding}" Width="20" Height="20" />
+        </DataTemplate>
+    </lumina:LuminaWindow.DataTemplates>
 
-    <suki:SukiWindow.Hosts>
-        <suki:SukiDialogHost Manager="{Binding DialogManager}" />
-    </suki:SukiWindow.Hosts>
-    
     <Grid>
-       <!-- Main Content (SukiSideMenu) -->
+        <lumina:LuminaShell ShellKey="Root"
+                            OpenPaneLength="220"
+                            IsMenuOpen="True"
+                            Padding="0"
+                            IsShellChromeVisible="True"
+                            IsShellHeaderVisible="False"
+                            AutoApplyPageMetadata="False"
+                            ActiveNavigationKey="{Binding SelectedNavigationKey, Mode=TwoWay}"
+                            DialogContent="{Binding DialogContent}"
+                            IsDialogOpen="{Binding IsDialogOpen}">
+            <lumina:LuminaShell.MenuHeader>
+                <StackPanel Orientation="Horizontal" Spacing="10" Margin="12,18,12,12">
+                    <avalonia:MaterialIcon Kind="ConsoleLine"
+                                           Foreground="{DynamicResource LuminaPrimaryBrush}"
+                                           Width="24"
+                                           Height="24"/>
+                    <TextBlock Text="JxTerminal"
+                               FontWeight="Bold"
+                               FontSize="18"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource LuminaTextForegroundBrush}" />
+                </StackPanel>
+            </lumina:LuminaShell.MenuHeader>
 
-    <suki:SukiSideMenu x:Name="NavMenu"
-                       ItemsSource="{Binding MenuItems}"
-                       IsMenuExpanded="True"
-                       SelectedItem="{Binding SelectedMenuItem, Mode=TwoWay}"
-                       UseCustomContent="True"
-                       SelectionChanged="OnSelectionChanged">
-        <suki:SukiSideMenu.HeaderContent>
-            <StackPanel Orientation="Horizontal" Spacing="10" Margin="12,42,12,12">
-                <avalonia:MaterialIcon Kind="ConsoleLine" Foreground="{DynamicResource SukiPrimaryColor}" Width="24" Height="24"/>
-                <TextBlock Text="JxTerminal" FontWeight="Bold" FontSize="18" VerticalAlignment="Center" />
-            </StackPanel>
-        </suki:SukiSideMenu.HeaderContent>
+            <lumina:LuminaShell.MenuContent>
+                <lumina:LuminaNavigationView SelectedKey="{Binding SelectedNavigationKey, Mode=TwoWay}">
+                    <lumina:LuminaNavigationItem NavigationKey="HostList"
+                                                Header="{c:Localize HostList}"
+                                                Command="{Binding NavigateToHostListCommand}" Icon="{x:Static icons:MaterialIconKind.ServerNetwork}">
+                        
+                    </lumina:LuminaNavigationItem>
 
-                        <suki:SukiSideMenu.ItemTemplate>
-                            <DataTemplate DataType="vm:MenuItemViewModel">
-                                <suki:SukiSideMenuItem Header="{Binding Header}" ItemsSource="{Binding Children}">
-                                    <suki:SukiSideMenuItem.Icon>
-                                        <avalonia:MaterialIcon Kind="{Binding IconKind}" Width="24" Height="24" />
-                                    </suki:SukiSideMenuItem.Icon>
-                                </suki:SukiSideMenuItem>
-                            </DataTemplate>
-                        </suki:SukiSideMenu.ItemTemplate>
-        <suki:SukiSideMenu.FooterContent>
-             <StackPanel Margin="10">
-                <Button Classes="Flat" HorizontalAlignment="Stretch" Padding="5" Margin="0,10,0,0">
+                    <lumina:LuminaNavigationItem NavigationKey="Terminal"
+                                                Header="{c:Localize Terminal}"
+                                                Command="{Binding NavigateToTerminalCommand}" Icon="{x:Static icons:MaterialIconKind.ConsoleLine}">
+                        
+                    </lumina:LuminaNavigationItem>
+
+                    <lumina:LuminaNavigationItem NavigationKey="Transfer"
+                                                Header="{c:Localize Transfer}"
+                                                Command="{Binding NavigateToPlaceholderCommand}"
+                                                CommandParameter="Transfer" Icon="{x:Static icons:MaterialIconKind.FolderSwap}">
+                        
+                    </lumina:LuminaNavigationItem>
+
+                    <lumina:LuminaNavigationItem NavigationKey="Snippets"
+                                                Header="{c:Localize Snippets}"
+                                                Command="{Binding NavigateToPlaceholderCommand}"
+                                                CommandParameter="Snippets" Icon="{x:Static icons:MaterialIconKind.CodeBraces}">
+                        
+                    </lumina:LuminaNavigationItem>
+
+                    <lumina:LuminaNavigationItem NavigationKey="Keys"
+                                                Header="{c:Localize Keys}"
+                                                Command="{Binding NavigateToPlaceholderCommand}"
+                                                CommandParameter="Keys" Icon="{x:Static icons:MaterialIconKind.KeyVariant}">
+                        
+                    </lumina:LuminaNavigationItem>
+
+                    <lumina:LuminaNavigationItem NavigationKey="Settings"
+                                                Header="{c:Localize Settings}"
+                                                Command="{Binding NavigateToSettingsCommand}" Icon="{x:Static icons:MaterialIconKind.Cog}">
+                        
+                    </lumina:LuminaNavigationItem>
+                </lumina:LuminaNavigationView>
+            </lumina:LuminaShell.MenuContent>
+
+            <lumina:LuminaShell.MenuFooter>
+                <lumina:LuminaCard Padding="10"
+                                   Margin="8"
+                                   Classes="Interactive"
+                                   Background="{DynamicResource LuminaNavigationPaneItemBrush}"
+                                   BorderThickness="0">
                     <Grid ColumnDefinitions="Auto, *">
-                        <Border Width="32" Height="32" CornerRadius="16" Background="Gray" Margin="0,0,10,0">
-                            <avalonia:MaterialIcon Kind="User" Foreground="White" Width="16" Height="16"/>
+                        <Border Width="32"
+                                Height="32"
+                                CornerRadius="16"
+                                Background="{DynamicResource LuminaBorderBrush}"
+                                Margin="0,0,10,0">
+                            <avalonia:MaterialIcon Kind="User"
+                                                   Foreground="{DynamicResource LuminaTextForegroundBrush}"
+                                                   Width="16"
+                                                   Height="16"/>
                         </Border>
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="{c:Localize Login}" FontSize="10" Opacity="0.7"/>
-                        </StackPanel>
+                        <TextBlock Grid.Column="1"
+                                   Text="{c:Localize Login}"
+                                   FontSize="12"
+                                   Opacity="0.7"
+                                   VerticalAlignment="Center"/>
                     </Grid>
-                </Button>
-             </StackPanel>
-        </suki:SukiSideMenu.FooterContent>
+                </lumina:LuminaCard>
+            </lumina:LuminaShell.MenuFooter>
 
-        <suki:SukiSideMenu.Content>
-            <TransitioningContentControl Margin="12,36,12,12" Content="{Binding ActiveContent}">
-                <TransitioningContentControl.PageTransition>
-                    <CrossFade Duration="0:00:00.200" />
-                </TransitioningContentControl.PageTransition>
-            </TransitioningContentControl>
-        </suki:SukiSideMenu.Content>
-    </suki:SukiSideMenu>
-    
-        <Grid Background="#80000000" IsVisible="{Binding IsBusy}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+            <Border Background="{DynamicResource LuminaBackgroundBrush}">
+                <TransitioningContentControl Content="{Binding ActiveContent}"
+                                             Padding="0"
+                                             Margin="0"
+                                             VerticalContentAlignment="Stretch"
+                                             HorizontalContentAlignment="Stretch">
+                    <TransitioningContentControl.PageTransition>
+                        <CrossFade Duration="0:00:00.200" />
+                    </TransitioningContentControl.PageTransition>
+                </TransitioningContentControl>
+            </Border>
+        </lumina:LuminaShell>
+
+        <Grid Background="#80000000"
+              IsVisible="{Binding IsBusy}"
+              HorizontalAlignment="Stretch"
+              VerticalAlignment="Stretch">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="20">
-                <suki:Loading /> 
-                <TextBlock Text="Connecting..." Foreground="White" FontSize="20" FontWeight="Bold"/>
+                <lumina:LuminaLoading Size="42" StrokeThickness="4" />
+                <TextBlock Text="Connecting..."
+                           Foreground="{DynamicResource LuminaTextForegroundBrush}"
+                           FontSize="20"
+                           FontWeight="Bold"/>
             </StackPanel>
         </Grid>
     </Grid>
-</suki:SukiWindow>
+</lumina:LuminaWindow>
