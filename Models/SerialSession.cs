@@ -10,6 +10,10 @@ public class SerialSession : ITerminalSession
 {
     public string PortName { get; }
     public int BaudRate { get; }
+    public int DataBits { get; }
+    public Parity Parity { get; }
+    public StopBits StopBits { get; }
+    public Handshake Handshake { get; }
 
     private SerialPort? _serialPort;
     private CancellationTokenSource? _cts;
@@ -21,10 +25,15 @@ public class SerialSession : ITerminalSession
 
     public bool IsConnected => _serialPort?.IsOpen ?? false;
 
-    public SerialSession(string portName, int baudRate)
+    public SerialSession(string portName, int baudRate, int dataBits = 8,
+        Parity parity = Parity.None, StopBits stopBits = StopBits.One, Handshake handshake = Handshake.None)
     {
         PortName = portName;
         BaudRate = baudRate;
+        DataBits = dataBits;
+        Parity = parity;
+        StopBits = stopBits;
+        Handshake = handshake;
     }
 
     public async Task ConnectAsync()
@@ -33,11 +42,12 @@ public class SerialSession : ITerminalSession
         {
             try
             {
-                _serialPort = new SerialPort(PortName, BaudRate)
+                _serialPort = new SerialPort(PortName, BaudRate, Parity, DataBits, StopBits)
                 {
                     Encoding = Encoding.UTF8, // Maybe configurable?
-                    DtrEnable = true,
-                    RtsEnable = true
+                    Handshake = Handshake,
+                    DtrEnable = Handshake != Handshake.RequestToSend && Handshake != Handshake.RequestToSendXOnXOff,
+                    RtsEnable = Handshake != Handshake.RequestToSend && Handshake != Handshake.RequestToSendXOnXOff
                 };
                 
                 _serialPort.Open();

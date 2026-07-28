@@ -39,6 +39,28 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
     [ObservableProperty]
     private bool _isSystemInfoVisible = true; // Default to true for modern look
 
+    // Find in terminal
+    [ObservableProperty]
+    private bool _isSearchVisible;
+
+    [ObservableProperty]
+    private string _searchText = string.Empty;
+
+    [ObservableProperty]
+    private bool _searchMatchCase;
+
+    partial void OnIsSearchVisibleChanged(bool value)
+    {
+        // Dropping the query clears the highlights in the terminal control.
+        if (!value) SearchText = string.Empty;
+    }
+
+    [RelayCommand]
+    private void ToggleSearch() => IsSearchVisible = !IsSearchVisible;
+
+    [RelayCommand]
+    private void CloseSearch() => IsSearchVisible = false;
+
     // System Info (Mockup for UI dev, real implementation requires SSH command parsing)
     [ObservableProperty]
     private double _cpuUsage;
@@ -215,9 +237,9 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
             _ = MonitorSystemInfo();
         }
         else if (session is LocalShellSession || session is PtyLocalShellSession)
-            Title = "Local Shell";
+            Title = Services.LocalizationService.Instance["QuickLocal"];
         else
-            Title = "Terminal";
+            Title = Services.LocalizationService.Instance["Terminal"];
 
         // Subscribe to events
         Session.Connected += OnConnected;

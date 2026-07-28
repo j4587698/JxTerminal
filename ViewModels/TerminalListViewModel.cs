@@ -61,6 +61,28 @@ public partial class TerminalListViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void CloseCurrentTab()
+    {
+        if (SelectedTab != null) OnTabRequestClose(SelectedTab);
+    }
+
+    [RelayCommand]
+    private void NextTab() => CycleTab(1);
+
+    [RelayCommand]
+    private void PreviousTab() => CycleTab(-1);
+
+    private void CycleTab(int offset)
+    {
+        if (Tabs.Count < 2 || SelectedTab == null) return;
+        var index = Tabs.IndexOf(SelectedTab);
+        if (index < 0) return;
+        SelectedTab = Tabs[((index + offset) % Tabs.Count + Tabs.Count) % Tabs.Count];
+    }
+
+    public void CloseTab(TerminalViewModel tab) => OnTabRequestClose(tab);
+
+    [RelayCommand]
     private void DuplicateTab(TerminalViewModel tab)
     {
         if (tab?.ConnectionInfo != null)

@@ -14,6 +14,11 @@ public partial class TerminalListView : UserControl
         InitializeComponent();
     }
 
+    private void SearchBox_Loaded(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is TextBox tb) tb.Focus();
+    }
+
     private TerminalViewModel? FindViewModel(Control control)
     {
         // Walk up visual tree to find parent with TerminalViewModel DataContext
@@ -23,6 +28,18 @@ public partial class TerminalListView : UserControl
                 return vm;
         }
         return null;
+    }
+
+    private void Tab_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(sender as Control).Properties.IsMiddleButtonPressed) return;
+
+        if (sender is Control { DataContext: TerminalViewModel tab }
+            && DataContext is TerminalListViewModel list)
+        {
+            list.CloseTab(tab);
+            e.Handled = true;
+        }
     }
 
     private void SftpPathTextBox_KeyDown(object? sender, KeyEventArgs e)
@@ -41,5 +58,47 @@ public partial class TerminalListView : UserControl
             var vm = FindViewModel(listBox);
             vm?.Sftp?.NavigateCommand.Execute(item);
         }
+    }
+
+    /// <summary>
+    /// Finds the terminal control that belongs to the same tab as the given control.
+    /// </summary>
+    private static JxTerminal.Controls.TerminalControl? FindTerminal(Control control)
+    {
+        foreach (var ancestor in control.GetVisualAncestors().OfType<Control>())
+        {
+            var terminal = ancestor.GetVisualDescendants()
+                .OfType<JxTerminal.Controls.TerminalControl>()
+                .FirstOrDefault();
+            if (terminal != null) return terminal;
+        }
+        return null;
+    }
+
+    private void SearchBox_KeyDown(object? sender, KeyEventArgs e)    {
+        if (sender is not Control control) return;
+
+        switch (e.Key)
+        {
+            case Key.Enter:
+                if (e.KeyModifiers.HasFlag(KeyModifiers.Shift)) FindTerminal(control)?.FindPrevious();
+                else FindTerminal(control)?.FindNext();
+                e.Handled = true;
+                break;
+            case Key.Escape:
+                FindViewModel(control)?.CloseSearchCommand.Execute(null);
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void FindNext_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is Control control) FindTerminal(control)?.FindNext();
+    }
+
+    private void FindPrevious_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is Control control) FindTerminal(control)?.FindPrevious();
     }
 }

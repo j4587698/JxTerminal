@@ -17,5 +17,6 @@
         <lumina:LuminaTheme />
         <luminaColorPicker:LuminaColorPickerTheme />
         <materialIcons:MaterialIconStyles />
+        <StyleInclude Source="avares://JxTerminal/Styles/AppStyles.axaml" />
     </Application.Styles>
 </Application>

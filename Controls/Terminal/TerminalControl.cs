@@ -8,6 +8,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using JxTerminal.Models;
 using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 using XTerm.Buffer;
@@ -175,6 +176,44 @@ public class TerminalControl : Control
     public static readonly StyledProperty<Color> SelectionBackgroundProperty = 
         AvaloniaProperty.Register<TerminalControl, Color>(nameof(SelectionBackground), Color.FromArgb(77, 255, 255, 255));
 
+    // Search / find-in-buffer properties
+    public static readonly StyledProperty<string?> SearchQueryProperty =
+        AvaloniaProperty.Register<TerminalControl, string?>(nameof(SearchQuery));
+
+    public static readonly StyledProperty<bool> SearchMatchCaseProperty =
+        AvaloniaProperty.Register<TerminalControl, bool>(nameof(SearchMatchCase));
+
+    public static readonly StyledProperty<int> SearchMatchCountProperty =
+        AvaloniaProperty.Register<TerminalControl, int>(nameof(SearchMatchCount));
+
+    /// <summary>1-based index of the highlighted match, or 0 when there is none.</summary>
+    public static readonly StyledProperty<int> SearchMatchOrdinalProperty =
+        AvaloniaProperty.Register<TerminalControl, int>(nameof(SearchMatchOrdinal));
+
+    public string? SearchQuery
+    {
+        get => GetValue(SearchQueryProperty);
+        set => SetValue(SearchQueryProperty, value);
+    }
+
+    public bool SearchMatchCase
+    {
+        get => GetValue(SearchMatchCaseProperty);
+        set => SetValue(SearchMatchCaseProperty, value);
+    }
+
+    public int SearchMatchCount
+    {
+        get => GetValue(SearchMatchCountProperty);
+        private set => SetValue(SearchMatchCountProperty, value);
+    }
+
+    public int SearchMatchOrdinal
+    {
+        get => GetValue(SearchMatchOrdinalProperty);
+        private set => SetValue(SearchMatchOrdinalProperty, value);
+    }
+
     public Color BackgroundColor
     {
         get => GetValue(BackgroundColorProperty);
@@ -243,15 +282,225 @@ public class TerminalControl : Control
 
         // Context Menu
         var contextMenu = new ContextMenu();
-        var copyItem = new MenuItem { Header = "Copy" };
+        var copyItem = new MenuItem();
         copyItem.Click += async (s, e) => await CopyText();
-        var pasteItem = new MenuItem { Header = "Paste" };
+        var pasteItem = new MenuItem();
         pasteItem.Click += async (s, e) => await PasteText();
+        var selectAllItem = new MenuItem();
+        selectAllItem.Click += (s, e) => SelectAll();
+        var clearItem = new MenuItem();
+        clearItem.Click += (s, e) => ClearScreen();
 
         contextMenu.Items.Add(copyItem);
         contextMenu.Items.Add(pasteItem);
+        contextMenu.Items.Add(new Separator());
+        contextMenu.Items.Add(selectAllItem);
+        contextMenu.Items.Add(clearItem);
+
+        _localizeMenu = () =>
+        {
+            var l = Services.LocalizationService.Instance;
+            copyItem.Header = l["Copy"];
+            pasteItem.Header = l["Paste"];
+            selectAllItem.Header = l["SelectAll"];
+            clearItem.Header = l["ClearScreen"];
+        };
+        _localizeMenu();
 
         this.ContextMenu = contextMenu;
+    }
+
+    private Action? _localizeMenu;
+
+    private void OnLocalizationChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        => _localizeMenu?.Invoke();
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        Services.LocalizationService.Instance.PropertyChanged -= OnLocalizationChanged;
+        Services.LocalizationService.Instance.PropertyChanged += OnLocalizationChanged;
+        _localizeMenu?.Invoke();
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        Services.LocalizationService.Instance.PropertyChanged -= OnLocalizationChanged;
+        _cursorBlinkTimer?.Stop();
+    }
+
+    /// <summary>
+    /// Selects the whole scrollback buffer.
+    /// </summary>
+    public void SelectAll()
+    {
+        var terminal = Controller?.Terminal;
+        if (terminal?.Buffer == null) return;
+
+        _selectionStart = new Point(0, 0);
+        _selectionEnd = new Point(Math.Max(0, terminal.Cols - 1), Math.Max(0, terminal.Buffer.Lines.Length - 1));
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Asks the remote shell to clear the screen (Ctrl+L).
+    /// </summary>
+    public void ClearScreen()
+    {
+        Controller?.SendInput("\x0c");
+    }
+
+    private readonly List<(int Row, int StartCol, int EndCol)> _searchMatches = new();
+    private int _currentMatch = -1;
+
+    /// <summary>
+    /// Rebuilds the match list for <see cref="SearchQuery"/> over the whole scrollback buffer
+    /// and jumps to the match closest to the current viewport.
+    /// </summary>
+    private void RunSearch(bool jumpToMatch = true)
+    {
+        int previousMatch = _currentMatch;
+        _searchMatches.Clear();
+        _currentMatch = -1;
+
+        var terminal = Controller?.Terminal;
+        var query = SearchQuery;
+
+        if (terminal?.Buffer == null || string.IsNullOrEmpty(query))
+        {
+            SearchMatchCount = 0;
+            SearchMatchOrdinal = 0;
+            InvalidateVisual();
+            return;
+        }
+
+        var comparison = SearchMatchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+        var buffer = terminal.Buffer;
+        var text = new StringBuilder();
+        var columns = new List<int>();
+
+        for (int row = 0; row < buffer.Lines.Length; row++)
+        {
+            if (buffer.Lines[row] is not BufferLine line) continue;
+
+            text.Clear();
+            columns.Clear();
+
+            int length = Math.Min(line.Length, terminal.Cols);
+            for (int col = 0; col < length; col++)
+            {
+                var cell = line[col];
+                if (cell.Width == 0) continue;
+
+                var content = string.IsNullOrEmpty(cell.Content) ? " " : cell.Content;
+                for (int k = 0; k < content.Length; k++) columns.Add(col);
+                text.Append(content);
+            }
+
+            var lineText = text.ToString();
+            int index = 0;
+            while (index <= lineText.Length - query.Length)
+            {
+                int found = lineText.IndexOf(query, index, comparison);
+                if (found < 0) break;
+
+                int startCol = columns[found];
+                int lastCharIndex = Math.Min(found + query.Length - 1, columns.Count - 1);
+                int endCol = columns[lastCharIndex] + 1;
+                _searchMatches.Add((row, startCol, endCol));
+
+                index = found + Math.Max(1, query.Length);
+            }
+        }
+
+        SearchMatchCount = _searchMatches.Count;
+
+        if (_searchMatches.Count > 0)
+        {
+            if (jumpToMatch)
+            {
+                // Prefer the first match at or below the current viewport.
+                int viewport = buffer.YDisp;
+                int candidate = _searchMatches.FindIndex(m => m.Row >= viewport);
+                _currentMatch = candidate >= 0 ? candidate : _searchMatches.Count - 1;
+                ScrollToCurrentMatch();
+            }
+            else
+            {
+                _currentMatch = Math.Min(Math.Max(previousMatch, 0), _searchMatches.Count - 1);
+                SearchMatchOrdinal = _currentMatch + 1;
+            }
+        }
+        else
+        {
+            SearchMatchOrdinal = 0;
+        }
+
+        InvalidateVisual();
+    }
+
+    public void FindNext() => StepMatch(1);
+
+    public void FindPrevious() => StepMatch(-1);
+
+    private void StepMatch(int offset)
+    {
+        if (_searchMatches.Count == 0) return;
+
+        _currentMatch = (_currentMatch + offset + _searchMatches.Count) % _searchMatches.Count;
+        ScrollToCurrentMatch();
+        InvalidateVisual();
+    }
+
+    private void ScrollToCurrentMatch()
+    {
+        var terminal = Controller?.Terminal;
+        if (terminal?.Buffer == null || _currentMatch < 0) return;
+
+        SearchMatchOrdinal = _currentMatch + 1;
+
+        var buffer = terminal.Buffer;
+        int row = _searchMatches[_currentMatch].Row;
+
+        if (row < buffer.YDisp || row >= buffer.YDisp + terminal.Rows)
+        {
+            int target = Math.Max(0, Math.Min(row - terminal.Rows / 2, buffer.YBase));
+            buffer.ViewportY = target;
+            UpdateScrollProperties();
+        }
+    }
+
+    /// <summary>
+    /// Clears the current search and its highlights.
+    /// </summary>
+    public void ClearSearch()
+    {
+        SearchQuery = null;
+    }
+
+    private void RenderSearchMatches(DrawingContext context, TerminalBuffer buffer, double verticalOffset)
+    {
+        var terminal = Controller?.Terminal;
+        if (terminal == null || _charWidth <= 0) return;
+
+        var highlight = new SolidColorBrush(Color.FromArgb(90, 255, 214, 0));
+        var activeHighlight = new SolidColorBrush(Color.FromArgb(170, 255, 170, 0));
+
+        for (int i = 0; i < _searchMatches.Count; i++)
+        {
+            var (row, startCol, endCol) = _searchMatches[i];
+            int screenRow = row - buffer.YDisp;
+            if (screenRow < 0 || screenRow >= terminal.Rows) continue;
+
+            double x = startCol * _charWidth;
+            double y = verticalOffset + screenRow * _charHeight;
+            double w = (endCol - startCol) * _charWidth;
+            if (w <= 0) continue;
+
+            context.FillRectangle(i == _currentMatch ? activeHighlight : highlight,
+                new Rect(x, y, w, _charHeight));
+        }
     }
 
     private void InitializeCursorBlinkTimer()
@@ -322,6 +571,8 @@ public class TerminalControl : Control
     {
         Dispatcher.UIThread.InvokeAsync(() =>
         {
+            // Buffer indices shift as new output arrives, so recompute matches without moving the view.
+            if (!string.IsNullOrEmpty(SearchQuery)) RunSearch(jumpToMatch: false);
             UpdateScrollProperties();
             InvalidateVisual();
         });
@@ -373,6 +624,10 @@ public class TerminalControl : Control
                  change.Property == SelectionBackgroundProperty)
         {
             InvalidateVisual();
+        }
+        else if (change.Property == SearchQueryProperty || change.Property == SearchMatchCaseProperty)
+        {
+            RunSearch();
         }
         else if (change.Property == ColorSchemeProperty)
         {
@@ -609,6 +864,11 @@ public class TerminalControl : Control
                 }
             }
 
+            if (_searchMatches.Count > 0)
+            {
+                RenderSearchMatches(context, buffer, verticalOffset);
+            }
+
             if (_selectionStart.HasValue && _selectionEnd.HasValue)
             {
                 RenderSelection(context, buffer, verticalOffset);
@@ -747,7 +1007,35 @@ public class TerminalControl : Control
 
         string? sequence = null;
 
-        if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        // Terminal-app shortcuts take precedence over control sequences.
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+        {
+            switch (e.Key)
+            {
+                case Key.C:
+                    _ = CopyText();
+                    e.Handled = true;
+                    return;
+                case Key.V:
+                    _ = PasteText();
+                    e.Handled = true;
+                    return;
+                case Key.A:
+                    SelectAll();
+                    e.Handled = true;
+                    return;
+            }
+        }
+
+        // Shift+Insert is the classic X11 paste binding.
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift) && e.Key == Key.Insert)
+        {
+            _ = PasteText();
+            e.Handled = true;
+            return;
+        }
+
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && !e.KeyModifiers.HasFlag(KeyModifiers.Shift))
         {
             sequence = e.Key switch
             {

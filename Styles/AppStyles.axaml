@@ -1,0 +1,264 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:icons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia">
+
+    <Styles.Resources>
+        <!-- ===== Spacing scale ===== -->
+        <Thickness x:Key="AppPagePadding">20</Thickness>
+        <Thickness x:Key="AppCardPadding">18</Thickness>
+        <Thickness x:Key="AppTilePadding">14</Thickness>
+        <x:Double x:Key="AppGapSm">8</x:Double>
+        <x:Double x:Key="AppGapMd">12</x:Double>
+        <x:Double x:Key="AppGapLg">18</x:Double>
+
+        <!-- ===== Radius scale ===== -->
+        <CornerRadius x:Key="AppRadiusSm">8</CornerRadius>
+        <CornerRadius x:Key="AppRadiusMd">10</CornerRadius>
+        <CornerRadius x:Key="AppRadiusLg">14</CornerRadius>
+        <CornerRadius x:Key="AppRadiusPill">999</CornerRadius>
+
+        <!-- ===== Sizes ===== -->
+        <x:Double x:Key="AppIconSm">16</x:Double>
+        <x:Double x:Key="AppIconMd">18</x:Double>
+        <x:Double x:Key="AppIconLg">20</x:Double>
+        <x:Double x:Key="AppControlHeight">34</x:Double>
+    </Styles.Resources>
+
+    <!-- ======================================================= -->
+    <!--  TYPOGRAPHY                                             -->
+    <!-- ======================================================= -->
+    <Style Selector="TextBlock.PageTitle">
+        <Setter Property="FontSize" Value="22" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{DynamicResource LuminaTextPrimaryBrush}" />
+    </Style>
+
+    <Style Selector="TextBlock.PageSubtitle">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource LuminaTextTertiaryBrush}" />
+    </Style>
+
+    <Style Selector="TextBlock.CardTitle">
+        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource LuminaTextPrimaryBrush}" />
+    </Style>
+
+    <Style Selector="TextBlock.GroupTitle">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource LuminaTextTertiaryBrush}" />
+    </Style>
+
+    <Style Selector="TextBlock.PropLabel">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource LuminaTextTertiaryBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="TextBlock.PropValue">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource LuminaTextPrimaryBrush}" />
+        <Setter Property="HorizontalAlignment" Value="Right" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="TextBlock.Metric">
+        <Setter Property="FontSize" Value="24" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{DynamicResource LuminaTextPrimaryBrush}" />
+    </Style>
+
+    <Style Selector="TextBlock.MetricSm">
+        <Setter Property="FontSize" Value="17" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{DynamicResource LuminaTextPrimaryBrush}" />
+    </Style>
+
+    <Style Selector="TextBlock.Hint">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="Foreground" Value="{DynamicResource LuminaTextTertiaryBrush}" />
+    </Style>
+
+    <Style Selector="TextBlock.Mono">
+        <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, Menlo, monospace" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource LuminaTextSecondaryBrush}" />
+    </Style>
+
+    <!-- ======================================================= -->
+    <!--  SURFACES                                               -->
+    <!-- ======================================================= -->
+    <Style Selector="Border.Card">
+        <Setter Property="Background" Value="{DynamicResource LuminaSurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource LuminaBorderDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource AppRadiusLg}" />
+    </Style>
+
+    <Style Selector="Border.Tile">
+        <Setter Property="Background" Value="{DynamicResource LuminaSurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource LuminaBorderDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource AppRadiusMd}" />
+        <Setter Property="Padding" Value="{DynamicResource AppTilePadding}" />
+    </Style>
+
+    <Style Selector="Border.Toolbar">
+        <Setter Property="Background" Value="{DynamicResource LuminaSurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource LuminaBorderSubtleBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource AppRadiusMd}" />
+        <Setter Property="Padding" Value="6" />
+    </Style>
+
+    <Style Selector="Border.Divider">
+        <Setter Property="Height" Value="1" />
+        <Setter Property="Background" Value="{DynamicResource LuminaDividerBrush}" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+
+    <Style Selector="Border.Badge">
+        <Setter Property="Background" Value="{DynamicResource LuminaPrimaryBgBrush}" />
+        <Setter Property="CornerRadius" Value="{DynamicResource AppRadiusPill}" />
+        <Setter Property="Padding" Value="7,2" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="Border.Badge > TextBlock">
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{DynamicResource LuminaPrimaryBrush}" />
+    </Style>
+
+    <Style Selector="Border.IconChip">
+        <Setter Property="Background" Value="{DynamicResource LuminaPrimaryBgBrush}" />
+        <Setter Property="CornerRadius" Value="{DynamicResource AppRadiusMd}" />
+        <Setter Property="Width" Value="40" />
+        <Setter Property="Height" Value="40" />
+    </Style>
+
+    <!-- ======================================================= -->
+    <!--  SEGMENTED ICON TABS                                    -->
+    <!-- ======================================================= -->
+    <Style Selector="RadioButton.SegTab">
+        <Setter Property="Width" Value="34" />
+        <Setter Property="Height" Value="34" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Foreground" Value="{DynamicResource LuminaTextTertiaryBrush}" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Name="PART_Background"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="{DynamicResource AppRadiusSm}">
+                    <Border.Transitions>
+                        <Transitions>
+                            <BrushTransition Property="Background" Duration="0:0:0.12" />
+                        </Transitions>
+                    </Border.Transitions>
+                    <icons:MaterialIcon Kind="{TemplateBinding Content}"
+                                        Width="18"
+                                        Height="18"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Foreground="{TemplateBinding Foreground}" />
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+    <Style Selector="RadioButton.SegTab:pointerover">
+        <Setter Property="Background" Value="{DynamicResource LuminaStateHoverBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource LuminaTextPrimaryBrush}" />
+    </Style>
+
+    <Style Selector="RadioButton.SegTab:checked">
+        <Setter Property="Background" Value="{DynamicResource LuminaPrimaryBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource LuminaPrimaryForegroundBrush}" />
+    </Style>
+
+    <!-- ======================================================= -->
+    <!--  TERMINAL TABS                                          -->
+    <!-- ======================================================= -->
+    <Style Selector="ListBox.Tabs">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+
+    <Style Selector="ListBox.Tabs ListBoxItem">
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Margin" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Panel>
+                    <Border Name="PART_Background"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="10,10,0,0"
+                            Padding="12,8">
+                        <Border.Transitions>
+                            <Transitions>
+                                <BrushTransition Property="Background" Duration="0:0:0.12" />
+                            </Transitions>
+                        </Border.Transitions>
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}" />
+                    </Border>
+                    <Border Name="PART_Indicator"
+                            Height="2"
+                            Margin="10,0"
+                            VerticalAlignment="Bottom"
+                            CornerRadius="2,2,0,0"
+                            Background="Transparent" />
+                </Panel>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+    <Style Selector="ListBox.Tabs ListBoxItem:pointerover">
+        <Setter Property="Background" Value="{DynamicResource LuminaStateHoverBrush}" />
+    </Style>
+
+    <Style Selector="ListBox.Tabs ListBoxItem:selected">
+        <Setter Property="Background" Value="{DynamicResource LuminaSurfaceBrush}" />
+    </Style>
+
+    <Style Selector="ListBox.Tabs ListBoxItem:selected /template/ Border#PART_Indicator">
+        <Setter Property="Background" Value="{DynamicResource LuminaPrimaryBrush}" />
+    </Style>
+
+    <!-- ======================================================= -->
+    <!--  MISC                                                   -->
+    <!-- ======================================================= -->
+    <Style Selector="Button.IconOnly">
+        <Setter Property="Width" Value="34" />
+        <Setter Property="Height" Value="34" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="{DynamicResource AppRadiusSm}" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="Button.IconOnly.Compact">
+        <Setter Property="Width" Value="28" />
+        <Setter Property="Height" Value="28" />
+    </Style>
+
+    <Style Selector="ProgressBar.Thin">
+        <Setter Property="Height" Value="5" />
+        <Setter Property="MinHeight" Value="5" />
+        <Setter Property="CornerRadius" Value="{DynamicResource AppRadiusPill}" />
+    </Style>
+
+    <Style Selector="ListBox.Plain">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
+</Styles>

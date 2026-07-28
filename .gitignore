@@ -90,3 +90,6 @@ Thumbs.db
 .gemini/
 .spec-workflow/
 
+# Runtime logs
+crash.log
+

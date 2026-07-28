@@ -25,8 +25,7 @@ public enum NavigationType
 }
 
 public partial class NavigationItem : ObservableObject
-{
-    [ObservableProperty] private string _title = "";
+{    [ObservableProperty] private string _title = "";
     [ObservableProperty] private MaterialIconKind _icon;
     [ObservableProperty] private NavigationType _type;
     [ObservableProperty] private ConnectionGroup? _group;
@@ -47,6 +46,36 @@ public partial class NavigationItem : ObservableObject
             Count = group.Connections.Count;
             // Assuming we might want to listen to collection changes in the future for live updates
         }
+    }
+}
+
+/// <summary>
+/// A protocol choice in the host list filter bar. Keeps the strongly typed value separate from
+/// the localized label so that switching language never breaks filtering.
+/// </summary>
+public partial class ProtocolFilterOption : ObservableObject
+{
+    public ConnectionType? Type { get; }
+
+    [ObservableProperty]
+    private string _display = "";
+
+    public ProtocolFilterOption(ConnectionType? type)
+    {
+        Type = type;
+        Refresh();
+    }
+
+    public void Refresh()
+    {
+        Display = Type switch
+        {
+            null => LocalizationService.Instance["ProtocolFilterAll"],
+            ConnectionType.Ssh => "SSH",
+            ConnectionType.Telnet => "Telnet",
+            ConnectionType.Serial => LocalizationService.Instance["Serial"],
+            _ => LocalizationService.Instance["Local"]
+        };
     }
 }
 
@@ -86,13 +115,20 @@ public partial class HostListViewModel : ViewModelBase
     private ConnectionGroup? _selectedGroup;
 
     [ObservableProperty]
-    private string _selectedProtocolFilter = "全协议";
+    private ProtocolFilterOption? _selectedProtocolFilter;
 
-    public ObservableCollection<string> ProtocolFilters { get; } = new() { "全协议", "SSH", "Telnet", "Serial", "Local" };
+    public ObservableCollection<ProtocolFilterOption> ProtocolFilters { get; } = new()
+    {
+        new ProtocolFilterOption(null),
+        new ProtocolFilterOption(ConnectionType.Ssh),
+        new ProtocolFilterOption(ConnectionType.Telnet),
+        new ProtocolFilterOption(ConnectionType.Serial),
+        new ProtocolFilterOption(ConnectionType.Local)
+    };
 
     partial void OnSearchTextChanged(string value) => UpdateDisplay();
     partial void OnSelectedGroupChanged(ConnectionGroup? value) => UpdateDisplay();
-    partial void OnSelectedProtocolFilterChanged(string value) => UpdateDisplay();
+    partial void OnSelectedProtocolFilterChanged(ProtocolFilterOption? value) => UpdateDisplay();
 
     // Callback to open Add/Edit Connection UI
     // First param: List of groups, Second param: Connection to edit (nullable)
@@ -103,10 +139,10 @@ public partial class HostListViewModel : ViewModelBase
     public HostListViewModel(MainWindowViewModel mainViewModel)
     {
         _mainViewModel = mainViewModel;
+        SelectedProtocolFilter = ProtocolFilters[0];
         LocalizationService.Instance.PropertyChanged += (_, _) => {
             RebuildNavigationTree();
-            // Update protocol filters? Usually combobox items are static strings or need converter.
-            // For now let's keep protocol filters simple or refresh them too if we want to localize "All Protocols".
+            foreach (var filter in ProtocolFilters) filter.Refresh();
         };
         LoadData();
     }
@@ -165,9 +201,10 @@ public partial class HostListViewModel : ViewModelBase
             var matchingConnections = group.Connections.AsEnumerable();
 
             // A. Protocol Filter
-            if (SelectedProtocolFilter != "全协议")
+            var typeFilter = SelectedProtocolFilter?.Type;
+            if (typeFilter.HasValue)
             {
-                matchingConnections = matchingConnections.Where(c => c.Type.ToString().Equals(SelectedProtocolFilter, StringComparison.OrdinalIgnoreCase));
+                matchingConnections = matchingConnections.Where(c => c.Type == typeFilter.Value);
             }
 
             // B. Search Text Filter

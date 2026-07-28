@@ -31,6 +31,18 @@ public class SshSession : ITerminalSession
     public ShellStream? ShellStream => _shellStream;
     public SftpClient? SftpClient => _sftpClient;
 
+    /// <summary>
+    /// Asked when the server presents a host key that is unknown or different from the trusted one.
+    /// Arguments: host display name, received SHA256 fingerprint, previously trusted fingerprint
+    /// (null when the host has never been seen). Returns true to accept and remember the key.
+    /// </summary>
+    public Func<string, string, string?, bool>? HostKeyVerifier { get; set; }
+
+    /// <summary>
+    /// Set when the connection was aborted because the host key was rejected.
+    /// </summary>
+    public bool HostKeyRejected { get; private set; }
+
     public SshSession(string host, int port, string username, string password, SshAuthenticationType authType = SshAuthenticationType.Password, string keyFilePath = "", string passphrase = "")
     {
         Host = host;
@@ -85,7 +97,13 @@ public class SshSession : ITerminalSession
                 }
 
                 _sshClient = new SshClient(connectionInfo);
+                _sshClient.HostKeyReceived += OnHostKeyReceived;
                 _sshClient.Connect();
+
+                if (HostKeyRejected)
+                {
+                    throw new System.Security.SecurityException("HostKeyRejected");
+                }
 
                 // Create shell stream
                 // 80 cols, 24 rows, 800 width, 600 height, 1024 buffer size
@@ -93,6 +111,7 @@ public class SshSession : ITerminalSession
                 _shellStream.DataReceived += (s, e) => DataReceived?.Invoke(Encoding.UTF8.GetString(e.Data));
 
                 _sftpClient = new SftpClient(connectionInfo);
+                _sftpClient.HostKeyReceived += OnHostKeyReceived;
                 _sftpClient.Connect();
 
                 Connected?.Invoke();
@@ -102,6 +121,38 @@ public class SshSession : ITerminalSession
                 ErrorOccurred?.Invoke(ex);
             }
         });
+    }
+
+    private void OnHostKeyReceived(object? sender, Renci.SshNet.Common.HostKeyEventArgs e)
+    {
+        var received = e.FingerPrintSHA256;
+        var known = Services.KnownHostsService.GetFingerprint(Host, Port);
+
+        if (known != null && string.Equals(known, received, StringComparison.Ordinal))
+        {
+            e.CanTrust = true;
+            return;
+        }
+
+        var verifier = HostKeyVerifier;
+        if (verifier == null)
+        {
+            // No UI attached: refuse rather than silently trusting an unverified key.
+            e.CanTrust = false;
+            HostKeyRejected = true;
+            return;
+        }
+
+        var accepted = verifier($"{Host}:{Port}", received, known);
+        e.CanTrust = accepted;
+        if (accepted)
+        {
+            Services.KnownHostsService.Trust(Host, Port, received);
+        }
+        else
+        {
+            HostKeyRejected = true;
+        }
     }
 
     public async Task<string> ExecuteCommandAsync(string command)

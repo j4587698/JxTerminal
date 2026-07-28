@@ -19,13 +19,24 @@
                      UseWindowGlass="True">
     <lumina:LuminaWindow.DataTemplates>
         <DataTemplate DataType="icons:MaterialIconKind">
-            <avalonia:MaterialIcon Kind="{Binding}" Width="20" Height="20" />
+            <avalonia:MaterialIcon Kind="{Binding}" Width="18" Height="18" />
         </DataTemplate>
     </lumina:LuminaWindow.DataTemplates>
 
+    <lumina:LuminaWindow.KeyBindings>
+        <!-- Ctrl+W / Ctrl+T are left to the shell; use Shift variants so bash keeps its bindings. -->
+        <KeyBinding Gesture="Ctrl+Shift+T" Command="{Binding TerminalList.CreateConnectionCommand}"/>
+        <KeyBinding Gesture="Ctrl+Shift+W" Command="{Binding TerminalList.CloseCurrentTabCommand}"/>
+        <KeyBinding Gesture="Ctrl+Shift+F" Command="{Binding TerminalList.SelectedTab.ToggleSearchCommand}"/>
+        <KeyBinding Gesture="Ctrl+Tab" Command="{Binding TerminalList.NextTabCommand}"/>
+        <KeyBinding Gesture="Ctrl+Shift+Tab" Command="{Binding TerminalList.PreviousTabCommand}"/>
+        <KeyBinding Gesture="Ctrl+PageDown" Command="{Binding TerminalList.NextTabCommand}"/>
+        <KeyBinding Gesture="Ctrl+PageUp" Command="{Binding TerminalList.PreviousTabCommand}"/>
+    </lumina:LuminaWindow.KeyBindings>
+
     <Grid>
         <lumina:LuminaShell ShellKey="Root"
-                            OpenPaneLength="220"
+                            OpenPaneLength="228"
                             IsMenuOpen="True"
                             Padding="0"
                             IsShellChromeVisible="True"
@@ -35,17 +46,23 @@
                             DialogContent="{Binding DialogContent}"
                             IsDialogOpen="{Binding IsDialogOpen}">
             <lumina:LuminaShell.MenuHeader>
-                <StackPanel Orientation="Horizontal" Spacing="10" Margin="12,18,12,12">
-                    <avalonia:MaterialIcon Kind="ConsoleLine"
-                                           Foreground="{DynamicResource LuminaPrimaryBrush}"
-                                           Width="24"
-                                           Height="24"/>
-                    <TextBlock Text="JxTerminal"
-                               FontWeight="Bold"
-                               FontSize="18"
-                               VerticalAlignment="Center"
-                               Foreground="{DynamicResource LuminaTextForegroundBrush}" />
-                </StackPanel>
+                <Grid ColumnDefinitions="Auto,*" Margin="14,20,14,14">
+                    <Border Classes="IconChip" Width="34" Height="34">
+                        <avalonia:MaterialIcon Kind="ConsoleLine"
+                                               Foreground="{DynamicResource LuminaPrimaryBrush}"
+                                               Width="20"
+                                               Height="20" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="JxTerminal"
+                                   FontWeight="Bold"
+                                   FontSize="15"
+                                   Foreground="{DynamicResource LuminaTextPrimaryBrush}" />
+                        <TextBlock Text="{c:Localize AppTagline}"
+                                   Classes="Hint"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Grid>
             </lumina:LuminaShell.MenuHeader>
 
             <lumina:LuminaShell.MenuContent>
@@ -93,54 +110,65 @@
 
             <lumina:LuminaShell.MenuFooter>
                 <lumina:LuminaCard Padding="10"
-                                   Margin="8"
+                                   Margin="10"
                                    Classes="Interactive"
+                                   CornerRadius="{DynamicResource AppRadiusMd}"
                                    Background="{DynamicResource LuminaNavigationPaneItemBrush}"
-                                   BorderThickness="0">
-                    <Grid ColumnDefinitions="Auto, *">
-                        <Border Width="32"
-                                Height="32"
-                                CornerRadius="16"
-                                Background="{DynamicResource LuminaBorderBrush}"
-                                Margin="0,0,10,0">
-                            <avalonia:MaterialIcon Kind="User"
-                                                   Foreground="{DynamicResource LuminaTextForegroundBrush}"
+                                   BorderBrush="{DynamicResource LuminaBorderSubtleBrush}"
+                                   BorderThickness="1">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Border Width="30"
+                                Height="30"
+                                CornerRadius="{DynamicResource AppRadiusPill}"
+                                Background="{DynamicResource LuminaPrimaryBgBrush}">
+                            <avalonia:MaterialIcon Kind="Account"
+                                                   Foreground="{DynamicResource LuminaPrimaryBrush}"
                                                    Width="16"
                                                    Height="16"/>
                         </Border>
                         <TextBlock Grid.Column="1"
+                                   Margin="10,0,0,0"
                                    Text="{c:Localize Login}"
                                    FontSize="12"
-                                   Opacity="0.7"
+                                   Foreground="{DynamicResource LuminaTextSecondaryBrush}"
                                    VerticalAlignment="Center"/>
+                        <avalonia:MaterialIcon Grid.Column="2"
+                                               Kind="ChevronRight"
+                                               Width="16"
+                                               Height="16"
+                                               Foreground="{DynamicResource LuminaTextTertiaryBrush}"
+                                               VerticalAlignment="Center"/>
                     </Grid>
                 </lumina:LuminaCard>
             </lumina:LuminaShell.MenuFooter>
 
-            <Border Background="{DynamicResource LuminaBackgroundBrush}">
-                <TransitioningContentControl Content="{Binding ActiveContent}"
-                                             Padding="0"
-                                             Margin="0"
-                                             VerticalContentAlignment="Stretch"
-                                             HorizontalContentAlignment="Stretch">
-                    <TransitioningContentControl.PageTransition>
-                        <CrossFade Duration="0:00:00.200" />
-                    </TransitioningContentControl.PageTransition>
-                </TransitioningContentControl>
-            </Border>
+            <TransitioningContentControl Content="{Binding ActiveContent}"
+                                         Padding="0"
+                                         Margin="0"
+                                         VerticalContentAlignment="Stretch"
+                                         HorizontalContentAlignment="Stretch">
+                <TransitioningContentControl.PageTransition>
+                    <CrossFade Duration="0:00:00.180" />
+                </TransitioningContentControl.PageTransition>
+            </TransitioningContentControl>
         </lumina:LuminaShell>
 
-        <Grid Background="#80000000"
-              IsVisible="{Binding IsBusy}"
-              HorizontalAlignment="Stretch"
-              VerticalAlignment="Stretch">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="20">
-                <lumina:LuminaLoading Size="42" StrokeThickness="4" />
-                <TextBlock Text="Connecting..."
-                           Foreground="{DynamicResource LuminaTextForegroundBrush}"
-                           FontSize="20"
-                           FontWeight="Bold"/>
-            </StackPanel>
-        </Grid>
+        <Border Background="{DynamicResource LuminaOverlayScrimBrush}"
+                IsVisible="{Binding IsBusy}">
+            <Border Classes="Card"
+                    Padding="34,28"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    BoxShadow="{DynamicResource LuminaShadowFloating}">
+                <StackPanel HorizontalAlignment="Center" Spacing="16">
+                    <lumina:LuminaLoading Size="36" StrokeThickness="3" />
+                    <TextBlock Text="{c:Localize StatusConnecting}"
+                               Foreground="{DynamicResource LuminaTextPrimaryBrush}"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+        </Border>
     </Grid>
 </lumina:LuminaWindow>

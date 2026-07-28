@@ -10,59 +10,37 @@
              x:Class="JxTerminal.Views.SystemMonitorSidebarView"
              x:DataType="vm:TerminalViewModel">
     <UserControl.Styles>
-        <Style Selector="RadioButton.MenuTab">
-            <Setter Property="Width" Value="36"/>
-            <Setter Property="Height" Value="36"/>
-            <Setter Property="Margin" Value="0,0,6,0"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Template">
-                <ControlTemplate>
-                    <Border Name="PART_Background" Background="{TemplateBinding Background}" CornerRadius="8">
-                        <avalonia:MaterialIcon Kind="{TemplateBinding Content}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextForegroundBrush}"/>
-                    </Border>
-                </ControlTemplate>
-            </Setter>
+        <!-- Nested cards sit one level below the sidebar surface -->
+        <Style Selector="lumina|LuminaCard.Glass">
+            <Setter Property="Background" Value="{DynamicResource LuminaBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource LuminaBorderSubtleBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="{DynamicResource AppRadiusMd}"/>
         </Style>
-        <Style Selector="RadioButton.MenuTab:checked /template/ Border#PART_Background">
-            <Setter Property="Background" Value="{DynamicResource LuminaPrimaryBrush}"/>
-        </Style>
-        <Style Selector="RadioButton.MenuTab:checked /template/ avalonia|MaterialIcon">
-            <Setter Property="Foreground" Value="White"/>
-        </Style>
-        <Style Selector="TextBlock.PropLabel">
-            <Setter Property="Opacity" Value="0.5"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-        <Style Selector="TextBlock.PropValue">
-            <Setter Property="HorizontalAlignment" Value="Right"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
+        <Style Selector="ProgressBar">
+            <Setter Property="CornerRadius" Value="{DynamicResource AppRadiusPill}"/>
         </Style>
     </UserControl.Styles>
-    <lumina:LuminaCard CornerRadius="12" Padding="0" ClipToBounds="True" Background="{DynamicResource LuminaSurfaceBrush}" BorderThickness="1" BorderBrush="{DynamicResource LuminaBorderBrush}">
+    <lumina:LuminaCard CornerRadius="{DynamicResource AppRadiusLg}" Padding="0" ClipToBounds="True" Background="{DynamicResource LuminaSurfaceBrush}" BorderThickness="1" BorderBrush="{DynamicResource LuminaBorderDefaultBrush}">
         <!-- 主布局：强约束上下！ -->
         <Grid RowDefinitions="Auto, *">
             
-            <Border Margin="15" CornerRadius="8" Background="{DynamicResource LuminaBackgroundBrush}" Padding="6">
+            <Border Margin="12" CornerRadius="{DynamicResource AppRadiusMd}" Background="{DynamicResource LuminaBackgroundBrush}" Padding="5">
                 <Grid ColumnDefinitions="*, Auto">
                     <!-- 改用 ScrollViewer 保证在一行且可滑动 -->
                     <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
-                        <StackPanel Orientation="Horizontal" Spacing="4">
-                            <RadioButton Classes="MenuTab" Content="ViewDashboard" IsChecked="True" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="0"/>
-                            <RadioButton Classes="MenuTab" Content="Cpu64Bit" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="1"/>
-                            <RadioButton Classes="MenuTab" Content="ExpansionCard" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="2"/>
-                            <RadioButton Classes="MenuTab" Content="Memory" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="3"/>
-                            <RadioButton Classes="MenuTab" Content="Harddisk" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="4"/>
-                            <RadioButton Classes="MenuTab" Content="Network" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="5"/>
-                            <RadioButton Classes="MenuTab" Content="FolderNetwork" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="6"/>
+                        <StackPanel Orientation="Horizontal" Spacing="3">
+                            <RadioButton Classes="SegTab" Content="ViewDashboard" IsChecked="True" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="0" ToolTip.Tip="{c:Localize SystemOverview}"/>
+                            <RadioButton Classes="SegTab" Content="Cpu64Bit" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="1" ToolTip.Tip="{c:Localize Processor}"/>
+                            <RadioButton Classes="SegTab" Content="ExpansionCard" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="2" ToolTip.Tip="{c:Localize GraphicsCard}"/>
+                            <RadioButton Classes="SegTab" Content="Memory" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="3" ToolTip.Tip="{c:Localize MemoryTitle}"/>
+                            <RadioButton Classes="SegTab" Content="Harddisk" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="4" ToolTip.Tip="{c:Localize DiskTitle}"/>
+                            <RadioButton Classes="SegTab" Content="Network" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="5" ToolTip.Tip="{c:Localize NetworkTitle}"/>
+                            <RadioButton Classes="SegTab" Content="FolderNetwork" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="6" ToolTip.Tip="{c:Localize SFTP}"/>
                         </StackPanel>
                     </ScrollViewer>
-                    <Button Grid.Column="1" Command="{Binding ToggleSftpCommand}" Classes="Ghost" Width="36" Height="36" CornerRadius="8" Margin="10,0,0,0" Padding="0" VerticalAlignment="Center">
-                        <avalonia:MaterialIcon Kind="Close" Width="18" Height="18" Foreground="{DynamicResource LuminaTextForegroundBrush}"/>
+                    <Button Grid.Column="1" Command="{Binding ToggleSftpCommand}" Classes="Ghost IconOnly" Margin="8,0,0,0" VerticalAlignment="Center">
+                        <avalonia:MaterialIcon Kind="Close" Width="17" Height="17" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
                     </Button>
                 </Grid>
             </Border>
@@ -86,29 +64,29 @@
                         </lumina:LuminaCard>
                         
                         <Grid Grid.Row="4" ColumnDefinitions="*, 12, *" RowDefinitions="Auto, 12, Auto">
-                            <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource LuminaSurfaceBrush}" CornerRadius="12" Padding="15" ClipToBounds="True">
+                            <Border Grid.Row="0" Grid.Column="0" Background="{DynamicResource LuminaBackgroundBrush}" BorderBrush="{DynamicResource LuminaBorderSubtleBrush}" BorderThickness="1" CornerRadius="{DynamicResource AppRadiusMd}" Padding="14" ClipToBounds="True">
                                 <Grid RowDefinitions="Auto, 10, Auto, 5, Auto">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <avalonia:MaterialIcon Kind="Cpu64Bit" Width="18" Height="18" Foreground="{DynamicResource LuminaWarningBrush}"/>
                                         <TextBlock Text="CPU" Classes="PropLabel" FontWeight="Bold"/>
                                     </StackPanel>
                                     <TextBlock Grid.Row="2" Text="{Binding CpuUsage, StringFormat='{}{0:0.0}%'}" FontSize="26" FontWeight="Bold"/>
-                                    <ProgressBar Grid.Row="4" Value="{Binding CpuUsage}" Minimum="0" Maximum="100" Height="4" Foreground="{DynamicResource LuminaWarningBrush}" Background="#20FFC107"/>
+                                    <ProgressBar Grid.Row="4" Value="{Binding CpuUsage}" Minimum="0" Maximum="100" Height="4" Foreground="{DynamicResource LuminaWarningBrush}" Background="{DynamicResource LuminaStateHoverBrush}"/>
                                 </Grid>
                             </Border>
                             
-                            <Border Grid.Row="0" Grid.Column="2" Background="{DynamicResource LuminaSurfaceBrush}" CornerRadius="12" Padding="15" ClipToBounds="True">
+                            <Border Grid.Row="0" Grid.Column="2" Background="{DynamicResource LuminaBackgroundBrush}" BorderBrush="{DynamicResource LuminaBorderSubtleBrush}" BorderThickness="1" CornerRadius="{DynamicResource AppRadiusMd}" Padding="14" ClipToBounds="True">
                                 <Grid RowDefinitions="Auto, 10, Auto, 5, Auto">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <avalonia:MaterialIcon Kind="Memory" Width="18" Height="18" Foreground="{DynamicResource LuminaDangerBrush}"/>
                                         <TextBlock Text="{c:Localize Memory}" Classes="PropLabel" FontWeight="Bold"/>
                                     </StackPanel>
                                     <TextBlock Grid.Row="2" Text="{Binding RamUsage, StringFormat='{}{0:0.0}%'}" FontSize="26" FontWeight="Bold"/>
-                                    <ProgressBar Grid.Row="4" Value="{Binding RamUsage}" Minimum="0" Maximum="100" Height="4" Foreground="{DynamicResource LuminaDangerBrush}" Background="#20E91E63"/>
+                                    <ProgressBar Grid.Row="4" Value="{Binding RamUsage}" Minimum="0" Maximum="100" Height="4" Foreground="{DynamicResource LuminaDangerBrush}" Background="{DynamicResource LuminaStateHoverBrush}"/>
                                 </Grid>
                             </Border>
                             
-                            <Border Grid.Row="2" Grid.Column="0" Background="{DynamicResource LuminaSurfaceBrush}" CornerRadius="12" Padding="15" ClipToBounds="True">
+                            <Border Grid.Row="2" Grid.Column="0" Background="{DynamicResource LuminaBackgroundBrush}" BorderBrush="{DynamicResource LuminaBorderSubtleBrush}" BorderThickness="1" CornerRadius="{DynamicResource AppRadiusMd}" Padding="14" ClipToBounds="True">
                                 <Grid RowDefinitions="Auto, 10, Auto, 5, Auto">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <avalonia:MaterialIcon Kind="ArrowDown" Width="18" Height="18" Foreground="{DynamicResource LuminaSuccessBrush}"/>
@@ -119,10 +97,10 @@
                                 </Grid>
                             </Border>
                             
-                            <Border Grid.Row="2" Grid.Column="2" Background="{DynamicResource LuminaSurfaceBrush}" CornerRadius="12" Padding="15" ClipToBounds="True">
+                            <Border Grid.Row="2" Grid.Column="2" Background="{DynamicResource LuminaBackgroundBrush}" BorderBrush="{DynamicResource LuminaBorderSubtleBrush}" BorderThickness="1" CornerRadius="{DynamicResource AppRadiusMd}" Padding="14" ClipToBounds="True">
                                 <Grid RowDefinitions="Auto, 10, Auto, 5, Auto">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <avalonia:MaterialIcon Kind="ArrowUp" Width="18" Height="18" Foreground="{DynamicResource LuminaInfoBrush}"/>
+                                        <avalonia:MaterialIcon Kind="ArrowUp" Width="18" Height="18" Foreground="{DynamicResource LuminaCyanBrush}"/>
                                         <TextBlock Text="{c:Localize Upload}" Classes="PropLabel" FontWeight="Bold"/>
                                     </StackPanel>
                                     <TextBlock Grid.Row="2" Text="{Binding NetworkUp}" FontSize="26" FontWeight="Bold"/>
@@ -132,7 +110,7 @@
                         </Grid>
                         
                         <Grid Grid.Row="6" ColumnDefinitions="*, 12, *">
-                            <Border Grid.Column="0" Background="{DynamicResource LuminaSurfaceBrush}" CornerRadius="12" Padding="15">
+                            <Border Grid.Column="0" Background="{DynamicResource LuminaBackgroundBrush}" BorderBrush="{DynamicResource LuminaBorderSubtleBrush}" BorderThickness="1" CornerRadius="{DynamicResource AppRadiusMd}" Padding="14">
                                 <Grid RowDefinitions="Auto, 10, Auto, 5, Auto">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <avalonia:MaterialIcon Kind="ChartLine" Width="18" Height="18" Foreground="{DynamicResource LuminaPrimaryBrush}"/>
@@ -146,14 +124,14 @@
                                 </Grid>
                             </Border>
                             
-                            <Border Grid.Column="2" Background="{DynamicResource LuminaSurfaceBrush}" CornerRadius="12" Padding="15" ClipToBounds="True">
+                            <Border Grid.Column="2" Background="{DynamicResource LuminaBackgroundBrush}" BorderBrush="{DynamicResource LuminaBorderSubtleBrush}" BorderThickness="1" CornerRadius="{DynamicResource AppRadiusMd}" Padding="14" ClipToBounds="True">
                                 <Grid RowDefinitions="Auto, 10, Auto, 5, Auto">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <avalonia:MaterialIcon Kind="Harddisk" Width="18" Height="18" Foreground="{DynamicResource LuminaWarningBrush}"/>
                                         <TextBlock Text="{c:Localize Disk}" Classes="PropLabel" FontWeight="Bold"/>
                                     </StackPanel>
                                     <TextBlock Grid.Row="2" Text="{Binding DiskUsage, StringFormat='{}{0:0.0}%'}" FontSize="26" FontWeight="Bold"/>
-                                    <ProgressBar Grid.Row="4" Value="{Binding DiskUsage}" Minimum="0" Maximum="100" Height="4" Foreground="{DynamicResource LuminaWarningBrush}" Background="#20FF9800"/>
+                                    <ProgressBar Grid.Row="4" Value="{Binding DiskUsage}" Minimum="0" Maximum="100" Height="4" Foreground="{DynamicResource LuminaWarningBrush}" Background="{DynamicResource LuminaStateHoverBrush}"/>
                                 </Grid>
                             </Border>
                         </Grid>
@@ -369,7 +347,7 @@
                         
                         <Grid Grid.Row="2" ColumnDefinitions="*, 15, *" RowDefinitions="Auto, 15, Auto">
                             <lumina:LuminaCard Classes="Glass" Grid.Row="0" Grid.Column="0" Padding="15"><Grid RowDefinitions="Auto, 5, Auto"><StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="5"><avalonia:MaterialIcon Kind="ArrowDown" Foreground="{DynamicResource LuminaSuccessBrush}"/><TextBlock Text="{c:Localize Download}" Classes="PropLabel"/></StackPanel><TextBlock Grid.Row="2" Text="{Binding NetworkDown}" FontSize="18" FontWeight="Bold"/></Grid></lumina:LuminaCard>
-                            <lumina:LuminaCard Classes="Glass" Grid.Row="0" Grid.Column="2" Padding="15"><Grid RowDefinitions="Auto, 5, Auto"><StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="5"><avalonia:MaterialIcon Kind="ArrowUp" Foreground="{DynamicResource LuminaInfoBrush}"/><TextBlock Text="{c:Localize Upload}" Classes="PropLabel"/></StackPanel><TextBlock Grid.Row="2" Text="{Binding NetworkUp}" FontSize="18" FontWeight="Bold"/></Grid></lumina:LuminaCard>
+                            <lumina:LuminaCard Classes="Glass" Grid.Row="0" Grid.Column="2" Padding="15"><Grid RowDefinitions="Auto, 5, Auto"><StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="5"><avalonia:MaterialIcon Kind="ArrowUp" Foreground="{DynamicResource LuminaCyanBrush}"/><TextBlock Text="{c:Localize Upload}" Classes="PropLabel"/></StackPanel><TextBlock Grid.Row="2" Text="{Binding NetworkUp}" FontSize="18" FontWeight="Bold"/></Grid></lumina:LuminaCard>
                             <lumina:LuminaCard Classes="Glass" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Padding="15"><Grid RowDefinitions="Auto, 5, Auto"><StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="5"><avalonia:MaterialIcon Kind="Timer" Foreground="{DynamicResource LuminaPrimaryBrush}"/><TextBlock Text="{c:Localize Latency}" Classes="PropLabel"/></StackPanel><TextBlock Grid.Row="2" Text="{Binding PingStatus}" FontSize="18" FontWeight="Bold"/></Grid></lumina:LuminaCard>
                         </Grid>
                         
@@ -434,7 +412,23 @@
                     
                     <TextBox Grid.Row="2" Text="{Binding Sftp.CurrentPath, Mode=TwoWay}" Classes="Small" KeyDown="SftpPathTextBox_KeyDown"/>
                     
-                    <ListBox Grid.Row="4" ItemsSource="{Binding Sftp.Files}" Background="Transparent" Padding="0" DoubleTapped="SftpFileList_DoubleTapped">
+                    <Grid Grid.Row="4" RowDefinitions="Auto, *">
+                        <Border IsVisible="{Binding Sftp.HasError}"
+                                Background="{DynamicResource LuminaDangerBgBrush}"
+                                CornerRadius="{DynamicResource AppRadiusSm}"
+                                Padding="10,7" Margin="0,0,0,8">
+                            <Grid ColumnDefinitions="Auto, *, Auto">
+                                <avalonia:MaterialIcon Kind="AlertCircleOutline" Width="15" Height="15" VerticalAlignment="Top" Margin="0,1,0,0"
+                                                       Foreground="{DynamicResource LuminaDangerBrush}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding Sftp.ErrorMessage}" TextWrapping="Wrap" FontSize="12" Margin="8,0"
+                                           Foreground="{DynamicResource LuminaDangerBrush}"/>
+                                <Button Grid.Column="2" Classes="Ghost IconOnly Compact" Command="{Binding Sftp.DismissErrorCommand}" VerticalAlignment="Top">
+                                    <avalonia:MaterialIcon Kind="Close" Width="13" Height="13" Foreground="{DynamicResource LuminaDangerBrush}"/>
+                                </Button>
+                            </Grid>
+                        </Border>
+
+                        <ListBox Grid.Row="1" ItemsSource="{Binding Sftp.Files}" Background="Transparent" Padding="0" DoubleTapped="SftpFileList_DoubleTapped">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Grid ColumnDefinitions="Auto, *, Auto" Height="32">
@@ -444,10 +438,11 @@
                                 </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
-                    </ListBox>
-                    
-                    <Grid Grid.Row="4" Background="#80000000" IsVisible="{Binding Sftp.IsLoading}">
-                        <ProgressBar IsIndeterminate="True" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </ListBox>
+
+                        <Grid Grid.Row="1" Background="{DynamicResource LuminaOverlayScrimBrush}" IsVisible="{Binding Sftp.IsLoading}">
+                            <ProgressBar IsIndeterminate="True" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Grid>
                     </Grid>
                 </Grid>
             </Grid>

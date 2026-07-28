@@ -12,6 +12,8 @@ public static class PathConfig
     public static string ConnectionsFile => Path.Combine(AppDataRoot, "connections.json");
     public static string SettingsFile => Path.Combine(AppDataRoot, "settings.json");
     public static string BackgroundsDir => Path.Combine(AppDataRoot, "Backgrounds");
+    public static string MasterKeyFile => Path.Combine(AppDataRoot, "master.key");
+    public static string KnownHostsFile => Path.Combine(AppDataRoot, "known_hosts");
 
     static PathConfig()
     {

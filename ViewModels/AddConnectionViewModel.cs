@@ -15,7 +15,24 @@ public partial class AddConnectionViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsSsh))]
     [NotifyPropertyChangedFor(nameof(IsTelnet))]
     [NotifyPropertyChangedFor(nameof(IsSerial))]
+    [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     private ConnectionType _type = ConnectionType.Ssh;
+
+    partial void OnTypeChanged(ConnectionType oldValue, ConnectionType newValue)
+    {
+        // Move to the new protocol's well-known port, unless the user typed a custom one.
+        if (Port == DefaultPortFor(oldValue))
+        {
+            Port = DefaultPortFor(newValue);
+        }
+    }
+
+    private static int DefaultPortFor(ConnectionType type) => type switch
+    {
+        ConnectionType.Telnet => 23,
+        ConnectionType.Ssh => 22,
+        _ => 0
+    };
 
     [ObservableProperty] 
     [NotifyPropertyChangedFor(nameof(IsPasswordAuth))]
@@ -23,8 +40,8 @@ public partial class AddConnectionViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsAskAuth))]
     private SshAuthenticationType _authenticationType = SshAuthenticationType.Password;
 
-    [ObservableProperty] private string _name = "New Server";
-    [ObservableProperty] private string _host = "";
+    [ObservableProperty] private string _name = JxTerminal.Services.LocalizationService.Instance["NewConnection"];
+    [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(SaveCommand))] private string _host = "";
     [ObservableProperty] private int _port = 22;
     [ObservableProperty] private string _username = "root";
     [ObservableProperty] private string _password = "";
@@ -33,9 +50,18 @@ public partial class AddConnectionViewModel : ViewModelBase
     [ObservableProperty] private string _selectedGroup = "Default";
 
     // Serial
-    [ObservableProperty] private string _serialPortName = "";
+    [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(SaveCommand))] private string _serialPortName = "";
     [ObservableProperty] private int _baudRate = 9600;
+    [ObservableProperty] private int _dataBits = 8;
+    [ObservableProperty] private Parity _parity = Parity.None;
+    [ObservableProperty] private StopBits _stopBits = StopBits.One;
+    [ObservableProperty] private Handshake _handshake = Handshake.None;
+
     public List<int> AvailableBaudRates { get; } = new List<int> { 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200 };
+    public List<int> AvailableDataBits { get; } = new List<int> { 5, 6, 7, 8 };
+    public List<Parity> AvailableParities { get; } = new List<Parity> { Parity.None, Parity.Even, Parity.Odd, Parity.Mark, Parity.Space };
+    public List<StopBits> AvailableStopBits { get; } = new List<StopBits> { StopBits.One, StopBits.OnePointFive, StopBits.Two };
+    public List<Handshake> AvailableHandshakes { get; } = new List<Handshake> { Handshake.None, Handshake.XOnXOff, Handshake.RequestToSend, Handshake.RequestToSendXOnXOff };
     
     [ObservableProperty] private List<string> _availableSerialPorts = new();
 
@@ -113,6 +139,10 @@ public partial class AddConnectionViewModel : ViewModelBase
         // Serial
         _serialPortName = existingConnection.SerialPortName;
         _baudRate = existingConnection.BaudRate;
+        _dataBits = existingConnection.DataBits;
+        _parity = existingConnection.Parity;
+        _stopBits = existingConnection.StopBits;
+        _handshake = existingConnection.Handshake;
 
         if (groups.Contains(existingConnection.GroupName))
             SelectedGroup = existingConnection.GroupName;
@@ -164,7 +194,14 @@ public partial class AddConnectionViewModel : ViewModelBase
         }
     }
 
-    [RelayCommand]
+    /// <summary>
+    /// A connection is only savable once its target is filled in.
+    /// </summary>
+    private bool CanSave() => Type == ConnectionType.Serial
+        ? !string.IsNullOrWhiteSpace(SerialPortName)
+        : !string.IsNullOrWhiteSpace(Host);
+
+    [RelayCommand(CanExecute = nameof(CanSave))]
     public void Save()
     {
         var connection = new SavedConnection
@@ -181,7 +218,11 @@ public partial class AddConnectionViewModel : ViewModelBase
             Passphrase = Passphrase,
             GroupName = SelectedGroup,
             SerialPortName = SerialPortName,
-            BaudRate = BaudRate
+            BaudRate = BaudRate,
+            DataBits = DataBits,
+            Parity = Parity,
+            StopBits = StopBits,
+            Handshake = Handshake
         };
         RequestClose?.Invoke(this, connection);
     }

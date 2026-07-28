@@ -16,292 +16,325 @@
         <c:StringLocalizationConverter x:Key="LocalizeConverter"/>
     </UserControl.Resources>
 
-    <Grid RowDefinitions="Auto, *">
-        <TextBlock Text="{c:Localize Settings}"
-                   FontSize="24"
-                   FontWeight="Bold"
-                   Margin="24,24,24,16"/>
+    <UserControl.Styles>
+        <!-- One consistent "setting row" rhythm across the whole page -->
+        <Style Selector="Grid.SettingRow">
+            <Setter Property="MinHeight" Value="34"/>
+        </Style>
+        <Style Selector="StackPanel.Swatch > TextBlock">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Foreground" Value="{DynamicResource LuminaTextTertiaryBrush}"/>
+        </Style>
+        <Style Selector="StackPanel.Swatch">
+            <Setter Property="Spacing" Value="4"/>
+            <Setter Property="Margin" Value="0,0,12,10"/>
+        </Style>
+        <Style Selector="TabControl WrapPanel > StackPanel">
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+    </UserControl.Styles>
 
-        <TabControl Grid.Row="1" TabStripPlacement="Left" Margin="10,0,24,24">
+    <Grid RowDefinitions="Auto, *">
+        <StackPanel Margin="24,20,24,16" Spacing="2">
+            <TextBlock Text="{c:Localize Settings}" Classes="PageTitle"/>
+            <TextBlock Text="{c:Localize SettingsTip}" Classes="PageSubtitle"/>
+        </StackPanel>
+
+        <TabControl Grid.Row="1" TabStripPlacement="Left" Margin="14,0,24,20">
             <!-- General Section -->
             <TabItem Header="{c:Localize General}">
-                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Padding="0,0,16,0">
-                    <lumina:LuminaCard Classes="Glass" Margin="16,0,0,0" Padding="24" CornerRadius="12" VerticalAlignment="Top">
-                        <StackPanel Spacing="20">
-                            <Grid ColumnDefinitions="*, Auto">
-                                <StackPanel Spacing="2">
-                                    <TextBlock Text="{c:Localize Language}" FontWeight="SemiBold"/>
-                                    <TextBlock Text="Interface language" FontSize="11" Opacity="0.6"/>
-                                </StackPanel>
-                                <ComboBox ItemsSource="{Binding AvailableLanguages}" SelectedItem="{Binding SelectedLanguage}" MinWidth="180" Grid.Column="1">
-                                     <ComboBox.ItemTemplate>
-                                         <DataTemplate>
-                                             <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource LuminaTextForegroundBrush}"/>
-                                         </DataTemplate>
-                                     </ComboBox.ItemTemplate>
-                                </ComboBox>
-                            </Grid>
-                            
-                            <Grid ColumnDefinitions="*, Auto">
-                                <StackPanel Spacing="2">
-                                    <TextBlock Text="{c:Localize Theme}" FontWeight="SemiBold"/>
-                                    <TextBlock Text="Light or Dark mode" FontSize="11" Opacity="0.6"/>
-                                </StackPanel>
-                                <ComboBox ItemsSource="{Binding AvailableThemes}" SelectedItem="{Binding SelectedBaseTheme}" MinWidth="180" Grid.Column="1">
-                                     <ComboBox.ItemTemplate>
-                                         <DataTemplate>
-                                             <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource LuminaTextForegroundBrush}"/>
-                                         </DataTemplate>
-                                     </ComboBox.ItemTemplate>
-                                </ComboBox>
-                            </Grid>
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,14,0">
+                    <StackPanel Margin="16,0,0,0" Spacing="14" VerticalAlignment="Top">
+                        <Border Classes="Card" Padding="18">
+                            <StackPanel Spacing="14">
+                                <TextBlock Text="{c:Localize Appearance}" Classes="GroupTitle"/>
 
-                            <Grid ColumnDefinitions="*, Auto">
-                                <StackPanel Spacing="2">
-                                    <TextBlock Text="{c:Localize PrimaryColor}" FontWeight="SemiBold"/>
-                                    <TextBlock Text="Accent color for buttons and highlights" FontSize="11" Opacity="0.6"/>
-                                </StackPanel>
-                                <ComboBox ItemsSource="{Binding AvailableColors}" SelectedItem="{Binding SelectedColor}" MinWidth="180" Grid.Column="1">
-                                     <ComboBox.ItemTemplate>
-                                         <DataTemplate>
-                                             <StackPanel Orientation="Horizontal" Spacing="10">
-                                                 <Border Background="{Binding Color, Converter={StaticResource ColorToBrushConverter}}" Width="16" Height="16" CornerRadius="8"/>
-                                                 <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextForegroundBrush}"/>
-                                             </StackPanel>
-                                         </DataTemplate>
-                                     </ComboBox.ItemTemplate>
-                                </ComboBox>
-                            </Grid>
-                        </StackPanel>
-                    </lumina:LuminaCard>
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{c:Localize Language}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                        <TextBlock Text="{c:Localize LanguageDesc}" Classes="Hint"/>
+                                    </StackPanel>
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableLanguages}" SelectedItem="{Binding SelectedLanguage}" MinWidth="184" VerticalAlignment="Center">
+                                         <ComboBox.ItemTemplate>
+                                             <DataTemplate>
+                                                 <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                             </DataTemplate>
+                                         </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </Grid>
+
+                                <Border Classes="Divider"/>
+
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{c:Localize Theme}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                        <TextBlock Text="{c:Localize ThemeDesc}" Classes="Hint"/>
+                                    </StackPanel>
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableThemes}" SelectedItem="{Binding SelectedBaseTheme}" MinWidth="184" VerticalAlignment="Center">
+                                         <ComboBox.ItemTemplate>
+                                             <DataTemplate>
+                                                 <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                             </DataTemplate>
+                                         </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </Grid>
+
+                                <Border Classes="Divider"/>
+
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{c:Localize PrimaryColor}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                        <TextBlock Text="{c:Localize PrimaryColorDesc}" Classes="Hint"/>
+                                    </StackPanel>
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableColors}" SelectedItem="{Binding SelectedColor}" MinWidth="184" VerticalAlignment="Center">
+                                         <ComboBox.ItemTemplate>
+                                             <DataTemplate>
+                                                 <StackPanel Orientation="Horizontal" Spacing="9">
+                                                     <Border Background="{Binding Color, Converter={StaticResource ColorToBrushConverter}}" Width="14" Height="14" CornerRadius="7" VerticalAlignment="Center"/>
+                                                     <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                                 </StackPanel>
+                                             </DataTemplate>
+                                         </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
                 </ScrollViewer>
             </TabItem>
 
             <!-- Terminal Section -->
             <TabItem Header="{c:Localize Terminal}">
-                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Padding="0,0,16,0">
-                    <lumina:LuminaCard Classes="Glass" Margin="16,0,0,0" Padding="24" CornerRadius="12" VerticalAlignment="Top">
-                        <StackPanel Spacing="20">
-                            <!-- Font -->
-                            <Grid ColumnDefinitions="*, Auto">
-                                <StackPanel Spacing="2">
-                                    <TextBlock Text="{c:Localize FontFamily}" FontWeight="SemiBold"/>
-                                    <TextBlock Text="{c:Localize MonospaceRecommended}" FontSize="11" Opacity="0.6"/>
-                                </StackPanel>
-                                <Grid Grid.Column="1" ColumnDefinitions="*, Auto">
-                                    <TextBox Text="{Binding Settings.FontFamily}" MinWidth="180" VerticalAlignment="Center"/>
-                                    <Button Grid.Column="1" Content="..." Command="{Binding PickFontCommand}" Margin="5,0,0,0" Classes="Outline"/>
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,14,0">
+                    <StackPanel Margin="16,0,0,0" Spacing="14" VerticalAlignment="Top">
+
+                        <!-- Font -->
+                        <Border Classes="Card" Padding="18">
+                            <StackPanel Spacing="14">
+                                <TextBlock Text="{c:Localize Font}" Classes="GroupTitle"/>
+
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{c:Localize FontFamily}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                        <TextBlock Text="{c:Localize MonospaceRecommended}" Classes="Hint"/>
+                                    </StackPanel>
+                                    <Grid Grid.Column="1" ColumnDefinitions="*, Auto" VerticalAlignment="Center">
+                                        <TextBox Text="{Binding Settings.FontFamily}" MinWidth="184" VerticalAlignment="Center"/>
+                                        <Button Grid.Column="1" Content="..." Command="{Binding PickFontCommand}" Margin="6,0,0,0" Classes="Outline"/>
+                                    </Grid>
                                 </Grid>
-                            </Grid>
-                            
-                            <Grid ColumnDefinitions="*, Auto">
-                                <TextBlock Text="{c:Localize FontSize}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                <NumericUpDown Value="{Binding Settings.FontSize}" Minimum="8" Maximum="72" Increment="1" MinWidth="120" Grid.Column="1"/>
-                            </Grid>
 
-                            <Border Height="1" Background="{DynamicResource LuminaDividerBrush}" Margin="0,10"/>
+                                <Border Classes="Divider"/>
 
-                            <!-- Color Scheme Selection -->
-                            <StackPanel Spacing="12">
-                                <TextBlock Text="{c:Localize ColorScheme}" FontWeight="SemiBold" FontSize="14"/>
-                                
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <TextBlock Text="{c:Localize FontSize}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <NumericUpDown Grid.Column="1" Value="{Binding Settings.FontSize}" Minimum="8" Maximum="72" Increment="1" MinWidth="124" VerticalAlignment="Center"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Color scheme -->
+                        <Border Classes="Card" Padding="18">
+                            <StackPanel Spacing="14">
+                                <TextBlock Text="{c:Localize ColorScheme}" Classes="GroupTitle"/>
+
                                 <Grid ColumnDefinitions="*, Auto">
-                                    <ComboBox ItemsSource="{Binding AvailableColorSchemes}" 
-                                              SelectedItem="{Binding SelectedColorScheme}" 
+                                    <ComboBox ItemsSource="{Binding AvailableColorSchemes}"
+                                              SelectedItem="{Binding SelectedColorScheme}"
                                               MinWidth="200" HorizontalAlignment="Stretch">
                                         <ComboBox.ItemTemplate>
                                             <DataTemplate x:DataType="m:TerminalColorScheme">
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <!-- Color preview swatches -->
+                                                <StackPanel Orientation="Horizontal" Spacing="9">
                                                     <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
-                                                        <Border Background="{Binding Background, Converter={StaticResource ColorToBrushConverter}}" 
-                                                                Width="14" Height="14" CornerRadius="2" BorderBrush="Gray" BorderThickness="0.5"/>
-                                                        <Border Background="{Binding Red, Converter={StaticResource ColorToBrushConverter}}" Width="14" Height="14" CornerRadius="2"/>
-                                                        <Border Background="{Binding Green, Converter={StaticResource ColorToBrushConverter}}" Width="14" Height="14" CornerRadius="2"/>
-                                                        <Border Background="{Binding Blue, Converter={StaticResource ColorToBrushConverter}}" Width="14" Height="14" CornerRadius="2"/>
-                                                        <Border Background="{Binding Yellow, Converter={StaticResource ColorToBrushConverter}}" Width="14" Height="14" CornerRadius="2"/>
-                                                        <Border Background="{Binding Magenta, Converter={StaticResource ColorToBrushConverter}}" Width="14" Height="14" CornerRadius="2"/>
+                                                        <Border Background="{Binding Background, Converter={StaticResource ColorToBrushConverter}}"
+                                                                Width="13" Height="13" CornerRadius="3" BorderBrush="{DynamicResource LuminaBorderDefaultBrush}" BorderThickness="1"/>
+                                                        <Border Background="{Binding Red, Converter={StaticResource ColorToBrushConverter}}" Width="13" Height="13" CornerRadius="3"/>
+                                                        <Border Background="{Binding Green, Converter={StaticResource ColorToBrushConverter}}" Width="13" Height="13" CornerRadius="3"/>
+                                                        <Border Background="{Binding Blue, Converter={StaticResource ColorToBrushConverter}}" Width="13" Height="13" CornerRadius="3"/>
+                                                        <Border Background="{Binding Yellow, Converter={StaticResource ColorToBrushConverter}}" Width="13" Height="13" CornerRadius="3"/>
+                                                        <Border Background="{Binding Magenta, Converter={StaticResource ColorToBrushConverter}}" Width="13" Height="13" CornerRadius="3"/>
                                                     </StackPanel>
-                                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextForegroundBrush}"/>
+                                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
                                                 </StackPanel>
                                             </DataTemplate>
                                         </ComboBox.ItemTemplate>
                                     </ComboBox>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" Margin="10,0,0,0">
-                                        <Button Content="{c:Localize DuplicateScheme}" Command="{Binding DuplicateSchemeCommand}" Classes="Outline" ToolTip.Tip="Duplicate as custom scheme"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="10,0,0,0">
+                                        <Button Content="{c:Localize DuplicateScheme}" Command="{Binding DuplicateSchemeCommand}" Classes="Outline" ToolTip.Tip="{c:Localize DuplicateSchemeDesc}"/>
                                         <Button Content="{c:Localize DeleteScheme}" Command="{Binding DeleteSchemeCommand}" Classes="Outline"
-                                                IsEnabled="{Binding IsSchemeEditable}" ToolTip.Tip="Delete custom scheme"/>
+                                                IsEnabled="{Binding IsSchemeEditable}" ToolTip.Tip="{c:Localize DeleteSchemeDesc}"/>
                                     </StackPanel>
                                 </Grid>
 
-                                <!-- Color scheme preview: terminal background with foreground text -->
-                                <Border Background="{Binding SelectedColorScheme.Background, Converter={StaticResource ColorToBrushConverter}}" 
-                                        CornerRadius="6" Padding="12,8" MinHeight="40" BorderBrush="{DynamicResource LuminaBorderBrush}" BorderThickness="1">
-                                    <StackPanel Spacing="2">
-                                        <TextBlock Text="user@host:~$ ls -la" FontFamily="Consolas, Monospace" FontSize="12"
+                                <!-- Live preview -->
+                                <Border Background="{Binding SelectedColorScheme.Background, Converter={StaticResource ColorToBrushConverter}}"
+                                        CornerRadius="{DynamicResource AppRadiusSm}" Padding="14,12" MinHeight="40"
+                                        BorderBrush="{DynamicResource LuminaBorderDefaultBrush}" BorderThickness="1">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="user@host:~$ ls -la" FontFamily="Cascadia Mono, Consolas, monospace" FontSize="12"
                                                    Foreground="{Binding SelectedColorScheme.Foreground, Converter={StaticResource ColorToBrushConverter}}"/>
-                                        <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <TextBlock Text="Documents" FontFamily="Consolas, Monospace" FontSize="12"
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="Documents" FontFamily="Cascadia Mono, Consolas, monospace" FontSize="12"
                                                        Foreground="{Binding SelectedColorScheme.Blue, Converter={StaticResource ColorToBrushConverter}}"/>
-                                            <TextBlock Text="script.sh" FontFamily="Consolas, Monospace" FontSize="12"
+                                            <TextBlock Text="script.sh" FontFamily="Cascadia Mono, Consolas, monospace" FontSize="12"
                                                        Foreground="{Binding SelectedColorScheme.Green, Converter={StaticResource ColorToBrushConverter}}"/>
-                                            <TextBlock Text="error.log" FontFamily="Consolas, Monospace" FontSize="12"
+                                            <TextBlock Text="error.log" FontFamily="Cascadia Mono, Consolas, monospace" FontSize="12"
                                                        Foreground="{Binding SelectedColorScheme.Red, Converter={StaticResource ColorToBrushConverter}}"/>
-                                            <TextBlock Text="notes.txt" FontFamily="Consolas, Monospace" FontSize="12"
+                                            <TextBlock Text="notes.txt" FontFamily="Cascadia Mono, Consolas, monospace" FontSize="12"
                                                        Foreground="{Binding SelectedColorScheme.Yellow, Converter={StaticResource ColorToBrushConverter}}"/>
-                                            <TextBlock Text="archive.tar" FontFamily="Consolas, Monospace" FontSize="12"
+                                            <TextBlock Text="archive.tar" FontFamily="Cascadia Mono, Consolas, monospace" FontSize="12"
                                                        Foreground="{Binding SelectedColorScheme.Magenta, Converter={StaticResource ColorToBrushConverter}}"/>
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
+                        </Border>
 
-                            <Border Height="1" Background="{DynamicResource LuminaDividerBrush}" Margin="0,10"/>
+                        <!-- Terminal colors -->
+                        <Border Classes="Card" Padding="18">
+                            <StackPanel Spacing="14">
+                                <TextBlock Text="{c:Localize TerminalColors}" Classes="GroupTitle"/>
 
-                            <!-- Terminal Colors (editable when scheme is custom) -->
-                            <StackPanel Spacing="12">
-                                <TextBlock Text="{c:Localize TerminalColors}" FontWeight="SemiBold" FontSize="14"/>
-                                
-                                <!-- Foreground & Background -->
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="{c:Localize Foreground}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <TextBlock Text="{c:Localize Foreground}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
-                                        <TextBlock Text="{Binding Settings.ColorScheme.Foreground, Converter={StaticResource ColorToHexConverter}}" 
-                                                   VerticalAlignment="Center" FontFamily="Consolas, Monospace" Opacity="0.6"/>
+                                        <TextBlock Text="{Binding Settings.ColorScheme.Foreground, Converter={StaticResource ColorToHexConverter}}" Classes="Mono" VerticalAlignment="Center"/>
                                         <ColorPicker Color="{Binding Settings.ColorScheme.Foreground}" IsEnabled="{Binding IsSchemeEditable}"/>
                                     </StackPanel>
                                 </Grid>
 
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="{c:Localize Background}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <TextBlock Text="{c:Localize Background}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
-                                        <TextBlock Text="{Binding Settings.ColorScheme.Background, Converter={StaticResource ColorToHexConverter}}" 
-                                                   VerticalAlignment="Center" FontFamily="Consolas, Monospace" Opacity="0.6"/>
+                                        <TextBlock Text="{Binding Settings.ColorScheme.Background, Converter={StaticResource ColorToHexConverter}}" Classes="Mono" VerticalAlignment="Center"/>
                                         <ColorPicker Color="{Binding Settings.ColorScheme.Background}" IsEnabled="{Binding IsSchemeEditable}"/>
                                     </StackPanel>
                                 </Grid>
 
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="{c:Localize SelectionColor}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <TextBlock Text="{c:Localize SelectionColor}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
-                                        <TextBlock Text="{Binding Settings.ColorScheme.SelectionBackground, Converter={StaticResource ColorToHexConverter}}" 
-                                                   VerticalAlignment="Center" FontFamily="Consolas, Monospace" Opacity="0.6"/>
+                                        <TextBlock Text="{Binding Settings.ColorScheme.SelectionBackground, Converter={StaticResource ColorToHexConverter}}" Classes="Mono" VerticalAlignment="Center"/>
                                         <ColorPicker Color="{Binding Settings.ColorScheme.SelectionBackground}" IsEnabled="{Binding IsSchemeEditable}"/>
                                     </StackPanel>
                                 </Grid>
 
-                                <Border Height="1" Background="{DynamicResource LuminaDividerBrush}" Margin="0,10"/>
+                                <Border Classes="Divider"/>
 
-                                <!-- ANSI 16 Colors Grid -->
-                                <TextBlock Text="{c:Localize AnsiColors}" FontWeight="SemiBold" Opacity="0.8"/>
-                                
-                                <!-- Normal Colors (0-7) -->
-                                <TextBlock Text="{c:Localize NormalColors}" FontSize="11" Opacity="0.6"/>
+                                <TextBlock Text="{c:Localize AnsiColors}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+
+                                <TextBlock Text="{c:Localize NormalColors}" Classes="Hint"/>
                                 <WrapPanel Orientation="Horizontal">
-                                    <StackPanel Spacing="2" Margin="0,0,12,8">
-                                        <TextBlock Text="Black" FontSize="10" Opacity="0.5"/>
+                                    <StackPanel Classes="Swatch">
+                                        <TextBlock Text="Black"/>
                                         <ColorPicker Color="{Binding Settings.ColorScheme.Black}" IsEnabled="{Binding IsSchemeEditable}"/>
                                     </StackPanel>
-                                    <StackPanel Spacing="2" Margin="0,0,12,8">
-                                        <TextBlock Text="Red" FontSize="10" Opacity="0.5"/>
+                                    <StackPanel Classes="Swatch">
+                                        <TextBlock Text="Red"/>
                                         <ColorPicker Color="{Binding Settings.ColorScheme.Red}" IsEnabled="{Binding IsSchemeEditable}"/>
                                     </StackPanel>
-                                    <StackPanel Spacing="2" Margin="0,0,12,8">
-                                        <TextBlock Text="Green" FontSize="10" Opacity="0.5"/>
+                                    <StackPanel Classes="Swatch">
+                                        <TextBlock Text="Green"/>
                                         <ColorPicker Color="{Binding Settings.ColorScheme.Green}" IsEnabled="{Binding IsSchemeEditable}"/>
                                     </StackPanel>
-                                    <StackPanel Spacing="2" Margin="0,0,12,8">
-                                        <TextBlock Text="Yellow" FontSize="10" Opacity="0.5"/>
+                                    <StackPanel Classes="Swatch">
+                                        <TextBlock Text="Yellow"/>
                                         <ColorPicker Color="{Binding Settings.ColorScheme.Yellow}" IsEnabled="{Binding IsSchemeEditable}"/>
                                     </StackPanel>
-                                    <StackPanel Spacing="2" Margin="0,0,12,8">
-                                        <TextBlock Text="Blue" FontSize="10" Opacity="0.5"/>
+                                    <StackPanel Classes="Swatch">
+                                        <TextBlock Text="Blue"/>
                                         <ColorPicker Color="{Binding Settings.ColorScheme.Blue}" IsEnabled="{Binding IsSchemeEditable}"/>
                                     </StackPanel>
-                                    <StackPanel Spacing="2" Margin="0,0,12,8">
-                                        <TextBlock Text="Magenta" FontSize="10" Opacity="0.5"/>
+                                    <StackPanel Classes="Swatch">
+                                        <TextBlock Text="Magenta"/>
                                         <ColorPicker Color="{Binding Settings.ColorScheme.Magenta}" IsEnabled="{Binding IsSchemeEditable}"/>
                                     </StackPanel>
-                                    <StackPanel Spacing="2" Margin="0,0,12,8">
-                                        <TextBlock Text="Cyan" FontSize="10" Opacity="0.5"/>
+                                    <StackPanel Classes="Swatch">
+                                        <TextBlock Text="Cyan"/>
                                         <ColorPicker Color="{Binding Settings.ColorScheme.Cyan}" IsEnabled="{Binding IsSchemeEditable}"/>
                                     </StackPanel>
-                                    <StackPanel Spacing="2" Margin="0,0,12,8">
-                                        <TextBlock Text="White" FontSize="10" Opacity="0.5"/>
+                                    <StackPanel Classes="Swatch">
+                                        <TextBlock Text="White"/>
                                         <ColorPicker Color="{Binding Settings.ColorScheme.White}" IsEnabled="{Binding IsSchemeEditable}"/>
                                     </StackPanel>
                                 </WrapPanel>
-                                
-                                <!-- Bright Colors (8-15) -->
-                                <TextBlock Text="{c:Localize BrightColors}" FontSize="11" Opacity="0.6"/>
+
+                                <TextBlock Text="{c:Localize BrightColors}" Classes="Hint"/>
                                 <WrapPanel Orientation="Horizontal">
-                                    <StackPanel Spacing="2" Margin="0,0,12,8">
-                                        <TextBlock Text="Bright Black" FontSize="10" Opacity="0.5"/>
+                                    <StackPanel Classes="Swatch">
+                                        <TextBlock Text="Bright Black"/>
                                         <ColorPicker Color="{Binding Settings.ColorScheme.BrightBlack}" IsEnabled="{Binding IsSchemeEditable}"/>
                                     </StackPanel>
-                                    <StackPanel Spacing="2" Margin="0,0,12,8">
-                                        <TextBlock Text="Bright Red" FontSize="10" Opacity="0.5"/>
+                                    <StackPanel Classes="Swatch">
+                                        <TextBlock Text="Bright Red"/>
                                         <ColorPicker Color="{Binding Settings.ColorScheme.BrightRed}" IsEnabled="{Binding IsSchemeEditable}"/>
                                     </StackPanel>
-                                    <StackPanel Spacing="2" Margin="0,0,12,8">
-                                        <TextBlock Text="Bright Green" FontSize="10" Opacity="0.5"/>
+                                    <StackPanel Classes="Swatch">
+                                        <TextBlock Text="Bright Green"/>
                                         <ColorPicker Color="{Binding Settings.ColorScheme.BrightGreen}" IsEnabled="{Binding IsSchemeEditable}"/>
                                     </StackPanel>
-                                    <StackPanel Spacing="2" Margin="0,0,12,8">
-                                        <TextBlock Text="Bright Yellow" FontSize="10" Opacity="0.5"/>
+                                    <StackPanel Classes="Swatch">
+                                        <TextBlock Text="Bright Yellow"/>
                                         <ColorPicker Color="{Binding Settings.ColorScheme.BrightYellow}" IsEnabled="{Binding IsSchemeEditable}"/>
                                     </StackPanel>
-                                    <StackPanel Spacing="2" Margin="0,0,12,8">
-                                        <TextBlock Text="Bright Blue" FontSize="10" Opacity="0.5"/>
+                                    <StackPanel Classes="Swatch">
+                                        <TextBlock Text="Bright Blue"/>
                                         <ColorPicker Color="{Binding Settings.ColorScheme.BrightBlue}" IsEnabled="{Binding IsSchemeEditable}"/>
                                     </StackPanel>
-                                    <StackPanel Spacing="2" Margin="0,0,12,8">
-                                        <TextBlock Text="Bright Magenta" FontSize="10" Opacity="0.5"/>
+                                    <StackPanel Classes="Swatch">
+                                        <TextBlock Text="Bright Magenta"/>
                                         <ColorPicker Color="{Binding Settings.ColorScheme.BrightMagenta}" IsEnabled="{Binding IsSchemeEditable}"/>
                                     </StackPanel>
-                                    <StackPanel Spacing="2" Margin="0,0,12,8">
-                                        <TextBlock Text="Bright Cyan" FontSize="10" Opacity="0.5"/>
+                                    <StackPanel Classes="Swatch">
+                                        <TextBlock Text="Bright Cyan"/>
                                         <ColorPicker Color="{Binding Settings.ColorScheme.BrightCyan}" IsEnabled="{Binding IsSchemeEditable}"/>
                                     </StackPanel>
-                                    <StackPanel Spacing="2" Margin="0,0,12,8">
-                                        <TextBlock Text="Bright White" FontSize="10" Opacity="0.5"/>
+                                    <StackPanel Classes="Swatch">
+                                        <TextBlock Text="Bright White"/>
                                         <ColorPicker Color="{Binding Settings.ColorScheme.BrightWhite}" IsEnabled="{Binding IsSchemeEditable}"/>
                                     </StackPanel>
                                 </WrapPanel>
                             </StackPanel>
+                        </Border>
 
-                            <Border Height="1" Background="{DynamicResource LuminaDividerBrush}" Margin="0,10"/>
+                        <!-- Behavior -->
+                        <Border Classes="Card" Padding="18">
+                            <StackPanel Spacing="14">
+                                <TextBlock Text="{c:Localize Behavior}" Classes="GroupTitle"/>
 
-                            <Grid ColumnDefinitions="*, Auto">
-                                <TextBlock Text="{c:Localize EnableColors}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                <ToggleSwitch IsChecked="{Binding Settings.EnableColors}" Grid.Column="1"/>
-                            </Grid>
-
-                            <Border Height="1" Background="{DynamicResource LuminaDividerBrush}" Margin="0,10"/>
-
-                            <!-- Behavior -->
-                            <Grid ColumnDefinitions="*, Auto">
-                                <TextBlock Text="{c:Localize Scrollback}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                <NumericUpDown Value="{Binding Settings.ScrollbackLines}" Minimum="100" Maximum="10000" Increment="100" MinWidth="120" Grid.Column="1"/>
-                            </Grid>
-
-                            <!-- Background Image -->
-                            <StackPanel Spacing="10">
-                                <TextBlock Text="{c:Localize BackgroundImage}" FontWeight="SemiBold"/>
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <TextBox Text="{Binding Settings.BackgroundImagePath}" PlaceholderText="{c:Localize ImagePathWatermark}"/>
-                                    <Button Grid.Column="1" Content="..." Margin="5,0,0,0" Click="BrowseFile_Click" Classes="Outline"/>
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <TextBlock Text="{c:Localize EnableColors}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.EnableColors}" VerticalAlignment="Center"/>
                                 </Grid>
-                                <Grid ColumnDefinitions="Auto, *, Auto">
-                                    <TextBlock Text="{c:Localize Opacity}" VerticalAlignment="Center" Margin="0,0,10,0" Opacity="0.6"/>
-                                    <Slider Grid.Column="1" Value="{Binding Settings.BackgroundImageOpacity}" Minimum="0" Maximum="1" TickFrequency="0.05" IsSnapToTickEnabled="True"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding Settings.BackgroundImageOpacity, StringFormat='{}{0:P0}'}" VerticalAlignment="Center" Margin="10,0,0,0" Width="40"/>
+
+                                <Border Classes="Divider"/>
+
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <TextBlock Text="{c:Localize Scrollback}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <NumericUpDown Grid.Column="1" Value="{Binding Settings.ScrollbackLines}" Minimum="100" Maximum="10000" Increment="100" MinWidth="124" VerticalAlignment="Center"/>
                                 </Grid>
                             </StackPanel>
-                        </StackPanel>
-                    </lumina:LuminaCard>
+                        </Border>
+
+                        <!-- Background image -->
+                        <Border Classes="Card" Padding="18">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="{c:Localize BackgroundImage}" Classes="GroupTitle"/>
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <TextBox Text="{Binding Settings.BackgroundImagePath}" PlaceholderText="{c:Localize ImagePathWatermark}"/>
+                                    <Button Grid.Column="1" Content="..." Margin="6,0,0,0" Click="BrowseFile_Click" Classes="Outline"/>
+                                </Grid>
+                                <Grid ColumnDefinitions="Auto, *, Auto">
+                                    <TextBlock Text="{c:Localize Opacity}" Classes="PropLabel" Margin="0,0,12,0"/>
+                                    <Slider Grid.Column="1" Value="{Binding Settings.BackgroundImageOpacity}" Minimum="0" Maximum="1" TickFrequency="0.05" IsSnapToTickEnabled="True"/>
+                                    <TextBlock Grid.Column="2" Text="{Binding Settings.BackgroundImageOpacity, StringFormat='{}{0:P0}'}" Classes="PropValue" Margin="12,0,0,0" Width="44"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
                 </ScrollViewer>
             </TabItem>
         </TabControl>
     </Grid>
 </UserControl>
+

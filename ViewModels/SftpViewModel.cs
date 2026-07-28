@@ -21,6 +21,25 @@ public partial class SftpViewModel : ObservableObject
     [ObservableProperty]
     private bool _isLoading;
 
+    /// <summary>
+    /// Last operation failure, shown as an inline banner. Empty when everything is fine.
+    /// </summary>
+    [ObservableProperty]
+    private string _errorMessage = "";
+
+    public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
+
+    partial void OnErrorMessageChanged(string value) => OnPropertyChanged(nameof(HasError));
+
+    private void ReportError(string key, string detail)
+    {
+        var text = string.Format(Services.LocalizationService.Instance[key], detail);
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => ErrorMessage = text);
+    }
+
+    [RelayCommand]
+    private void DismissError() => ErrorMessage = "";
+
     public ObservableCollection<SftpFileItem> Files { get; } = new();
 
     public SftpViewModel(SshSession session)
@@ -52,11 +71,12 @@ public partial class SftpViewModel : ObservableObject
                         {
                             Files.Add(item);
                         }
+                        ErrorMessage = "";
                     });
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"SFTP Error: {ex.Message}");
+                    ReportError("SftpListFailed", ex.Message);
                 }
                 finally
                 {
@@ -134,7 +154,7 @@ public partial class SftpViewModel : ObservableObject
         {
             var file = await storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
-                Title = "Download File",
+                Title = Services.LocalizationService.Instance["DownloadFile"],
                 SuggestedFileName = fileItem.Name
             });
 
@@ -148,11 +168,12 @@ public partial class SftpViewModel : ObservableObject
                     using var localStream = await file.OpenWriteAsync();
                     await remoteStream.CopyToAsync(localStream);
                 });
+                ErrorMessage = "";
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Show error
+            ReportError("SftpDownloadFailed", ex.Message);
         }
         finally
         {
@@ -169,7 +190,7 @@ public partial class SftpViewModel : ObservableObject
         {
             var files = await storageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
-                Title = "Upload File",
+                Title = Services.LocalizationService.Instance["UploadFile"],
                 AllowMultiple = true
             });
 
@@ -192,7 +213,10 @@ public partial class SftpViewModel : ObservableObject
                 await RefreshFiles();
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            ReportError("SftpUploadFailed", ex.Message);
+        }
         finally
         {
             IsLoading = false;
