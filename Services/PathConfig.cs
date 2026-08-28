@@ -14,6 +14,7 @@ public static class PathConfig
     public static string BackgroundsDir => Path.Combine(AppDataRoot, "Backgrounds");
     public static string MasterKeyFile => Path.Combine(AppDataRoot, "master.key");
     public static string KnownHostsFile => Path.Combine(AppDataRoot, "known_hosts");
+    public static string SnippetsFile => Path.Combine(AppDataRoot, "snippets.json");
 
     static PathConfig()
     {

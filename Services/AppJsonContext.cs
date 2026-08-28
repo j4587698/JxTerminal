@@ -15,6 +15,10 @@ namespace JxTerminal.Services;
 [JsonSerializable(typeof(SshAuthenticationType))]
 [JsonSerializable(typeof(TerminalSettings))]
 [JsonSerializable(typeof(TerminalColorScheme))]
+[JsonSerializable(typeof(ObservableCollection<SnippetItem>))]
+[JsonSerializable(typeof(List<SnippetItem>))]
+[JsonSerializable(typeof(IEnumerable<SnippetItem>))]
+[JsonSerializable(typeof(SnippetItem))]
 internal partial class AppJsonContext : JsonSerializerContext
 {
 }

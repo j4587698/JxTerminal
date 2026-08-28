@@ -16,7 +16,6 @@
              x:Name="Root">
     
     <UserControl.Resources>
-        <c:FileSizeConverter x:Key="FileSizeConverter"/>
         <c:ColorToBrushConverter x:Key="ColorToBrushConverter"/>
     </UserControl.Resources>
 
@@ -94,6 +93,11 @@
                                     <Ellipse Width="7" Height="7" VerticalAlignment="Center"
                                              Fill="{DynamicResource LuminaBorderStrongBrush}"
                                              IsVisible="{Binding !IsConnected}"/>
+                                    <Ellipse Width="7" Height="7" VerticalAlignment="Center"
+                                             ToolTip.Tip="{c:Localize UnseenOutput}"
+                                             Classes="UnseenDot"
+                                             Fill="{DynamicResource LuminaWarningBrush}"
+                                             IsVisible="{Binding HasUnseenOutput}"/>
                                     <TextBlock Text="{Binding Title}" VerticalAlignment="Center" FontSize="13"
                                                MaxWidth="160" TextTrimming="CharacterEllipsis"
                                                Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
@@ -130,19 +134,20 @@
                     <DataTemplate DataType="vm:TerminalViewModel">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto" SharedSizeGroup="Sidebar"/>
+                                <ColumnDefinition Width="*" MinWidth="320"/>
+                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <!-- Terminal area -->
                             <ThemeVariantScope RequestedThemeVariant="Dark" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                                 <lumina:LuminaCard Margin="12" CornerRadius="{DynamicResource AppRadiusLg}" Padding="0" ClipToBounds="True" Background="{Binding Settings.BackgroundColor, Converter={StaticResource ColorToBrushConverter}}" BorderThickness="1" BorderBrush="{DynamicResource LuminaBorderDefaultBrush}">
                                 <Grid ColumnDefinitions="*, Auto">
-                                    <ctrl:TerminalControl x:Name="terminalControl" Controller="{Binding}" 
-                                                       FontFamily="{Binding Settings.FontFamily}" FontSize="{Binding Settings.FontSize}"
+                                    <ctrl:TerminalControl x:Name="terminalControl" Controller="{Binding}"
+                                                       FontFamily="{Binding Settings.FontFamily}" FontSize="{Binding Settings.FontSize, Mode=TwoWay}"
                                                        BackgroundColor="{Binding Settings.BackgroundColor}" ForegroundColor="{Binding Settings.ForegroundColor}"
                                                        EnableColors="{Binding Settings.EnableColors}" ScrollbackLines="{Binding Settings.ScrollbackLines}"
                                                        BackgroundImage="{Binding Settings.BackgroundImage}" BackgroundImageOpacity="{Binding Settings.BackgroundImageOpacity}"
                                                        ColorScheme="{Binding Settings.ColorScheme}" SelectionBackground="{Binding Settings.ColorScheme.SelectionBackground}"
+                                                       CopyOnSelect="{Binding Settings.CopyOnSelect}" CursorStyle="{Binding Settings.CursorStyle}"
                                                        SearchQuery="{Binding SearchText}" SearchMatchCase="{Binding SearchMatchCase}"/>
                                     <ScrollBar Grid.Column="1" HorizontalAlignment="Right" Orientation="Vertical" Minimum="0"
                                                Maximum="{Binding #terminalControl.ScrollMaximum}" Value="{Binding #terminalControl.ScrollPosition, Mode=TwoWay}"
@@ -166,9 +171,10 @@
                                             <TextBlock VerticalAlignment="Center" MinWidth="52" TextAlignment="Center"
                                                        Foreground="{DynamicResource LuminaTextTertiaryBrush}" FontSize="12">
                                                 <TextBlock.Text>
-                                                    <MultiBinding StringFormat="{}{0}/{1}">
+                                                    <MultiBinding Converter="{x:Static c:MatchCountConverter.Instance}">
                                                         <Binding Path="#terminalControl.SearchMatchOrdinal"/>
                                                         <Binding Path="#terminalControl.SearchMatchCount"/>
+                                                        <Binding Path="SearchText"/>
                                                     </MultiBinding>
                                                 </TextBlock.Text>
                                             </TextBlock>

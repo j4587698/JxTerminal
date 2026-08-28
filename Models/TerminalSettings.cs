@@ -126,6 +126,26 @@ public partial class TerminalSettings : ObservableObject
     [ObservableProperty]
     private int _scrollbackLines = 1000;
 
+    /// <summary>
+    /// Shell launched for local PTY sessions: PowerShell, Cmd, Wsl or Bash.
+    /// </summary>
+    [ObservableProperty]
+    private string _localShellKind = "Auto";
+
+    /// <summary>
+    /// Text encoding for remote sessions (SSH/Telnet/Serial), e.g. "UTF-8" or "GBK".
+    /// </summary>
+    [ObservableProperty]
+    private string _remoteEncoding = "UTF-8";
+
+    /// <summary>Automatically copy selected terminal text to the clipboard.</summary>
+    [ObservableProperty]
+    private bool _copyOnSelect;
+
+    /// <summary>Cursor shape: Block, Bar or Underline.</summary>
+    [ObservableProperty]
+    private string _cursorStyle = "Block";
+
     [ObservableProperty]
     private string? _backgroundImagePath;
 
@@ -158,7 +178,7 @@ public partial class TerminalSettings : ObservableObject
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error loading background image: {ex.Message}");
+            Services.AppLog.Warn($"Error loading background image: {ex.Message}");
             BackgroundImage = null;
         }
     }

@@ -43,7 +43,7 @@ public static class KnownHostsService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to read known_hosts: {ex.Message}");
+            AppLog.Warn($"Failed to read known_hosts: {ex.Message}");
         }
         return map;
     }
@@ -70,11 +70,13 @@ public static class KnownHostsService
         try
         {
             var lines = Entries.Select(kv => $"{kv.Key} {kv.Value}");
-            File.WriteAllLines(PathConfig.KnownHostsFile, lines);
+            var temp = PathConfig.KnownHostsFile + ".tmp";
+            File.WriteAllLines(temp, lines);
+            File.Move(temp, PathConfig.KnownHostsFile, overwrite: true);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to write known_hosts: {ex.Message}");
+            AppLog.Warn($"Failed to write known_hosts: {ex.Message}");
         }
     }
 }

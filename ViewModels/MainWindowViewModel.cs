@@ -15,8 +15,25 @@ namespace JxTerminal.ViewModels;
 
 public partial class MainWindowViewModel : ViewModelBase
 {
+    /// <summary>
+    /// Process-wide instance so view models without a direct reference (terminal tabs,
+    /// SFTP panel) can still route dialogs through the main shell.
+    /// </summary>
+    public static MainWindowViewModel? Instance { get; private set; }
+
     [ObservableProperty]
     private ViewModelBase _activeContent = null!;
+
+    /// <summary>Window title mirrors the active terminal tab, e.g. "root@web1 - JxTerminal".</summary>
+    public string WindowTitle
+    {
+        get
+        {
+            var l = Services.LocalizationService.Instance;
+            var tab = TerminalList?.SelectedTab;
+            return tab == null ? l["AppName"] : $"{tab.Title} - {l["AppName"]}";
+        }
+    }
 
     partial void OnActiveContentChanged(ViewModelBase value)
     {
@@ -53,17 +70,40 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isDialogOpen;
 
+    /// <summary>
+    /// True only while a background operation is running AND no modal dialog is
+    /// open. The connecting overlay uses this so it never covers a dialog that
+    /// needs user input (password / host-key trust).
+    /// </summary>
+    public bool IsBusyOverlayVisible => IsBusy && !IsDialogOpen;
+
     [ObservableProperty]
     private TerminalSettings _settings;
 
     public MainWindowViewModel()
     {
+        Instance = this;
+
+        // Keep the busy-overlay visibility in sync: it must hide whenever a modal
+        // dialog is open, otherwise the full-window scrim would trap the dialog.
+        PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(IsBusy) or nameof(IsDialogOpen))
+                OnPropertyChanged(nameof(IsBusyOverlayVisible));
+        };
+
         // Load Settings Synchronously (or async init pattern)
         // Since constructor is sync, we'll start with default and then load.
         _settings = new TerminalSettings();
-        LoadSettings();
 
         TerminalList = new TerminalListViewModel();
+        TerminalList.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(TerminalList.SelectedTab))
+                OnPropertyChanged(nameof(WindowTitle));
+        };
+        Services.LocalizationService.Instance.PropertyChanged += (_, _) =>
+            OnPropertyChanged(nameof(WindowTitle));
         TerminalList.RequestCreateConnection += () => {
              ActiveContent = HostList;
              SelectedMenuItem = MenuItems.FirstOrDefault(m => m.Key == "HostList");
@@ -100,8 +140,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             Key = "Snippets",
             IconKind = MaterialIconKind.ScriptText,
-            Command = NavigateToPlaceholderCommand,
-            CommandParameter = "Snippets"
+            Command = NavigateToSnippetsCommand
         });
 
         MenuItems.Add(new MenuItemViewModel
@@ -127,7 +166,32 @@ public partial class MainWindowViewModel : ViewModelBase
     public void NavigateToTerminal() => ActiveContent = TerminalList;
 
     [RelayCommand]
-    public void NavigateToSettings() => ActiveContent = new SettingsViewModel(Settings, this);
+    public void NavigateToSettings() => ActiveContent = SettingsPage ??= new SettingsViewModel(Settings, this);
+
+    private SettingsViewModel? SettingsPage;
+
+    [RelayCommand]
+    public void NavigateToSnippets()
+    {
+        SelectedNavigationKey = "Snippets";
+        ActiveContent = SnippetsPage ??= new SnippetsViewModel(this);
+    }
+
+    private SnippetsViewModel? SnippetsPage;
+
+    /// <summary>
+    /// Sends a command line to the active terminal tab (appending Enter) and brings the
+    /// terminal page to front. No-op when no connected tab exists.
+    /// </summary>
+    public void SendToActiveTerminal(string command)
+    {
+        if (string.IsNullOrEmpty(command)) return;
+        var tab = TerminalList.SelectedTab;
+        if (tab == null) return;
+
+        tab.SendInput(command.EndsWith('\r') || command.EndsWith('\n') ? command : command + "\r");
+        ActiveContent = TerminalList;
+    }
 
     [RelayCommand]
     public void NavigateToPlaceholder(string title)
@@ -210,15 +274,27 @@ public partial class MainWindowViewModel : ViewModelBase
     /// Prompts for a password. Resolves to null when the user cancels. The value is never persisted.
     /// </summary>
     public Task<string?> ShowPasswordDialog(string title, string message)
+        => ShowInputDialog(title, message, isPassword: true);
+
+    /// <summary>
+    /// Generic single-line text prompt. Resolves to null when the user cancels.
+    /// </summary>
+    public Task<string?> ShowInputDialog(string title, string message, bool isPassword = false)
     {
         var tcs = new TaskCompletionSource<string?>();
         var l = Services.LocalizationService.Instance;
 
         var input = new TextBox
         {
-            PasswordChar = '\u25cf',
-            PlaceholderText = l["Password"]
+            PlaceholderText = message
         };
+        if (isPassword) input.PasswordChar = '\u25cf';
+
+        void Complete(string? result)
+        {
+            CloseDialog();
+            tcs.TrySetResult(result);
+        }
 
         var confirm = new Button
         {
@@ -226,15 +302,15 @@ public partial class MainWindowViewModel : ViewModelBase
             Classes = { "Primary" },
             IsDefault = true
         };
+        confirm.Click += (_, _) => Complete(input.Text ?? string.Empty);
+
         var cancel = new Button
         {
             Content = l["Cancel"],
             Classes = { "Ghost" },
             IsCancel = true
         };
-
-        confirm.Click += (_, _) => { CloseDialog(); tcs.TrySetResult(input.Text ?? string.Empty); };
-        cancel.Click += (_, _) => { CloseDialog(); tcs.TrySetResult(null); };
+        cancel.Click += (_, _) => Complete(null);
 
         var panel = new StackPanel
         {
@@ -271,16 +347,35 @@ public partial class MainWindowViewModel : ViewModelBase
         DialogContent = null;
     }
 
-    private async void LoadSettings()
+    /// <summary>
+    /// Creates the view model with settings fully loaded before the UI binds to them.
+    /// Synchronous on purpose: OnFrameworkInitializationCompleted must create the main
+    /// window before returning, otherwise the classic lifetime may exit with zero windows.
+    /// </summary>
+    public static MainWindowViewModel Create()
     {
-        Settings = await JxTerminal.Services.DataStore.LoadSettingsAsync();
-        Settings.ResolveColorScheme();
-        // Hook up auto-save
-        Settings.PropertyChanged += async (s, e) => {
-             // Avoid saving on transient changes if possible, or debounce. 
-             // For now, save on every change.
-             await JxTerminal.Services.DataStore.SaveSettingsAsync(Settings);
+        var vm = new MainWindowViewModel();
+        vm.Settings = JxTerminal.Services.DataStore.LoadSettings();
+        vm.Settings.ResolveColorScheme();
+
+        // Debounced auto-save: color picker drags fire dozens of notifications per second.
+        var saveCts = new System.Threading.CancellationTokenSource();
+        vm.Settings.PropertyChanged += (s, e) =>
+        {
+            saveCts.Cancel();
+            saveCts = new System.Threading.CancellationTokenSource();
+            var token = saveCts.Token;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(500, token);
+                    await JxTerminal.Services.DataStore.SaveSettingsAsync(vm.Settings);
+                }
+                catch (OperationCanceledException) { }
+            });
         };
+        return vm;
     }
 
     [ObservableProperty]
@@ -299,11 +394,12 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             if (connInfo.Type == ConnectionType.Local)
             {
-                session = new PtyLocalShellSession();
+                session = new PtyLocalShellSession(
+                    string.IsNullOrWhiteSpace(connInfo.ShellPath) ? Settings.LocalShellKind : connInfo.ShellPath);
             }
             else if (connInfo.Type == ConnectionType.Telnet)
             {
-                session = new TelnetSession(connInfo.Host, connInfo.Port);
+                session = new TelnetSession(connInfo.Host, connInfo.Port, Settings.RemoteEncoding);
             }
             else if (connInfo.Type == ConnectionType.Serial)
             {
@@ -313,7 +409,8 @@ public partial class MainWindowViewModel : ViewModelBase
                     connInfo.DataBits,
                     connInfo.Parity,
                     connInfo.StopBits,
-                    connInfo.Handshake);
+                    connInfo.Handshake,
+                    Settings.RemoteEncoding);
             }
             else
             {
@@ -335,31 +432,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
 
                 session = new SshSession(
-                    connInfo.Host, 
-                    connInfo.Port, 
-                    connInfo.Username, 
-                    password, 
-                    connInfo.AuthenticationType, 
-                    connInfo.KeyFilePath, 
-                    connInfo.Passphrase);
+                    connInfo.Host,
+                    connInfo.Port,
+                    connInfo.Username,
+                    password,
+                    connInfo.AuthenticationType,
+                    connInfo.KeyFilePath,
+                    connInfo.Passphrase,
+                    Settings.RemoteEncoding);
             }
 
             if (session is SshSession ssh)
             {
                  ssh.HostKeyVerifier = VerifyHostKey;
-                 session.ErrorOccurred += OnConnectionError;
             }
 
-            if (session is SerialSession serialSession)
-            {
-                serialSession.ErrorOccurred += OnConnectionError;
-            }
-            // TelnetSession checking?
-            if (session is TelnetSession telnetSession)
-            {
-                telnetSession.ErrorOccurred += OnConnectionError;
-            }
-
+            // Observe session errors for every transport so failures are never silent
+            // (the local-shell path in particular reports through this event).
+            Exception? sessionError = null;
+            session.ErrorOccurred += OnConnectionError;
+            session.ErrorOccurred += ex => sessionError ??= ex;
 
             await session.ConnectAsync();
 
@@ -379,6 +471,12 @@ public partial class MainWindowViewModel : ViewModelBase
                 // Connection attempt failed; release the socket/handles it may already hold.
                 session.ErrorOccurred -= OnConnectionError;
                 (session as IDisposable)?.Dispose();
+
+                if (sessionError != null)
+                {
+                    var l = JxTerminal.Services.LocalizationService.Instance;
+                    ShowMessageDialog(l["ConnectionFailedTitle"], $"{l["ConnectionFailed"]}{sessionError.Message}");
+                }
             }
         }
         catch (Exception ex)
@@ -393,10 +491,10 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Called on the connection worker thread; marshals the trust prompt to the UI thread and
-    /// blocks until the user answers.
+    /// Awaits the trust prompt on the async connect pipeline. Runs on the UI-thread context of the
+    /// awaiting caller, so there is no blocking wait between threads.
     /// </summary>
-    private bool VerifyHostKey(string hostDisplay, string fingerprint, string? knownFingerprint)
+    private Task<bool> VerifyHostKey(string hostDisplay, string fingerprint, string? knownFingerprint)
     {
         var l = JxTerminal.Services.LocalizationService.Instance;
 
@@ -405,10 +503,7 @@ public partial class MainWindowViewModel : ViewModelBase
             ? string.Format(l["HostKeyNewMessage"], hostDisplay, fingerprint)
             : string.Format(l["HostKeyChangedMessage"], hostDisplay, knownFingerprint, fingerprint);
 
-        return Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(
-                () => ShowConfirmDialog(title, message, l["Trust"], danger: knownFingerprint != null))
-            .GetAwaiter()
-            .GetResult();
+        return ShowConfirmDialog(title, message, l["Trust"], danger: knownFingerprint != null);
     }
 
     private void OnConnectionError(Exception ex)

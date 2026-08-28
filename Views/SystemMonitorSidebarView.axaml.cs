@@ -11,6 +11,24 @@ public partial class SystemMonitorSidebarView : UserControl
     public SystemMonitorSidebarView()
     {
         InitializeComponent();
+        AttachedToVisualTree += (_, _) =>
+        {
+            // Hand the platform file dialogs to the SFTP view model (parameterless commands).
+            if (TopLevel.GetTopLevel(this)?.StorageProvider is { } storage
+                && DataContext is TerminalViewModel { Sftp: { } sftp })
+            {
+                sftp.SetStorageProvider(storage);
+            }
+
+            // Drag & drop upload target.
+            var list = this.FindControl<ListBox>("SftpFileList");
+            if (list != null)
+            {
+                DragDrop.SetAllowDrop(list, true);
+                list.AddHandler(DragDrop.DragOverEvent, SftpList_DragOver);
+                list.AddHandler(DragDrop.DropEvent, SftpList_Drop);
+            }
+        };
     }
 
     private TerminalViewModel? FindViewModel(Control control)
@@ -42,5 +60,25 @@ public partial class SystemMonitorSidebarView : UserControl
             var vm = FindViewModel(listBox);
             vm?.Sftp?.NavigateCommand.Execute(item);
         }
+    }
+
+    private void SftpList_DragOver(object? sender, DragEventArgs e)
+    {
+        e.DragEffects = e.DataTransfer.Contains(DataFormat.File)
+            ? DragDropEffects.Copy
+            : DragDropEffects.None;
+    }
+
+    private void SftpList_Drop(object? sender, DragEventArgs e)
+    {
+        if (sender is not Control control) return;
+        var sftp = FindViewModel(control)?.Sftp;
+        if (sftp == null) return;
+
+        var files = e.DataTransfer.TryGetFiles();
+        if (files == null || files.Length == 0) return;
+
+        e.Handled = true;
+        _ = sftp.UploadDroppedAsync(files);
     }
 }

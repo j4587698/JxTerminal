@@ -26,7 +26,8 @@ public class SerialSession : ITerminalSession
     public bool IsConnected => _serialPort?.IsOpen ?? false;
 
     public SerialSession(string portName, int baudRate, int dataBits = 8,
-        Parity parity = Parity.None, StopBits stopBits = StopBits.One, Handshake handshake = Handshake.None)
+        Parity parity = Parity.None, StopBits stopBits = StopBits.One, Handshake handshake = Handshake.None,
+        string encodingName = "UTF-8")
     {
         PortName = portName;
         BaudRate = baudRate;
@@ -34,7 +35,11 @@ public class SerialSession : ITerminalSession
         Parity = parity;
         StopBits = stopBits;
         Handshake = handshake;
+        try { _encoding = Encoding.GetEncoding(string.IsNullOrWhiteSpace(encodingName) ? "UTF-8" : encodingName); }
+        catch (ArgumentException) { _encoding = Encoding.UTF8; }
     }
+
+    private readonly Encoding _encoding;
 
     public async Task ConnectAsync()
     {
@@ -44,7 +49,7 @@ public class SerialSession : ITerminalSession
             {
                 _serialPort = new SerialPort(PortName, BaudRate, Parity, DataBits, StopBits)
                 {
-                    Encoding = Encoding.UTF8, // Maybe configurable?
+                    Encoding = _encoding,
                     Handshake = Handshake,
                     DtrEnable = Handshake != Handshake.RequestToSend && Handshake != Handshake.RequestToSendXOnXOff,
                     RtsEnable = Handshake != Handshake.RequestToSend && Handshake != Handshake.RequestToSendXOnXOff

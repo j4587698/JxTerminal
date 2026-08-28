@@ -313,6 +313,52 @@
                                     <TextBlock Text="{c:Localize Scrollback}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
                                     <NumericUpDown Grid.Column="1" Value="{Binding Settings.ScrollbackLines}" Minimum="100" Maximum="10000" Increment="100" MinWidth="124" VerticalAlignment="Center"/>
                                 </Grid>
+
+                                <Border Classes="Divider"/>
+
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="{c:Localize RemoteEncoding}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                        <TextBlock Text="{c:Localize RemoteEncodingDesc}" FontSize="11" Opacity="0.6"/>
+                                    </StackPanel>
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableEncodings}" SelectedItem="{Binding SelectedEncoding}" MinWidth="124" VerticalAlignment="Center"/>
+                                </Grid>
+
+                                <Border Classes="Divider"/>
+
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="{c:Localize LocalShellKind}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                        <TextBlock Text="{c:Localize LocalShellKindDesc}" FontSize="11" Opacity="0.6"/>
+                                    </StackPanel>
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableLocalShells}" SelectedItem="{Binding SelectedLocalShell}" MinWidth="124" VerticalAlignment="Center"/>
+                                </Grid>
+
+                                <Border Classes="Divider"/>
+
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="{c:Localize CursorStyle}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                        <TextBlock Text="{c:Localize CursorStyleDesc}" FontSize="11" Opacity="0.6"/>
+                                    </StackPanel>
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableCursorStyles}" SelectedItem="{Binding SelectedCursorStyle}" MinWidth="124" VerticalAlignment="Center">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding DisplayName}"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </Grid>
+
+                                <Border Classes="Divider"/>
+
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="{c:Localize CopyOnSelect}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                        <TextBlock Text="{c:Localize CopyOnSelectDesc}" FontSize="11" Opacity="0.6"/>
+                                    </StackPanel>
+                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.CopyOnSelect}" VerticalAlignment="Center"/>
+                                </Grid>
                             </StackPanel>
                         </Border>
 

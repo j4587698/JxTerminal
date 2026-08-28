@@ -36,7 +36,8 @@
                             <RadioButton Classes="SegTab" Content="Memory" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="3" ToolTip.Tip="{c:Localize MemoryTitle}"/>
                             <RadioButton Classes="SegTab" Content="Harddisk" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="4" ToolTip.Tip="{c:Localize DiskTitle}"/>
                             <RadioButton Classes="SegTab" Content="Network" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="5" ToolTip.Tip="{c:Localize NetworkTitle}"/>
-                            <RadioButton Classes="SegTab" Content="FolderNetwork" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="6" ToolTip.Tip="{c:Localize SFTP}"/>
+                            <RadioButton Classes="SegTab" Content="FolderNetwork" GroupName="Sidebar" Command="{Binding SelectTabCommand}" CommandParameter="6" ToolTip.Tip="{c:Localize SFTP}"
+                                         IsVisible="{Binding IsSshSession}"/>
                         </StackPanel>
                     </ScrollViewer>
                     <Button Grid.Column="1" Command="{Binding ToggleSftpCommand}" Classes="Ghost IconOnly" Margin="8,0,0,0" VerticalAlignment="Center">
@@ -348,7 +349,7 @@
                         <Grid Grid.Row="2" ColumnDefinitions="*, 15, *" RowDefinitions="Auto, 15, Auto">
                             <lumina:LuminaCard Classes="Glass" Grid.Row="0" Grid.Column="0" Padding="15"><Grid RowDefinitions="Auto, 5, Auto"><StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="5"><avalonia:MaterialIcon Kind="ArrowDown" Foreground="{DynamicResource LuminaSuccessBrush}"/><TextBlock Text="{c:Localize Download}" Classes="PropLabel"/></StackPanel><TextBlock Grid.Row="2" Text="{Binding NetworkDown}" FontSize="18" FontWeight="Bold"/></Grid></lumina:LuminaCard>
                             <lumina:LuminaCard Classes="Glass" Grid.Row="0" Grid.Column="2" Padding="15"><Grid RowDefinitions="Auto, 5, Auto"><StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="5"><avalonia:MaterialIcon Kind="ArrowUp" Foreground="{DynamicResource LuminaCyanBrush}"/><TextBlock Text="{c:Localize Upload}" Classes="PropLabel"/></StackPanel><TextBlock Grid.Row="2" Text="{Binding NetworkUp}" FontSize="18" FontWeight="Bold"/></Grid></lumina:LuminaCard>
-                            <lumina:LuminaCard Classes="Glass" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Padding="15"><Grid RowDefinitions="Auto, 5, Auto"><StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="5"><avalonia:MaterialIcon Kind="Timer" Foreground="{DynamicResource LuminaPrimaryBrush}"/><TextBlock Text="{c:Localize Latency}" Classes="PropLabel"/></StackPanel><TextBlock Grid.Row="2" Text="{Binding PingStatus}" FontSize="18" FontWeight="Bold"/></Grid></lumina:LuminaCard>
+                            <lumina:LuminaCard Classes="Glass" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Padding="15"><Grid RowDefinitions="Auto, 5, Auto"><StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="5"><avalonia:MaterialIcon Kind="Timer" Foreground="{DynamicResource LuminaPrimaryBrush}"/><TextBlock Text="{c:Localize Latency}" Classes="PropLabel"/></StackPanel><TextBlock Grid.Row="2" Text="{Binding PingStatus}" FontSize="18" FontWeight="Bold" ToolTip.Tip="{c:Localize LatencyTooltip}"/></Grid></lumina:LuminaCard>
                         </Grid>
                         
                         <lumina:LuminaCard Classes="Glass" Grid.Row="4" Padding="15" HorizontalAlignment="Stretch">
@@ -390,8 +391,10 @@
                     </Grid>
                 </ScrollViewer>
 
-                <!-- 6. SFTP -->
-                <Grid IsVisible="{Binding IsTabSftp}" RowDefinitions="Auto, 10, Auto, 10, *" Margin="15">
+                <!-- 6. SFTP (SSH sessions only) -->
+                <Grid IsVisible="{Binding IsTabSftp}">
+                    <Grid IsVisible="{Binding Sftp, Converter={x:Static ObjectConverters.IsNotNull}}"
+                          RowDefinitions="Auto, 10, Auto, 10, *" Margin="15">
                     <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto">
                         <TextBlock Grid.Column="0" Text="{c:Localize FileManager}" FontWeight="Bold" FontSize="16" VerticalAlignment="Center"/>
                         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="3">
@@ -401,17 +404,30 @@
                             <Button Classes="Ghost" Command="{Binding Sftp.RefreshFilesCommand}" ToolTip.Tip="{c:Localize Refresh}" Padding="8">
                                 <avalonia:MaterialIcon Kind="Refresh" Width="16" Height="16"/>
                             </Button>
+                            <Button Classes="Ghost" Command="{Binding Sftp.CreateFolderCommand}" ToolTip.Tip="{c:Localize NewFolder}" Padding="8">
+                                <avalonia:MaterialIcon Kind="FolderPlus" Width="16" Height="16"/>
+                            </Button>
+                            <Button Classes="Ghost" Command="{Binding Sftp.RenameSelectedCommand}" ToolTip.Tip="{c:Localize RenameItem}" Padding="8"
+                                    IsEnabled="{Binding Sftp.SelectedFile, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                <avalonia:MaterialIcon Kind="Pencil" Width="16" Height="16"/>
+                            </Button>
+                            <Button Classes="Ghost" Command="{Binding Sftp.DeleteSelectedCommand}" ToolTip.Tip="{c:Localize DeleteConfirmTitle}" Padding="8"
+                                    IsEnabled="{Binding Sftp.SelectedFile, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                <avalonia:MaterialIcon Kind="Delete" Width="16" Height="16"/>
+                            </Button>
+                            <Separator/>
                             <Button Classes="Ghost" Command="{Binding Sftp.UploadFileCommand}" ToolTip.Tip="{c:Localize Upload}" Padding="8">
                                 <avalonia:MaterialIcon Kind="Upload" Width="16" Height="16"/>
                             </Button>
-                            <Button Classes="Ghost" Command="{Binding Sftp.DownloadFileCommand}" ToolTip.Tip="{c:Localize Download}" Padding="8">
+                            <Button Classes="Ghost" Command="{Binding Sftp.DownloadFileCommand}" ToolTip.Tip="{c:Localize Download}" Padding="8"
+                                    IsEnabled="{Binding Sftp.SelectedFile, Converter={x:Static ObjectConverters.IsNotNull}}">
                                 <avalonia:MaterialIcon Kind="Download" Width="16" Height="16"/>
                             </Button>
                         </StackPanel>
                     </Grid>
-                    
+
                     <TextBox Grid.Row="2" Text="{Binding Sftp.CurrentPath, Mode=TwoWay}" Classes="Small" KeyDown="SftpPathTextBox_KeyDown"/>
-                    
+
                     <Grid Grid.Row="4" RowDefinitions="Auto, *">
                         <Border IsVisible="{Binding Sftp.HasError}"
                                 Background="{DynamicResource LuminaDangerBgBrush}"
@@ -428,7 +444,9 @@
                             </Grid>
                         </Border>
 
-                        <ListBox Grid.Row="1" ItemsSource="{Binding Sftp.Files}" Background="Transparent" Padding="0" DoubleTapped="SftpFileList_DoubleTapped">
+                        <ListBox x:Name="SftpFileList" Grid.Row="1" ItemsSource="{Binding Sftp.Files}" SelectedItem="{Binding Sftp.SelectedFile, Mode=TwoWay}"
+                                 Background="Transparent" Padding="0" DoubleTapped="SftpFileList_DoubleTapped"
+                                 ToolTip.Tip="{c:Localize SftpDropHint}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Grid ColumnDefinitions="Auto, *, Auto" Height="32">
@@ -440,9 +458,25 @@
                         </ListBox.ItemTemplate>
                         </ListBox>
 
-                        <Grid Grid.Row="1" Background="{DynamicResource LuminaOverlayScrimBrush}" IsVisible="{Binding Sftp.IsLoading}">
+                        <Panel Grid.Row="1" Background="{DynamicResource LuminaOverlayScrimBrush}" IsVisible="{Binding Sftp.IsLoading}">
                             <ProgressBar IsIndeterminate="True" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        </Grid>
+                        </Panel>
+
+                        <!-- Transfer progress overlay -->
+                        <Panel Grid.Row="1" Background="{DynamicResource LuminaOverlayScrimBrush}" IsVisible="{Binding Sftp.IsTransferring}">
+                            <Border Classes="Card" Padding="18,14" HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="220">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="{Binding Sftp.TransferLabel}" TextTrimming="CharacterEllipsis" FontSize="12"
+                                               Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <ProgressBar Value="{Binding Sftp.TransferProgress}" Minimum="0" Maximum="100"
+                                                 IsIndeterminate="{Binding Sftp.TransferIndeterminate}"
+                                                 Height="6" CornerRadius="3"/>
+                                    <Button Classes="Ghost Compact" HorizontalAlignment="Right" Command="{Binding Sftp.CancelTransferCommand}"
+                                            Content="{c:Localize CancelTransfer}"/>
+                                </StackPanel>
+                            </Border>
+                        </Panel>
+                    </Grid>
                     </Grid>
                 </Grid>
             </Grid>

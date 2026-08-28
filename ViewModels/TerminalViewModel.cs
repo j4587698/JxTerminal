@@ -202,8 +202,10 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
     public SavedConnection? ConnectionInfo { get; }
     
     // The terminal state (buffer, cursor, etc.) persists here
-    public XTerm.Terminal Terminal { get; }
-    
+    public XTerm.Terminal Terminal { get; private set; }
+
+    private readonly System.Threading.CancellationTokenSource _monitorCts = new();
+
     public event Action? ScreenUpdated;
 
     public event Action<TerminalViewModel>? RequestClose;
@@ -228,15 +230,17 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
         
         if (session is SshSession ssh)
         {
-            Title = ssh.Host;
+            Title = string.IsNullOrWhiteSpace(ssh.Username)
+                ? $"{ssh.Host}:{ssh.Port}"
+                : $"{ssh.Username}@{ssh.Host}";
             // Initialize SFTP if available
-            Sftp = new SftpViewModel(ssh);
+            Sftp = new SftpViewModel(ssh, ConfirmAsync, PromptAsync);
             _ = Sftp.RefreshFiles(); // Initial load
-            
+
             // Start system info monitoring
             _ = MonitorSystemInfo();
         }
-        else if (session is LocalShellSession || session is PtyLocalShellSession)
+        else if (session is PtyLocalShellSession)
             Title = Services.LocalizationService.Instance["QuickLocal"];
         else
             Title = Services.LocalizationService.Instance["Terminal"];
@@ -246,6 +250,9 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
         Session.Disconnected += OnDisconnected;
         Session.ErrorOccurred += OnError;
 
+        // Recreate the terminal when the scrollback setting changes at runtime.
+        Settings.PropertyChanged += OnSettingsPropertyChanged;
+
         if (Session.IsConnected)
         {
             OnConnected();
@@ -254,6 +261,41 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
         {
             _ = ConnectAsync();
         }
+    }
+
+    private void OnSettingsPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(TerminalSettings.ScrollbackLines))
+        {
+            RebuildTerminal();
+        }
+    }
+
+    /// <summary>Modal confirm dialog routed through the main shell.</summary>
+    public Task<bool> ConfirmAsync(string title, string message)
+        => MainWindowViewModel.Instance?.ShowConfirmDialog(title, message, LocalizationService.Instance["Confirm"])
+           ?? Task.FromResult(false);
+
+    /// <summary>Modal text prompt routed through the main shell.</summary>
+    public Task<string?> PromptAsync(string title, string message)
+        => MainWindowViewModel.Instance?.ShowInputDialog(title, message);
+
+    /// <summary>
+    /// Swaps the terminal state for a fresh buffer with the current scrollback size.
+    /// The control reads Controller.Terminal on every frame, so the swap is picked up
+    /// as soon as the next repaint is requested.
+    /// </summary>
+    private void RebuildTerminal()
+    {
+        var old = Terminal;
+        var options = new XTerm.Options.TerminalOptions
+        {
+            Scrollback = Math.Max(0, Settings.ScrollbackLines),
+            Cols = old.Cols,
+            Rows = old.Rows
+        };
+        Terminal = new XTerm.Terminal(options);
+        ScreenUpdated?.Invoke();
     }
 
     private long _prevIdleTime = 0;
@@ -271,7 +313,10 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
         if (!(Session is SshSession sshSession))
             return;
 
-        while (!IsConnected) await Task.Delay(100);
+        var token = _monitorCts.Token;
+
+        while (!IsConnected && !token.IsCancellationRequested)
+            await Task.Delay(100, token).ContinueWith(_ => { });
 
         try
         {
@@ -285,7 +330,7 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
                 await MonitorLinuxSystemInfo(sshSession);
             }
         }
-        catch 
+        catch
         {
             // Fallback or error logging
         }
@@ -317,7 +362,7 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
         } 
         catch { }
 
-        while (IsConnected)
+        while (IsConnected && !_monitorCts.IsCancellationRequested)
         {
             try
             {
@@ -325,30 +370,34 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
                 // Use /proc/meminfo instead of free -b for more reliable memory parsing
                 // Use separate markers for df -h (DISK_H) and df -B1 (DISK_B) to avoid parsing confusion
                 var cmd = "echo '>>>STAT'; grep '^cpu ' /proc/stat; echo '>>>MEM'; cat /proc/meminfo | grep -E '^(MemTotal|MemFree|MemAvailable|Buffers|Cached|SwapTotal|SwapFree):'; echo '>>>DISK_H'; df -h / | tail -n 1; echo '>>>DISK_B'; df -B1 / | tail -n 1; echo '>>>NET'; cat /proc/net/dev; cat /proc/net/snmp | grep 'Tcp:' | tail -n 1; ss -tan | grep ESTAB | wc -l; echo '>>>UPTIME'; uptime; echo '>>>TEMP'; cat /sys/class/thermal/thermal_zone*/temp 2>/dev/null | head -n 1; echo '>>>DISKIO'; cat /proc/diskstats; echo '>>>GPU'; if command -v nvidia-smi >/dev/null 2>&1; then echo 'NVIDIA'; nvidia-smi --query-gpu=utilization.gpu,temperature.gpu,power.draw,name,memory.used,memory.total,fan.speed --format=csv,noheader,nounits 2>/dev/null; elif command -v rocm-smi >/dev/null 2>&1; then echo 'AMD'; rocm-smi --showuse --showtemp --showmeminfo vram --showpower --showproductname --csv 2>/dev/null; elif [ -d /sys/class/drm/card0/device ]; then echo 'INTEL'; cat /sys/class/drm/card0/device/vendor 2>/dev/null; cat /sys/class/drm/card0/gt/gt_cur_freq_mhz 2>/dev/null || echo '0'; cat /sys/class/drm/card0/device/mem_info_vram_used 2>/dev/null || echo '0'; cat /sys/class/drm/card0/device/mem_info_vram_total 2>/dev/null || echo '0'; else echo 'N/A'; fi; echo '>>>PROC'; ps aux --sort=-%cpu | head -n 11 | tail -n 10; echo '>>>PORTS'; ss -tlnp 2>/dev/null | tail -n +2 | head -n 20";
-                
-                var output = await sshSession.ExecuteCommandAsync(cmd);
-                
-                ParseSystemInfo(output);
-                
-                // Ping measurement using SSH round-trip time with high-precision Stopwatch
-                try
+
+                // Skip the round-trip while the sidebar panel is hidden.
+                if (IsSftpVisible)
                 {
-                    var sw = Stopwatch.StartNew();
-                    await sshSession.ExecuteCommandAsync("echo");
-                    sw.Stop();
-                    PingLatency = Math.Round(sw.Elapsed.TotalMilliseconds, 1);
-                    PingStatus = $"{PingLatency:0.0} ms";
-                }
-                catch
-                {
-                    PingStatus = "-";
+                    var output = await sshSession.ExecuteCommandAsync(cmd);
+
+                    ParseSystemInfo(output);
+
+                    // Ping measurement using SSH round-trip time with high-precision Stopwatch
+                    try
+                    {
+                        var sw = Stopwatch.StartNew();
+                        await sshSession.ExecuteCommandAsync("echo");
+                        sw.Stop();
+                        PingLatency = Math.Round(sw.Elapsed.TotalMilliseconds, 1);
+                        PingStatus = $"{PingLatency:0.0} ms";
+                    }
+                    catch
+                    {
+                        PingStatus = "-";
+                    }
                 }
             }
             catch
             {
                 // Ignore errors
             }
-            
+
             await Task.Delay(2000);
         }
     }
@@ -366,7 +415,7 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
         } 
         catch { }
 
-        while (IsConnected)
+        while (IsConnected && !_monitorCts.IsCancellationRequested)
         {
             try
             {
@@ -377,29 +426,32 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
                 // NET: netstat -ib -n | grep Link
                 // UPTIME: uptime
                 var cmd = "echo '>>>CPU'; top -l 1 -n 0 | grep 'CPU usage'; echo '>>>MEM'; sysctl hw.memsize; vm_stat; echo '>>>DISK'; df -h / | tail -n 1; echo '>>>NET'; netstat -ib -n | grep Link; echo '>>>UPTIME'; uptime";
-                
-                var output = await sshSession.ExecuteCommandAsync(cmd);
-                ParseMacSystemInfo(output);
-                
-                // Ping measurement using SSH round-trip time with high-precision Stopwatch
-                try
+
+                if (IsSftpVisible)
                 {
-                    var sw = Stopwatch.StartNew();
-                    await sshSession.ExecuteCommandAsync("echo");
-                    sw.Stop();
-                    PingLatency = Math.Round(sw.Elapsed.TotalMilliseconds, 1);
-                    PingStatus = $"{PingLatency:0.0} ms";
-                }
-                catch
-                {
-                    PingStatus = "-";
+                    var output = await sshSession.ExecuteCommandAsync(cmd);
+                    ParseMacSystemInfo(output);
+
+                    // Ping measurement using SSH round-trip time with high-precision Stopwatch
+                    try
+                    {
+                        var sw = Stopwatch.StartNew();
+                        await sshSession.ExecuteCommandAsync("echo");
+                        sw.Stop();
+                        PingLatency = Math.Round(sw.Elapsed.TotalMilliseconds, 1);
+                        PingStatus = $"{PingLatency:0.0} ms";
+                    }
+                    catch
+                    {
+                        PingStatus = "-";
+                    }
                 }
             }
             catch
             {
                 // Ignore errors
             }
-            
+
             await Task.Delay(2000);
         }
     }
@@ -586,6 +638,8 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
         long currentTx = 0;
         long currentDiskRead = 0;
         long currentDiskWrite = 0;
+        long currentPacketsRecv = 0;
+        long currentPacketsSent = 0;
         
         // 临时列表：先收集，解析完毕后统一做差量更新
         var newProcesses = new List<ProcessInfo>();
@@ -713,10 +767,11 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
                                  var nums = raw.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                                  if (nums.Length >= 9)
                                  {
+                                     // /proc/net/dev counters are cumulative since boot: assign, never accumulate.
                                      currentRx += long.Parse(nums[0]);
                                      currentTx += long.Parse(nums[8]);
-                                     if (nums.Length >= 3) TotalPacketsRecv += long.Parse(nums[1]);
-                                     if (nums.Length >= 10) TotalPacketsSent += long.Parse(nums[9]);
+                                     currentPacketsRecv += long.Parse(nums[1]);
+                                     currentPacketsSent += long.Parse(nums[9]);
                                  }
                              }
                         }
@@ -910,6 +965,8 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
         // Format network totals
         NetTotalRecv = FormatSize(currentRx);
         NetTotalSent = FormatSize(currentTx);
+        TotalPacketsRecv = currentPacketsRecv;
+        TotalPacketsSent = currentPacketsSent;
         
         _prevCheckTime = now;
         _prevRxBytes = currentRx;
@@ -1105,6 +1162,7 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
 
     private string FormatSpeed(double bytesPerSec)
     {
+        if (bytesPerSec < 0) bytesPerSec = 0; // counter reset/reboot between polls
         if (bytesPerSec < 1024) return $"{bytesPerSec:0} B/s";
         if (bytesPerSec < 1024 * 1024) return $"{bytesPerSec / 1024:0.0} KB/s";
         return $"{bytesPerSec / 1024 / 1024:0.0} MB/s";
@@ -1112,6 +1170,10 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
 
     public void Dispose()
     {
+        // Stop the monitoring loops first so they observe a stable state.
+        _monitorCts.Cancel();
+        Settings.PropertyChanged -= OnSettingsPropertyChanged;
+
         // Unsubscribe events
         Session.Connected -= OnConnected;
         Session.Disconnected -= OnDisconnected;
@@ -1123,12 +1185,29 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
             Session.Dispose();
         }
         catch { /* ignore */ }
-        
+
+        _monitorCts.Dispose();
         GC.SuppressFinalize(this);
     }
 
+    /// <summary>
+    /// Tracks DEC private modes announced by the remote application (mouse reporting,
+    /// bracketed paste, application cursor keys).
+    /// </summary>
+    public AnsiModeTracker Modes { get; } = new();
+
+    /// <summary>True while this tab is the visible one; drives the unread-output badge.</summary>
+    [ObservableProperty]
+    private bool _isActiveTab;
+
+    [ObservableProperty]
+    private bool _hasUnseenOutput;
+
     private void OnDataReceived(string data)
     {
+        Modes.Process(data);
+        if (!IsActiveTab) HasUnseenOutput = true;
+
         // Write directly to terminal buffer
         Terminal.Write(data);
         ScreenUpdated?.Invoke();
@@ -1149,6 +1228,12 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
             Session.Resize(rows, cols, width, height);
         }
     }
+
+    public bool MouseTracking => Modes.MouseTracking;
+    public bool MouseAnyEvent => Modes.MouseAnyEvent;
+    public bool SgrMouse => Modes.SgrMouse;
+    public bool ApplicationCursorKeys => Modes.ApplicationCursorKeys;
+    public bool BracketedPaste => Modes.BracketedPaste;
 
     private async Task ConnectAsync()
     {
@@ -1215,7 +1300,7 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
         IsConnecting = false;
         ShowOverlay = true;
         StatusMessage = LocalizationService.Instance["SessionDisconnected"];
-        Terminal.Write("\r\n[DISCONNECTED]\r\n");
+        Terminal.Write($"\r\n[{LocalizationService.Instance["SessionDisconnected"]}]\r\n");
     }
 
     private void OnError(Exception ex)
@@ -1223,6 +1308,6 @@ public partial class TerminalViewModel : ViewModelBase, IDisposable, ITerminalCo
         IsConnected = false;
         IsConnecting = false;
         ShowOverlay = true;
-        StatusMessage = $"Error: {ex.Message}";
+        StatusMessage = $"{LocalizationService.Instance["ErrorPrefix"]}{ex.Message}";
     }
 }

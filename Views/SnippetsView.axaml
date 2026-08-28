@@ -1,0 +1,89 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:JxTerminal.ViewModels"
+             xmlns:c="using:JxTerminal.Converters"
+             xmlns:lumina="clr-namespace:LuminaUI.Controls;assembly=LuminaUI"
+             xmlns:m="using:JxTerminal.Models"
+             xmlns:avalonia="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="500"
+             x:Class="JxTerminal.Views.SnippetsView"
+             x:DataType="vm:SnippetsViewModel">
+    <Grid RowDefinitions="Auto, *" Margin="20,16,24,20">
+
+        <!-- Toolbar -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto" Margin="0,0,0,14">
+            <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
+                <avalonia:MaterialIcon Kind="ScriptText" Width="20" Height="20" Foreground="{DynamicResource LuminaPrimaryBrush}"/>
+                <TextBlock Text="{c:Localize Snippets}" Classes="PageTitle"/>
+            </StackPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                <Button Command="{Binding AddSnippetCommand}" Classes="Outline">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                        <avalonia:MaterialIcon Kind="Plus" Width="15" Height="15"/>
+                        <TextBlock Text="{c:Localize NewSnippet}"/>
+                    </StackPanel>
+                </Button>
+                <Button Classes="Ghost IconOnly" Command="{Binding EditSnippetCommand}"
+                        IsEnabled="{Binding SelectedSnippet, Converter={x:Static ObjectConverters.IsNotNull}}"
+                        ToolTip.Tip="{c:Localize RenameItem}">
+                    <avalonia:MaterialIcon Kind="Pencil" Width="17" Height="17" Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
+                </Button>
+                <Button Classes="Ghost IconOnly" Command="{Binding DeleteSnippetCommand}"
+                        IsEnabled="{Binding SelectedSnippet, Converter={x:Static ObjectConverters.IsNotNull}}"
+                        ToolTip.Tip="{c:Localize DeleteConfirmTitle}">
+                    <avalonia:MaterialIcon Kind="Delete" Width="17" Height="17" Foreground="{DynamicResource LuminaDangerBrush}"/>
+                </Button>
+                <Button Command="{Binding SendToTerminalCommand}" CommandParameter="{Binding SelectedSnippet}" Classes="Primary"
+                        IsEnabled="{Binding SelectedSnippet, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                        <avalonia:MaterialIcon Kind="ConsoleLine" Width="15" Height="15"/>
+                        <TextBlock Text="{c:Localize SendToTerminal}"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- Content -->
+        <Panel Grid.Row="1">
+            <ListBox ItemsSource="{Binding Snippets}" SelectedItem="{Binding SelectedSnippet, Mode=TwoWay}"
+                     DoubleTapped="SnippetList_DoubleTapped" Background="Transparent">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="m:SnippetItem">
+                        <Grid ColumnDefinitions="Auto, 180, *, Auto" Margin="4,2" VerticalAlignment="Center">
+                            <avalonia:MaterialIcon Grid.Column="0" Kind="ConsoleLine" Width="16" Height="16" Opacity="0.55" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" FontSize="13"
+                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                            <TextBlock Grid.Column="2" Text="{Binding Command}" FontSize="12" Opacity="0.65"
+                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="14,0,0,0"
+                                       FontFamily="Consolas, monospace"
+                                       Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
+                            <Button Grid.Column="3" Classes="Ghost IconOnly Compact" Margin="10,0,0,0"
+                                    Command="{Binding $parent[ItemsControl].DataContext.SendToTerminalCommand}" CommandParameter="{Binding}"
+                                    ToolTip.Tip="{c:Localize SendToTerminal}">
+                                <avalonia:MaterialIcon Kind="Play" Width="14" Height="14" Foreground="{DynamicResource LuminaSuccessBrush}"/>
+                            </Button>
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <!-- Empty state -->
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12"
+                        IsHitTestVisible="False"
+                        IsVisible="{Binding HasNoSnippets}">
+                <Border Width="70" Height="70" CornerRadius="{DynamicResource AppRadiusPill}"
+                        Background="{DynamicResource LuminaStateHoverBrush}" HorizontalAlignment="Center">
+                    <avalonia:MaterialIcon Kind="ScriptTextOutline" Width="30" Height="30" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+                </Border>
+                <StackPanel Spacing="5">
+                    <TextBlock Text="{c:Localize NoSnippetsTitle}" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center"
+                               Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                    <TextBlock Text="{c:Localize SnippetsEmptyHint}" Classes="PageSubtitle" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </StackPanel>
+        </Panel>
+    </Grid>
+</UserControl>

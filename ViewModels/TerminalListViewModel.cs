@@ -15,6 +15,15 @@ public partial class TerminalListViewModel : ViewModelBase
     [ObservableProperty]
     private TerminalViewModel? _selectedTab;
 
+    partial void OnSelectedTabChanged(TerminalViewModel? value)
+    {
+        foreach (var tab in Tabs)
+            tab.IsActiveTab = tab == value;
+
+        if (value != null)
+            value.HasUnseenOutput = false;
+    }
+
     [ObservableProperty]
     private bool _hasTabs;
 
@@ -51,7 +60,11 @@ public partial class TerminalListViewModel : ViewModelBase
     private void OnTabRequestClose(TerminalViewModel tab)
     {
         Tabs.Remove(tab);
+        tab.IsActiveTab = false;
         tab.Dispose(); // Ensure resources are freed
+
+        // Re-tag the remaining tabs so exactly one is marked active.
+        if (SelectedTab != null) SelectedTab.IsActiveTab = true;
     }
 
     [RelayCommand]
@@ -71,6 +84,19 @@ public partial class TerminalListViewModel : ViewModelBase
 
     [RelayCommand]
     private void PreviousTab() => CycleTab(-1);
+
+    /// <summary>Ctrl+1..9 support: jumps to the Nth tab (1-based), ignoring out-of-range.</summary>
+    public void SelectTabByIndex(int index)
+    {
+        if (index < 0 || index >= Tabs.Count) return;
+        SelectedTab = Tabs[index];
+    }
+
+    [RelayCommand]
+    private void SelectTabIndex(string? indexStr)
+    {
+        if (int.TryParse(indexStr, out int index)) SelectTabByIndex(index);
+    }
 
     private void CycleTab(int offset)
     {

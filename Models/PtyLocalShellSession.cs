@@ -14,9 +14,12 @@ namespace JxTerminal.Models;
 /// </summary>
 public class PtyLocalShellSession : ITerminalSession
 {
+    private readonly string _shellKind;
     private IPtyConnection? _pty;
     private bool _isConnected;
     private CancellationTokenSource? _readCts;
+    // Stateful so multi-byte characters split across reads survive.
+    private readonly Decoder _decoder = Encoding.UTF8.GetDecoder();
 
     public event Action<string>? DataReceived;
     public event Action? Connected;
@@ -25,22 +28,65 @@ public class PtyLocalShellSession : ITerminalSession
 
     public bool IsConnected => _isConnected;
 
+    public PtyLocalShellSession(string shellKind = "Auto")
+    {
+        _shellKind = shellKind;
+    }
+
+    /// <summary>
+    /// Resolves the requested shell kind to a platform executable.
+    /// Accepts preset names (Auto/PowerShell/Cmd/Wsl/Bash) or an explicit path.
+    /// Falls back to the platform default when the request cannot be honoured.
+    /// </summary>
+    internal static string ResolveShell(string shellKind)
+    {
+        var isWindows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
+        var kind = (shellKind ?? "Auto").Trim();
+
+        // Explicit path from a saved connection: use it verbatim when it exists.
+        if (kind.Contains('/') || kind.Contains('\\') || kind.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+        {
+            return File.Exists(kind) ? kind : DefaultShell(isWindows);
+        }
+
+        switch (kind)
+        {
+            case "PowerShell" when isWindows:
+            {
+                var pwsh = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                    "PowerShell", "7", "pwsh.exe");
+                return File.Exists(pwsh)
+                    ? pwsh
+                    : Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
+            }
+            case "Cmd" when isWindows:
+                return Path.Combine(Environment.SystemDirectory, "cmd.exe");
+            case "Wsl" when isWindows && File.Exists(Path.Combine(Environment.SystemDirectory, "wsl.exe")):
+                return Path.Combine(Environment.SystemDirectory, "wsl.exe");
+            case "Bash" when !isWindows:
+                return "/bin/bash";
+        }
+
+        return DefaultShell(isWindows);
+    }
+
+    private static string DefaultShell(bool isWindows)
+        => isWindows
+            ? Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe")
+            : Environment.GetEnvironmentVariable("SHELL") is { Length: > 0 } sh ? sh : "/bin/bash";
+
     public async Task ConnectAsync()
     {
         try
         {
-            // Determine shell based on OS
-            string shell = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-                ? Path.Combine(Environment.SystemDirectory, "cmd.exe")
-                : "/bin/bash";
-
             var options = new PtyOptions
             {
                 Name = $"JxTerminal-{Guid.NewGuid()}",
                 Cols = 80,
                 Rows = 24,
                 Cwd = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                App = shell,
+                App = ResolveShell(_shellKind),
                 Environment = new Dictionary<string, string>
                 {
                     { "TERM", "xterm-256color" },
@@ -54,6 +100,7 @@ public class PtyLocalShellSession : ITerminalSession
             // Handle process exit
             _pty.ProcessExited += (sender, e) =>
             {
+                if (!_isConnected) return;
                 _isConnected = false;
                 Disconnected?.Invoke();
             };
@@ -80,12 +127,13 @@ public class PtyLocalShellSession : ITerminalSession
                 int bytesRead = await _pty.ReaderStream.ReadAsync(buffer, 0, buffer.Length, cancellationToken);
                 if (bytesRead > 0)
                 {
-                    string text = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                    DataReceived?.Invoke(text);
+                    // Stateful decode keeps UTF-8 sequences that span read boundaries intact.
+                    var chars = new char[_decoder.GetCharCount(buffer, 0, bytesRead, false)];
+                    int count = _decoder.GetChars(buffer, 0, bytesRead, chars, 0, false);
+                    if (count > 0) DataReceived?.Invoke(new string(chars, 0, count));
                 }
                 else if (bytesRead == 0)
                 {
-                    // End of stream
                     break;
                 }
             }
@@ -103,8 +151,11 @@ public class PtyLocalShellSession : ITerminalSession
         }
         finally
         {
-            _isConnected = false;
-            Disconnected?.Invoke();
+            if (_isConnected)
+            {
+                _isConnected = false;
+                Disconnected?.Invoke();
+            }
         }
     }
 
@@ -152,7 +203,10 @@ public class PtyLocalShellSession : ITerminalSession
         }
         catch { }
 
-        _isConnected = false;
-        Disconnected?.Invoke();
+        if (_isConnected)
+        {
+            _isConnected = false;
+            Disconnected?.Invoke();
+        }
     }
 }

@@ -51,7 +51,7 @@ public static class SecurityService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to read master key, regenerating: {ex.Message}");
+            AppLog.Warn($"Failed to read master key, regenerating: {ex.Message}");
         }
 
         var fresh = RandomNumberGenerator.GetBytes(32);
@@ -62,7 +62,7 @@ public static class SecurityService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to persist master key: {ex.Message}");
+            AppLog.Warn($"Failed to persist master key: {ex.Message}");
         }
         return fresh;
     }
@@ -86,7 +86,7 @@ public static class SecurityService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to restrict key file permissions: {ex.Message}");
+            AppLog.Warn($"Failed to restrict key file permissions: {ex.Message}");
         }
     }
 
@@ -115,7 +115,7 @@ public static class SecurityService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Encryption failed: {ex.Message}");
+            AppLog.Warn($"Encryption failed: {ex.Message}");
             return "";
         }
     }
@@ -145,7 +145,7 @@ public static class SecurityService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Decryption failed: {ex.Message}");
+            AppLog.Warn($"Decryption failed: {ex.Message}");
             return "";
         }
     }

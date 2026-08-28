@@ -49,11 +49,13 @@ public class TelnetSession : ITerminalSession
     private TcpClient? _client;
     private NetworkStream? _stream;
     private CancellationTokenSource? _cts;
+    private bool _disconnectedInvoked;
 
     private ParseState _state = ParseState.Data;
     private byte _pendingCommand;
     private readonly List<byte> _subnegotiation = new();
-    private readonly Decoder _decoder = Encoding.UTF8.GetDecoder();
+    private readonly Decoder _decoder;
+    private readonly Encoder _encoder = Encoding.UTF8.GetEncoder();
     private readonly SemaphoreSlim _writeLock = new(1, 1);
 
     private bool _nawsEnabled;
@@ -67,10 +69,15 @@ public class TelnetSession : ITerminalSession
 
     public bool IsConnected => _client?.Connected ?? false;
 
-    public TelnetSession(string host, int port)
+    public TelnetSession(string host, int port, string encodingName = "UTF-8")
     {
         Host = host;
         Port = port;
+        Encoding enc;
+        try { enc = Encoding.GetEncoding(string.IsNullOrWhiteSpace(encodingName) ? "UTF-8" : encodingName); }
+        catch (ArgumentException) { enc = Encoding.UTF8; }
+        _decoder = enc.GetDecoder();
+        _encoder = enc.GetEncoder();
     }
 
     public async Task ConnectAsync()
@@ -124,6 +131,10 @@ public class TelnetSession : ITerminalSession
                     if (count > 0) DataReceived?.Invoke(new string(chars, 0, count));
                 }
             }
+        }
+        catch (ObjectDisposedException)
+        {
+            // Stream torn down while a read was pending: normal during Dispose.
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -297,7 +308,9 @@ public class TelnetSession : ITerminalSession
     {
         if (_stream == null || !IsConnected) return;
 
-        _writeLock.Wait();
+        // Telnet payloads are tiny (negotiation triples / keystrokes); a timed wait keeps
+        // ordering intact while guaranteeing we can never block indefinitely on the socket.
+        if (!_writeLock.Wait(TimeSpan.FromSeconds(5))) return;
         try
         {
             _stream.Write(bytes, 0, bytes.Length);
@@ -313,11 +326,18 @@ public class TelnetSession : ITerminalSession
         }
     }
 
+    private void FireDisconnectedOnce()
+    {
+        if (_disconnectedInvoked) return;
+        _disconnectedInvoked = true;
+        Disconnected?.Invoke();
+    }
+
     public void Send(string data)
     {
         if (_stream == null || !IsConnected) return;
 
-        var raw = Encoding.UTF8.GetBytes(data);
+        var raw = Encode(data);
 
         // Escape IAC so user input containing 0xFF is not read as a command.
         var escaped = new List<byte>(raw.Length);
@@ -328,6 +348,14 @@ public class TelnetSession : ITerminalSession
         }
 
         WriteRaw(escaped.ToArray());
+    }
+
+    private byte[] Encode(string data)
+    {
+        var chars = data.ToCharArray();
+        var buffer = new byte[_encoder.GetByteCount(chars, 0, chars.Length, true)];
+        _encoder.GetBytes(chars, 0, chars.Length, buffer, 0, true);
+        return buffer;
     }
 
     public void Resize(int rows, int cols, int width, int height)
@@ -346,6 +374,6 @@ public class TelnetSession : ITerminalSession
         _stream?.Dispose();
         _client?.Dispose();
         _client = null;
-        Disconnected?.Invoke();
+        FireDisconnectedOnce();
     }
 }

@@ -108,6 +108,9 @@ public partial class HostListViewModel : ViewModelBase
     // Filtered view for the UI
     public ObservableCollection<ConnectionGroup> DisplayGroups { get; } = new();
 
+    /// <summary>True when the filtered host list is empty; drives the empty-state overlay.</summary>
+    public bool HasNoVisibleHosts => DisplayGroups.Count == 0;
+
     [ObservableProperty]
     private string _searchText = "";
 
@@ -226,6 +229,8 @@ public partial class HostListViewModel : ViewModelBase
                 DisplayGroups.Add(tempGroup);
             }
         }
+
+        OnPropertyChanged(nameof(HasNoVisibleHosts));
     }
 
     [RelayCommand]
@@ -283,13 +288,22 @@ public partial class HostListViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    public void DeleteGroup(ConnectionGroup group)
+    public async Task DeleteGroup(ConnectionGroup group)
     {
-        if (Groups.Contains(group))
+        if (!Groups.Contains(group)) return;
+
+        var l = LocalizationService.Instance;
+        if (!await _mainViewModel.ShowConfirmDialog(
+                l["DeleteConfirmTitle"],
+                string.Format(l["DeleteConfirmMessage"], group.Name),
+                l["Delete"],
+                danger: true))
         {
-            Groups.Remove(group);
-            SaveData(); // SaveData calls UpdateDisplay
+            return;
         }
+
+        Groups.Remove(group);
+        SaveData(); // SaveData calls UpdateDisplay
     }
 
     [RelayCommand]
@@ -335,16 +349,25 @@ public partial class HostListViewModel : ViewModelBase
     }
     
     [RelayCommand]
-    public void DeleteConnection(SavedConnection connection)
+    public async Task DeleteConnection(SavedConnection connection)
     {
         foreach (var group in Groups)
         {
-            if (group.Connections.Contains(connection))
+            if (!group.Connections.Contains(connection)) continue;
+
+            var l = LocalizationService.Instance;
+            if (!await _mainViewModel.ShowConfirmDialog(
+                    l["DeleteConfirmTitle"],
+                    string.Format(l["DeleteConfirmMessage"], connection.Name),
+                    l["Delete"],
+                    danger: true))
             {
-                group.Connections.Remove(connection);
-                SaveData(); // SaveData calls UpdateDisplay
                 return;
             }
+
+            group.Connections.Remove(connection);
+            SaveData(); // SaveData calls UpdateDisplay
+            return;
         }
     }
 

@@ -21,9 +21,13 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // Settings are loaded synchronously BEFORE the window is created: the main
+            // window must exist before this method returns or the app may exit silently.
+            var vm = MainWindowViewModel.Create();
+
             desktop.MainWindow = new MainWindow
             {
-                DataContext = new MainWindowViewModel(),
+                DataContext = vm,
             };
         }
 

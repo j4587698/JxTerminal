@@ -150,7 +150,59 @@ public partial class SettingsViewModel : ViewModelBase
                                ?? AvailableColorSchemes[0];
         _isSchemeEditable = _selectedColorScheme != null && !_selectedColorScheme.IsBuiltIn;
 
+        // Session options
+        AvailableLocalShells = new ObservableCollection<string> { "Auto", "PowerShell", "Cmd", "Wsl", "Bash" };
+        _selectedLocalShell = AvailableLocalShells.Contains(Settings.LocalShellKind)
+            ? Settings.LocalShellKind
+            : AvailableLocalShells[0];
+
+        AvailableEncodings = new ObservableCollection<string> { "UTF-8", "GBK", "GB18030", "Big5", "Shift-JIS", "EUC-KR", "Latin-1" };
+        var enc = string.IsNullOrWhiteSpace(Settings.RemoteEncoding) ? "UTF-8" : Settings.RemoteEncoding;
+        if (!AvailableEncodings.Contains(enc)) AvailableEncodings.Add(enc);
+        _selectedEncoding = enc;
+
+        // Cursor shape (localized display, stable string value)
+        AvailableCursorStyles = new ObservableCollection<LocalizedWrapper<string>>
+        {
+            new("Block", "CursorBlock"),
+            new("Bar", "CursorBar"),
+            new("Underline", "CursorUnderline")
+        };
+        _selectedCursorStyle = AvailableCursorStyles.FirstOrDefault(c => c.Value == Settings.CursorStyle)
+                               ?? AvailableCursorStyles[0];
+
         System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] Settings HashCode: {Settings.GetHashCode()}");
+    }
+
+    public ObservableCollection<string> AvailableLocalShells { get; }
+    public ObservableCollection<string> AvailableEncodings { get; }
+    public ObservableCollection<LocalizedWrapper<string>> AvailableCursorStyles { get; }
+
+    [ObservableProperty]
+    private string _selectedLocalShell;
+
+    [ObservableProperty]
+    private string _selectedEncoding;
+
+    [ObservableProperty]
+    private LocalizedWrapper<string> _selectedCursorStyle;
+
+    partial void OnSelectedLocalShellChanged(string value)
+    {
+        if (_isUpdating || value == null) return;
+        Settings.LocalShellKind = value;
+    }
+
+    partial void OnSelectedEncodingChanged(string value)
+    {
+        if (_isUpdating || value == null) return;
+        Settings.RemoteEncoding = value;
+    }
+
+    partial void OnSelectedCursorStyleChanged(LocalizedWrapper<string> value)
+    {
+        if (_isUpdating || value == null) return;
+        Settings.CursorStyle = value.Value;
     }
 
     partial void OnSelectedColorSchemeChanged(TerminalColorScheme? value)

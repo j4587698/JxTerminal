@@ -15,6 +15,9 @@ namespace JxTerminal.Services
         public static LocalizationService Instance => _instance ??= new LocalizationService();
 
         private Dictionary<string, string> _resources = new();
+        // English strings double as the fallback so a missing key in another language
+        // degrades to readable text instead of the raw key name.
+        private Dictionary<string, string> _fallbackResources = new();
         private string _cultureCode = "en-US";
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -26,6 +29,10 @@ namespace JxTerminal.Services
                 if (_resources.TryGetValue(key, out var value))
                 {
                     return value;
+                }
+                if (_fallbackResources.TryGetValue(key, out var fallback))
+                {
+                    return fallback;
                 }
                 return key;
             }
@@ -51,6 +58,22 @@ namespace JxTerminal.Services
 
         private void LoadResources(string cultureCode)
         {
+            // The fallback (en-US) is loaded once and never cleared.
+            if (_fallbackResources.Count == 0 && cultureCode != "en-US")
+            {
+                _fallbackResources = TryLoad("en-US");
+            }
+
+            _resources = TryLoad(cultureCode);
+
+            if (cultureCode == "en-US")
+            {
+                _fallbackResources = _resources;
+            }
+        }
+
+        private static Dictionary<string, string> TryLoad(string cultureCode)
+        {
             var uri = new Uri($"avares://JxTerminal/Assets/Localization/{cultureCode}.json");
             try
             {
@@ -58,20 +81,17 @@ namespace JxTerminal.Services
                 {
                     using var stream = AssetLoader.Open(uri);
                     using var reader = new StreamReader(stream);
-                    var json = reader.ReadToEnd();
-                    _resources = JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new Dictionary<string, string>();
+                    return JsonSerializer.Deserialize<Dictionary<string, string>>(reader.ReadToEnd())
+                           ?? new Dictionary<string, string>();
                 }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine($"Localization file not found: {uri}");
-                    _resources.Clear();
-                }
+
+                System.Diagnostics.Debug.WriteLine($"Localization file not found: {uri}");
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error loading localization resources: {ex.Message}");
-                _resources.Clear();
             }
+            return new Dictionary<string, string>();
         }
     }
 }
