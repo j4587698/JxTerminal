@@ -113,8 +113,9 @@ public class SshSession : ITerminalSession
                 {
                     accepted = await HostKeyVerifier($"{Host}:{Port}", pending.Value.Received, pending.Value.Known);
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Services.AppLog.Error($"HostKeyVerifier failed: {ex}");
                     accepted = false;
                 }
             }

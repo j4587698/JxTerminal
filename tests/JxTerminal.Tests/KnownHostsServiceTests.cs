@@ -1,4 +1,4 @@
-﻿using JxTerminal.Models;
+using JxTerminal.Models;
 using JxTerminal.Services;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -41,5 +41,22 @@ public class KnownHostsServiceTests
         Assert.IsFalse(session.HostKeyRejected);
         Assert.IsNull(session.ShellStream);
         Assert.IsNull(session.SftpClient);
+    }
+
+    [TestMethod]
+    public async System.Threading.Tasks.Task SshSession_HostKeyVerifier_CanBeAssignedAndInvoked()
+    {
+        var session = new SshSession("127.0.0.1", 22, "root", "password");
+        bool invoked = false;
+        session.HostKeyVerifier = (display, received, known) =>
+        {
+            invoked = true;
+            return System.Threading.Tasks.Task.FromResult(true);
+        };
+
+        Assert.IsNotNull(session.HostKeyVerifier);
+        var result = await session.HostKeyVerifier("127.0.0.1:22", "fingerprint1", null);
+        Assert.IsTrue(invoked);
+        Assert.IsTrue(result);
     }
 }

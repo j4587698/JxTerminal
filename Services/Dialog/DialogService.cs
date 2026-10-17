@@ -25,6 +25,12 @@ public class DialogService : IDialogService
 
     public void ShowDialog(Control content, string? title = null)
     {
+        if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => ShowDialog(content, title));
+            return;
+        }
+
         if (_showDialogAction != null)
         {
             _showDialogAction(content, title);
@@ -37,6 +43,12 @@ public class DialogService : IDialogService
 
     public void CloseDialog()
     {
+        if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(CloseDialog);
+            return;
+        }
+
         if (_closeDialogAction != null)
         {
             _closeDialogAction();
@@ -49,6 +61,12 @@ public class DialogService : IDialogService
 
     public void ShowMessage(string title, string message)
     {
+        if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => ShowMessage(title, message));
+            return;
+        }
+
         var panel = new StackPanel
         {
             Spacing = 16,
@@ -76,6 +94,11 @@ public class DialogService : IDialogService
 
     public Task<bool> ShowConfirmAsync(string title, string message, string? confirmText = null, bool danger = false)
     {
+        if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            return Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => ShowConfirmAsync(title, message, confirmText, danger));
+        }
+
         var tcs = new TaskCompletionSource<bool>();
         var l = LocalizationService.Instance;
         var btnText = string.IsNullOrWhiteSpace(confirmText) ? l["Confirm"] : confirmText;
@@ -91,8 +114,8 @@ public class DialogService : IDialogService
             Classes = { "Ghost" }
         };
 
-        confirm.Click += (_, _) => { CloseDialog(); tcs.TrySetResult(true); };
-        cancel.Click += (_, _) => { CloseDialog(); tcs.TrySetResult(false); };
+        confirm.Click += (_, _) => { tcs.TrySetResult(true); CloseDialog(); };
+        cancel.Click += (_, _) => { tcs.TrySetResult(false); CloseDialog(); };
 
         var panel = new StackPanel
         {
@@ -122,6 +145,11 @@ public class DialogService : IDialogService
 
     public Task<string?> ShowInputAsync(string title, string message, bool isPassword = false, string? defaultValue = null)
     {
+        if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            return Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => ShowInputAsync(title, message, isPassword, defaultValue));
+        }
+
         var tcs = new TaskCompletionSource<string?>();
         var l = LocalizationService.Instance;
 
@@ -134,8 +162,8 @@ public class DialogService : IDialogService
 
         void Complete(string? result)
         {
-            CloseDialog();
             tcs.TrySetResult(result);
+            CloseDialog();
         }
 
         var confirm = new Button

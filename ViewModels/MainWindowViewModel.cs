@@ -310,6 +310,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public void ShowDialog(Control content, string? title = null)
     {
+        if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => ShowDialog(content, title));
+            return;
+        }
+
         DialogContent = new LuminaDialog
         {
             Title = title,
@@ -323,6 +329,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public void ShowMessageDialog(string title, string message)
     {
+        if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => ShowMessageDialog(title, message));
+            return;
+        }
+
         var panel = new StackPanel
         {
             Spacing = 16,
@@ -353,6 +365,11 @@ public partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     public Task<bool> ShowConfirmDialog(string title, string message, string confirmText, bool danger = false)
     {
+        if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            return Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => ShowConfirmDialog(title, message, confirmText, danger));
+        }
+
         var tcs = new TaskCompletionSource<bool>();
 
         var confirm = new Button
@@ -366,8 +383,8 @@ public partial class MainWindowViewModel : ViewModelBase
             Classes = { "Ghost" }
         };
 
-        confirm.Click += (_, _) => { CloseDialog(); tcs.TrySetResult(true); };
-        cancel.Click += (_, _) => { CloseDialog(); tcs.TrySetResult(false); };
+        confirm.Click += (_, _) => { tcs.TrySetResult(true); CloseDialog(); };
+        cancel.Click += (_, _) => { tcs.TrySetResult(false); CloseDialog(); };
         var panel = new StackPanel
         {
             Spacing = 16,
@@ -406,6 +423,11 @@ public partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     public Task<string?> ShowInputDialog(string title, string message, bool isPassword = false)
     {
+        if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            return Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => ShowInputDialog(title, message, isPassword));
+        }
+
         var tcs = new TaskCompletionSource<string?>();
         var l = Services.LocalizationService.Instance;
 
@@ -417,8 +439,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
         void Complete(string? result)
         {
-            CloseDialog();
             tcs.TrySetResult(result);
+            CloseDialog();
         }
 
         var confirm = new Button
@@ -469,6 +491,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public void CloseDialog()
     {
+        if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(CloseDialog);
+            return;
+        }
         IsDialogOpen = false;
         DialogContent = null;
     }
@@ -701,8 +728,13 @@ public partial class MainWindowViewModel : ViewModelBase
     /// Awaits the trust prompt on the async connect pipeline. Runs on the UI-thread context of the
     /// awaiting caller, so there is no blocking wait between threads.
     /// </summary>
-    private Task<bool> VerifyHostKey(string hostDisplay, string fingerprint, string? knownFingerprint)
+    private async Task<bool> VerifyHostKey(string hostDisplay, string fingerprint, string? knownFingerprint)
     {
+        if (!Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+        {
+            return await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => VerifyHostKey(hostDisplay, fingerprint, knownFingerprint));
+        }
+
         var l = JxTerminal.Services.LocalizationService.Instance;
 
         var title = knownFingerprint == null ? l["HostKeyNewTitle"] : l["HostKeyChangedTitle"];
@@ -710,7 +742,7 @@ public partial class MainWindowViewModel : ViewModelBase
             ? string.Format(l["HostKeyNewMessage"], hostDisplay, fingerprint)
             : string.Format(l["HostKeyChangedMessage"], hostDisplay, knownFingerprint, fingerprint);
 
-        return ShowConfirmDialog(title, message, l["Trust"], danger: knownFingerprint != null);
+        return await ShowConfirmDialog(title, message, l["Trust"], danger: knownFingerprint != null);
     }
 
     private void OnConnectionError(Exception ex)
