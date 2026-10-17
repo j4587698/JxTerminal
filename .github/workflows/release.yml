@@ -66,19 +66,21 @@ jobs:
 
       - name: Publish Native AOT
         shell: bash
-        run: dotnet publish JxTerminal.csproj -c Release -r ${{ matrix.rid }} -p:PublishAot=true -p:StripSymbols=true -o ./publish
+        run: dotnet publish JxTerminal.csproj -c Release -r ${{ matrix.rid }} -p:PublishAot=true -p:StripSymbols=true -p:DebugType=none -p:DebugSymbols=false -o ./publish
 
       - name: Package Windows Artifact
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          Compress-Archive -Path ./publish/* -DestinationPath ${{ matrix.archive_name }}
+          Get-ChildItem -Path ./publish -Filter *.pdb -Recurse -ErrorAction SilentlyContinue | Remove-Item -Force
+          Compress-Archive -Path ./publish/* -DestinationPath ${{ matrix.archive_name }} -Force
 
       - name: Package Unix Artifact
         if: runner.os != 'Windows'
         shell: bash
         run: |
           chmod +x ./publish/JxTerminal
+          find ./publish -name "*.pdb" -type f -delete
           tar -czvf ${{ matrix.archive_name }} -C ./publish .
 
       - name: Upload Build Artifact
