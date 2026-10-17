@@ -92,7 +92,13 @@ public class SyncService
     }
 
     private static string AppVersion
-        => typeof(SyncService).Assembly.GetName().Version?.ToString() ?? "1.0.0";
+    {
+        get
+        {
+            var v = typeof(SyncService).Assembly.GetName().Version;
+            return v != null ? $"{v.Major}.{v.Minor}" : "0.1";
+        }
+    }
 
     private void ThrowIfUnauthenticated()
     {

@@ -112,6 +112,14 @@ public partial class SettingsViewModel : ViewModelBase
     public SyncViewModel Sync { get; }
 
     public string AppDataDirectory => PathConfig.AppDataRoot;
+    public string AppVersion
+    {
+        get
+        {
+            var v = typeof(SettingsViewModel).Assembly.GetName().Version;
+            return v != null ? $"{v.Major}.{v.Minor}" : "0.1";
+        }
+    }
 
     [RelayCommand]
     private void OpenDataFolder()
