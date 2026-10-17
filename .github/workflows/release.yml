@@ -65,13 +65,8 @@ jobs:
             libxrandr-dev
 
       - name: Publish Native AOT
-        run: |
-          dotnet publish JxTerminal.csproj \
-            -c Release \
-            -r ${{ matrix.rid }} \
-            -p:PublishAot=true \
-            -p:StripSymbols=true \
-            -o ./publish
+        shell: bash
+        run: dotnet publish JxTerminal.csproj -c Release -r ${{ matrix.rid }} -p:PublishAot=true -p:StripSymbols=true -o ./publish
 
       - name: Package Windows Artifact
         if: runner.os == 'Windows'
