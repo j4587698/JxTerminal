@@ -43,4 +43,10 @@ public interface ITerminalController
 
     /// <summary>True when pasted text must be wrapped in bracketed-paste markers.</summary>
     bool BracketedPaste { get; }
+
+    /// <summary>Starting coordinate of the user's text selection (in relative buffer coordinates).</summary>
+    Avalonia.Point? SelectionStart { get; set; }
+
+    /// <summary>Ending coordinate of the user's text selection (in relative buffer coordinates).</summary>
+    Avalonia.Point? SelectionEnd { get; set; }
 }

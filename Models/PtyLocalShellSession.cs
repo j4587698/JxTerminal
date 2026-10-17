@@ -19,7 +19,16 @@ public class PtyLocalShellSession : ITerminalSession
     private bool _isConnected;
     private CancellationTokenSource? _readCts;
     // Stateful so multi-byte characters split across reads survive.
-    private readonly Decoder _decoder = Encoding.UTF8.GetDecoder();
+    private readonly Decoder _decoder;
+    private readonly Encoding _encoding;
+    // Guards against raising Disconnected more than once per connection lifetime.
+    private int _disconnectedInvoked;
+
+    // Window dimensions (persists across connect lifecycle so SpawnAsync uses the actual size)
+    private int _cols = 80;
+    private int _rows = 24;
+    private int _width = 800;
+    private int _height = 600;
 
     public event Action<string>? DataReceived;
     public event Action? Connected;
@@ -28,10 +37,20 @@ public class PtyLocalShellSession : ITerminalSession
 
     public bool IsConnected => _isConnected;
 
+    private readonly object _writeLock = new();
+
     public PtyLocalShellSession(string shellKind = "Auto")
     {
         _shellKind = shellKind;
+        _encoding = ResolveLocalEncoding();
+        _decoder = _encoding.GetDecoder();
     }
+
+    /// <summary>
+    /// Modern ConPTY (Windows 10/11) and Unix PTYs emit and consume UTF-8 across
+    /// the pseudo-console VT pipe.
+    /// </summary>
+    private static Encoding ResolveLocalEncoding() => new UTF8Encoding(false);
 
     /// <summary>
     /// Resolves the requested shell kind to a platform executable.
@@ -83,8 +102,8 @@ public class PtyLocalShellSession : ITerminalSession
             var options = new PtyOptions
             {
                 Name = $"JxTerminal-{Guid.NewGuid()}",
-                Cols = 80,
-                Rows = 24,
+                Cols = _cols > 0 ? _cols : 80,
+                Rows = _rows > 0 ? _rows : 24,
                 Cwd = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 App = ResolveShell(_shellKind),
                 Environment = new Dictionary<string, string>
@@ -96,20 +115,21 @@ public class PtyLocalShellSession : ITerminalSession
 
             _pty = await PtyProvider.SpawnAsync(options, CancellationToken.None);
             _isConnected = true;
+            Interlocked.Exchange(ref _disconnectedInvoked, 0);
+
+            try { _pty.Resize(_cols > 0 ? _cols : 80, _rows > 0 ? _rows : 24); } catch { }
 
             // Handle process exit
             _pty.ProcessExited += (sender, e) =>
             {
-                if (!_isConnected) return;
-                _isConnected = false;
-                Disconnected?.Invoke();
+                FireDisconnectedOnce();
             };
 
             Connected?.Invoke();
 
             // Start reading output
             _readCts = new CancellationTokenSource();
-            _ = ReadOutputAsync(_readCts.Token);
+            _ = ReadOutputAsync(_readCts);
         }
         catch (Exception ex)
         {
@@ -117,8 +137,9 @@ public class PtyLocalShellSession : ITerminalSession
         }
     }
 
-    private async Task ReadOutputAsync(CancellationToken cancellationToken)
+    private async Task ReadOutputAsync(CancellationTokenSource cts)
     {
+        var cancellationToken = cts.Token;
         var buffer = new byte[4096];
         try
         {
@@ -151,11 +172,19 @@ public class PtyLocalShellSession : ITerminalSession
         }
         finally
         {
-            if (_isConnected)
-            {
-                _isConnected = false;
-                Disconnected?.Invoke();
-            }
+            FireDisconnectedOnce();
+            // The loop has fully unwound, so no token registration can still be
+            // in flight; safe to release the CTS here (Dispose only cancels).
+            cts.Dispose();
+        }
+    }
+
+    private void FireDisconnectedOnce()
+    {
+        if (Interlocked.Exchange(ref _disconnectedInvoked, 1) == 0)
+        {
+            _isConnected = false;
+            Disconnected?.Invoke();
         }
     }
 
@@ -165,9 +194,12 @@ public class PtyLocalShellSession : ITerminalSession
         {
             try
             {
-                byte[] bytes = Encoding.UTF8.GetBytes(data);
-                _pty.WriterStream.Write(bytes, 0, bytes.Length);
-                _pty.WriterStream.Flush();
+                byte[] bytes = _encoding.GetBytes(data);
+                lock (_writeLock)
+                {
+                    _pty.WriterStream.Write(bytes, 0, bytes.Length);
+                    _pty.WriterStream.Flush();
+                }
             }
             catch (Exception ex)
             {
@@ -178,6 +210,12 @@ public class PtyLocalShellSession : ITerminalSession
 
     public void Resize(int rows, int cols, int width, int height)
     {
+        if (cols <= 0 || rows <= 0) return;
+        _cols = cols;
+        _rows = rows;
+        if (width > 0) _width = width;
+        if (height > 0) _height = height;
+
         if (_pty != null && _isConnected)
         {
             try
@@ -193,8 +231,9 @@ public class PtyLocalShellSession : ITerminalSession
 
     public void Dispose()
     {
-        _readCts?.Cancel();
-        _readCts?.Dispose();
+        // Only cancel here: the token may still be registered by an in-flight ReadAsync;
+        // the CTS itself is disposed by ReadOutputAsync once its loop has unwound.
+        try { _readCts?.Cancel(); } catch (ObjectDisposedException) { }
 
         try
         {
@@ -203,10 +242,6 @@ public class PtyLocalShellSession : ITerminalSession
         }
         catch { }
 
-        if (_isConnected)
-        {
-            _isConnected = false;
-            Disconnected?.Invoke();
-        }
+        FireDisconnectedOnce();
     }
 }

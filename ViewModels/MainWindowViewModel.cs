@@ -2,14 +2,19 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using JxTerminal.Models;
 using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Styling;
 using LuminaUI.Controls;
+using LuminaUI.Theming;
 using Material.Icons;
+using JxTerminal.Services;
 
 namespace JxTerminal.ViewModels;
 
@@ -47,8 +52,24 @@ public partial class MainWindowViewModel : ViewModelBase
             SelectedMenuItem = MenuItems.FirstOrDefault(m => m.Key == "Terminal");
             SelectedNavigationKey = "Terminal";
         }
+        else if (value is TransferCenterViewModel)
+        {
+            SelectedMenuItem = MenuItems.FirstOrDefault(m => m.Key == "Transfer");
+            SelectedNavigationKey = "Transfer";
+        }
+        else if (value is SnippetsViewModel)
+        {
+            SelectedMenuItem = MenuItems.FirstOrDefault(m => m.Key == "Snippets");
+            SelectedNavigationKey = "Snippets";
+        }
+        else if (value is KeyManagerViewModel)
+        {
+            SelectedMenuItem = MenuItems.FirstOrDefault(m => m.Key == "Keys");
+            SelectedNavigationKey = "Keys";
+        }
         else if (value is SettingsViewModel)
         {
+            SelectedMenuItem = MenuItems.FirstOrDefault(m => m.Key == "Settings");
             SelectedNavigationKey = "Settings";
         }
     }
@@ -64,11 +85,57 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private string? _selectedNavigationKey = "HostList";
 
+    partial void OnSelectedNavigationKeyChanged(string? value)
+    {
+        switch (value)
+        {
+            case "HostList" when ActiveContent is not HostListViewModel:
+                NavigateToHostList();
+                break;
+            case "Terminal" when ActiveContent is not TerminalListViewModel:
+                NavigateToTerminal();
+                break;
+            case "Transfer" when ActiveContent is not TransferCenterViewModel:
+                NavigateToTransfer();
+                break;
+            case "Snippets" when ActiveContent is not SnippetsViewModel:
+                NavigateToSnippets();
+                break;
+            case "Keys" when ActiveContent is not KeyManagerViewModel:
+                NavigateToKeys();
+                break;
+            case "Settings" when ActiveContent is not SettingsViewModel:
+                NavigateToSettings();
+                break;
+        }
+    }
+
     [ObservableProperty]
     private object? _dialogContent;
 
     [ObservableProperty]
     private bool _isDialogOpen;
+
+    /// <summary>
+    /// Releases the current dialog's awaiter when the dialog is dismissed without a
+    /// result (Esc / overlay click via the TwoWay IsDialogOpen binding, or programmatic
+    /// close). Consumed on every close; dialogs that produce results complete their
+    /// TaskCompletionSource first, so the fallback is a no-op for them.
+    /// </summary>
+    private Action? _dialogDismissFallback;
+
+    public void RegisterDialogDismissFallback(Action? onDismissed)
+        => _dialogDismissFallback = onDismissed;
+
+    partial void OnIsDialogOpenChanged(bool value)
+    {
+        if (!value)
+        {
+            DialogContent = null;
+            var fallback = Interlocked.Exchange(ref _dialogDismissFallback, null);
+            fallback?.Invoke();
+        }
+    }
 
     /// <summary>
     /// True only while a background operation is running AND no modal dialog is
@@ -106,13 +173,11 @@ public partial class MainWindowViewModel : ViewModelBase
             OnPropertyChanged(nameof(WindowTitle));
         TerminalList.RequestCreateConnection += () => {
              ActiveContent = HostList;
+             SelectedNavigationKey = "HostList";
              SelectedMenuItem = MenuItems.FirstOrDefault(m => m.Key == "HostList");
         };
 
         TerminalList.DuplicateRequested += async (conn) => await Connect(conn);
-
-        HostList = new HostListViewModel(this);
-        ActiveContent = HostList;
 
         MenuItems.Add(new MenuItemViewModel
         {
@@ -132,8 +197,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             Key = "Transfer",
             IconKind = MaterialIconKind.FolderSwap,
-            Command = NavigateToPlaceholderCommand,
-            CommandParameter = "Transfer"
+            Command = NavigateToTransferCommand
         });
 
         MenuItems.Add(new MenuItemViewModel
@@ -147,8 +211,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             Key = "Keys",
             IconKind = MaterialIconKind.KeyVariant,
-            Command = NavigateToPlaceholderCommand,
-            CommandParameter = "Keys"
+            Command = NavigateToKeysCommand
         });
 
         MenuItems.Add(new MenuItemViewModel
@@ -157,18 +220,63 @@ public partial class MainWindowViewModel : ViewModelBase
             IconKind = MaterialIconKind.Cog,
             Command = NavigateToSettingsCommand
         });
+
+        HostList = new HostListViewModel(this);
+        ActiveContent = HostList;
+
+        // Wire up auto-sync snapshot applied event to refresh the UI
+        Services.Sync.SyncService.Instance.SnapshotApplied += () =>
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => ApplySyncedData(restored: true));
+        };
     }
 
     [RelayCommand]
     public void NavigateToHostList() => ActiveContent = HostList;
 
+    /// <summary>
+    /// Ctrl+K / title-bar search box: jump to the host list and focus its search field.
+    /// </summary>
+    [RelayCommand]
+    public void FocusHostSearch()
+    {
+        ActiveContent = HostList;
+        HostList.RequestSearchFocus();
+    }
+
     [RelayCommand]
     public void NavigateToTerminal() => ActiveContent = TerminalList;
 
     [RelayCommand]
-    public void NavigateToSettings() => ActiveContent = SettingsPage ??= new SettingsViewModel(Settings, this);
+    public void NavigateToSettings() => NavigateToSettingsTab(0);
+
+    public void NavigateToSettingsTab(int tabIndex)
+    {
+        SelectedNavigationKey = "Settings";
+        var page = SettingsPage ??= new SettingsViewModel(Settings, this);
+        page.SelectedTabIndex = tabIndex;
+        ActiveContent = page;
+    }
 
     private SettingsViewModel? SettingsPage;
+
+    [RelayCommand]
+    public void NavigateToTransfer()
+    {
+        SelectedNavigationKey = "Transfer";
+        ActiveContent = TransferCenterPage ??= new TransferCenterViewModel();
+    }
+
+    private TransferCenterViewModel? TransferCenterPage;
+
+    [RelayCommand]
+    public void NavigateToKeys()
+    {
+        SelectedNavigationKey = "Keys";
+        ActiveContent = KeyManagerPage ??= new KeyManagerViewModel();
+    }
+
+    private KeyManagerViewModel? KeyManagerPage;
 
     [RelayCommand]
     public void NavigateToSnippets()
@@ -205,23 +313,39 @@ public partial class MainWindowViewModel : ViewModelBase
         DialogContent = new LuminaDialog
         {
             Title = title,
-            Content = content
+            Content = content,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            MaxWidth = 600
         };
         IsDialogOpen = true;
     }
 
     public void ShowMessageDialog(string title, string message)
     {
-        ShowDialog(
-            new TextBlock
-            {
-                Text = message,
-                TextWrapping = TextWrapping.Wrap,
-                MaxWidth = 520,
-                Margin = new Avalonia.Thickness(4),
-                HorizontalAlignment = HorizontalAlignment.Stretch
-            },
-            title);
+        var panel = new StackPanel
+        {
+            Spacing = 16,
+            MinWidth = 300,
+            MaxWidth = 440
+        };
+        panel.Children.Add(new TextBlock
+        {
+            Text = message,
+            TextWrapping = TextWrapping.Wrap,
+            LineHeight = 20
+        });
+        var confirm = new Button
+        {
+            Content = Services.LocalizationService.Instance["Confirm"],
+            Classes = { "Primary" },
+            HorizontalAlignment = HorizontalAlignment.Right,
+            IsDefault = true
+        };
+        confirm.Click += (_, _) => CloseDialog();
+        panel.Children.Add(confirm);
+
+        ShowDialog(panel, title);
     }
 
     /// <summary>
@@ -244,17 +368,17 @@ public partial class MainWindowViewModel : ViewModelBase
 
         confirm.Click += (_, _) => { CloseDialog(); tcs.TrySetResult(true); };
         cancel.Click += (_, _) => { CloseDialog(); tcs.TrySetResult(false); };
-
         var panel = new StackPanel
         {
             Spacing = 16,
-            MaxWidth = 520,
-            Margin = new Avalonia.Thickness(4)
+            MinWidth = 320,
+            MaxWidth = 460
         };
         panel.Children.Add(new TextBlock
         {
             Text = message,
-            TextWrapping = TextWrapping.Wrap
+            TextWrapping = TextWrapping.Wrap,
+            LineHeight = 20
         });
         var buttons = new StackPanel
         {
@@ -266,6 +390,7 @@ public partial class MainWindowViewModel : ViewModelBase
         buttons.Children.Add(confirm);
         panel.Children.Add(buttons);
 
+        RegisterDialogDismissFallback(() => tcs.TrySetResult(false));
         ShowDialog(panel, title);
         return tcs.Task;
     }
@@ -315,14 +440,14 @@ public partial class MainWindowViewModel : ViewModelBase
         var panel = new StackPanel
         {
             Spacing = 16,
-            MinWidth = 360,
-            MaxWidth = 520,
-            Margin = new Avalonia.Thickness(4)
+            MinWidth = 320,
+            MaxWidth = 460
         };
         panel.Children.Add(new TextBlock
         {
             Text = message,
-            TextWrapping = TextWrapping.Wrap
+            TextWrapping = TextWrapping.Wrap,
+            LineHeight = 20
         });
         panel.Children.Add(input);
 
@@ -336,6 +461,7 @@ public partial class MainWindowViewModel : ViewModelBase
         buttons.Children.Add(confirm);
         panel.Children.Add(buttons);
 
+        RegisterDialogDismissFallback(() => tcs.TrySetResult(null));
         ShowDialog(panel, title);
         Avalonia.Threading.Dispatcher.UIThread.Post(() => input.Focus(), Avalonia.Threading.DispatcherPriority.Input);
         return tcs.Task;
@@ -358,34 +484,109 @@ public partial class MainWindowViewModel : ViewModelBase
         vm.Settings = JxTerminal.Services.DataStore.LoadSettings();
         vm.Settings.ResolveColorScheme();
 
-        // Debounced auto-save: color picker drags fire dozens of notifications per second.
-        var saveCts = new System.Threading.CancellationTokenSource();
-        vm.Settings.PropertyChanged += (s, e) =>
+        vm.ApplyVisualPreferences(vm.Settings);
+        vm.HookSettingsAutoSave();
+        return vm;
+    }
+
+    /// <summary>
+    /// Applies saved language, accent color and theme to the running application.
+    /// </summary>
+    private void ApplyVisualPreferences(TerminalSettings settings)
+    {
+        if (!string.IsNullOrWhiteSpace(settings.Language))
         {
-            saveCts.Cancel();
-            saveCts = new System.Threading.CancellationTokenSource();
-            var token = saveCts.Token;
+            LocalizationService.Instance.SetLanguage(settings.Language);
+        }
+        if (!string.IsNullOrWhiteSpace(settings.AccentColor))
+        {
+            LuminaThemeManager.TrySetAccentColor(settings.AccentColor);
+        }
+        if (!string.IsNullOrWhiteSpace(settings.ThemeMode))
+        {
+            var isLight = settings.ThemeMode.Equals("Light", StringComparison.OrdinalIgnoreCase);
+            Application.Current!.RequestedThemeVariant = isLight ? ThemeVariant.Light : ThemeVariant.Dark;
+            LuminaThemeManager.SetThemeMode(isLight ? LuminaThemeMode.Light : LuminaThemeMode.Dark);
+        }
+    }
+
+    private System.Threading.CancellationTokenSource _saveCts = new();
+
+    /// <summary>
+    /// Subscribes to settings changes and persists them with a short debounce.
+    /// </summary>
+    private void HookSettingsAutoSave()
+    {
+        _saveCts.Cancel();
+        _saveCts.Dispose();
+        _saveCts = new System.Threading.CancellationTokenSource();
+
+        Settings.PropertyChanged += (s, e) =>
+        {
+            // Cancel + dispose the previous generation so CTS instances don't pile up.
+            var old = Interlocked.Exchange(ref _saveCts, new System.Threading.CancellationTokenSource());
+            try { old.Cancel(); } catch (ObjectDisposedException) { }
+            old.Dispose();
+
+            var token = _saveCts.Token;
             _ = Task.Run(async () =>
             {
                 try
                 {
                     await Task.Delay(500, token);
-                    await JxTerminal.Services.DataStore.SaveSettingsAsync(vm.Settings);
+                    await JxTerminal.Services.DataStore.SaveSettingsAsync(Settings);
                 }
                 catch (OperationCanceledException) { }
             });
         };
-        return vm;
+    }
+
+    /// <summary>
+    /// Flushes any pending debounced settings immediately to the local database.
+    /// Called during application exit or window closing to prevent settings loss.
+    /// </summary>
+    public void FlushSettings()
+    {
+        try
+        {
+            _saveCts.Cancel();
+            JxTerminal.Services.DataStore.SaveSettings(Settings);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"Failed to flush settings: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Refreshes in-memory pages after a cloud restore: the host list is reloaded
+    /// immediately and cached pages are invalidated so the next navigation shows the
+    /// restored data. When <paramref name="restored"/> is true the active settings are
+    /// also replaced and the visual preferences re-applied.
+    /// </summary>
+    public void ApplySyncedData(bool restored)
+    {
+        HostList.ReloadData();
+
+        // Invalidate cached pages so they rebuild from the restored data store.
+        SettingsPage = null;
+        SnippetsPage = null;
+        KeyManagerPage = null;
+
+        if (restored)
+        {
+            Settings = JxTerminal.Services.DataStore.LoadSettings();
+            Settings.ResolveColorScheme();
+            ApplyVisualPreferences(Settings);
+            HookSettingsAutoSave();
+        }
     }
 
     [ObservableProperty]
     private bool _isBusy;
 
-    public async Task Connect(SavedConnection connection)
+    public async Task Connect(SavedConnection connection, string? initialCommand = null)
     {
-        if (IsBusy) return;
-        IsBusy = true;
-        
         var connInfo = connection.Clone();
 
         ITerminalSession session;
@@ -431,6 +632,21 @@ public partial class MainWindowViewModel : ViewModelBase
                     password = entered;
                 }
 
+                string privateKeyContent = "";
+                if (connInfo.KeyStoreId.HasValue)
+                {
+                    var key = Services.KeyStore.KeyStoreService.Instance.GetKey(connInfo.KeyStoreId.Value);
+                    if (key == null)
+                    {
+                        // The stored key was deleted from the key store: fail with a clear
+                        // message instead of silently falling back to an empty password.
+                        var l = JxTerminal.Services.LocalizationService.Instance;
+                        ShowMessageDialog(l["ConnectionFailedTitle"], l["KeyNotFound"]);
+                        return;
+                    }
+                    privateKeyContent = key.PrivateKeyPem;
+                }
+
                 session = new SshSession(
                     connInfo.Host,
                     connInfo.Port,
@@ -439,7 +655,8 @@ public partial class MainWindowViewModel : ViewModelBase
                     connInfo.AuthenticationType,
                     connInfo.KeyFilePath,
                     connInfo.Passphrase,
-                    Settings.RemoteEncoding);
+                    Settings.RemoteEncoding,
+                    privateKeyContent);
             }
 
             if (session is SshSession ssh)
@@ -447,46 +664,36 @@ public partial class MainWindowViewModel : ViewModelBase
                  ssh.HostKeyVerifier = VerifyHostKey;
             }
 
-            // Observe session errors for every transport so failures are never silent
-            // (the local-shell path in particular reports through this event).
-            Exception? sessionError = null;
-            session.ErrorOccurred += OnConnectionError;
-            session.ErrorOccurred += ex => sessionError ??= ex;
+            var vm = new TerminalViewModel(session, Settings, connInfo);
 
-            await session.ConnectAsync();
-
-            if (session.IsConnected)
+            if (!string.IsNullOrWhiteSpace(initialCommand))
             {
-                if (session is SshSession) session.ErrorOccurred -= OnConnectionError;
-                if (session is SerialSession) session.ErrorOccurred -= OnConnectionError;
-                if (session is TelnetSession) session.ErrorOccurred -= OnConnectionError;
-
-                var vm = new TerminalViewModel(session, Settings, connInfo);
-                TerminalList.Tabs.Add(vm);
-                TerminalList.SelectedTab = vm;
-                ActiveContent = TerminalList; 
-            }
-            else
-            {
-                // Connection attempt failed; release the socket/handles it may already hold.
-                session.ErrorOccurred -= OnConnectionError;
-                (session as IDisposable)?.Dispose();
-
-                if (sessionError != null)
+                void SendInitial()
                 {
-                    var l = JxTerminal.Services.LocalizationService.Instance;
-                    ShowMessageDialog(l["ConnectionFailedTitle"], $"{l["ConnectionFailed"]}{sessionError.Message}");
+                    session.Connected -= SendInitial;
+                    Task.Delay(300).ContinueWith(_ =>
+                    {
+                        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                        {
+                            vm.SendInput(initialCommand + "\n");
+                        });
+                    });
                 }
+
+                if (session.IsConnected) SendInitial();
+                else session.Connected += SendInitial;
             }
+
+            TerminalList.Tabs.Add(vm);
+            TerminalList.SelectedTab = vm;
+            ActiveContent = TerminalList;
+            SelectedNavigationKey = "Terminal";
+            SelectedMenuItem = MenuItems.FirstOrDefault(m => m.Key == "Terminal");
         }
         catch (Exception ex)
         {
             var l = JxTerminal.Services.LocalizationService.Instance;
             ShowMessageDialog(l["ConnectionFailedTitle"], $"{l["ConnectionFailed"]}{ex.Message}");
-        }
-        finally
-        {
-            IsBusy = false;
         }
     }
 

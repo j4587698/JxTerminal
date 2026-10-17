@@ -21,4 +21,14 @@ public partial class SnippetsView : UserControl
             vm.SendToTerminalCommand.Execute(item);
         }
     }
+
+    private void HistoryList_DoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is ListBox listBox
+            && listBox.SelectedItem is TerminalHistoryItem item
+            && DataContext is SnippetsViewModel vm)
+        {
+            vm.SendToTerminalCommand.Execute(item);
+        }
+    }
 }

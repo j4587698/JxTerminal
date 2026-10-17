@@ -1,0 +1,248 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:JxTerminal.ViewModels"
+             xmlns:m="using:JxTerminal.Models"
+             xmlns:c="using:JxTerminal.Converters"
+             xmlns:lumina="clr-namespace:LuminaUI.Controls;assembly=LuminaUI"
+             xmlns:avalonia="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
+             x:Class="JxTerminal.Views.TransferCenterView"
+             x:DataType="vm:TransferCenterViewModel">
+
+    <Grid RowDefinitions="Auto, *" Margin="16,14,16,14">
+        <!-- Header -->
+        <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,14">
+            <StackPanel Spacing="4">
+                <TextBlock Text="{c:Localize Transfer}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                <TextBlock Text="{c:Localize TransferCenterSubtitle}" Classes="PageSubtitle"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <!-- Search -->
+                <TextBox Width="220"
+                         Classes="Rounded"
+                         PlaceholderText="{c:Localize Search}"
+                         Text="{Binding SearchText, Mode=TwoWay}">
+                    <TextBox.InnerLeftContent>
+                        <avalonia:MaterialIcon Kind="Magnify" Width="16" Height="16" Margin="10,0,0,0" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+                    </TextBox.InnerLeftContent>
+                </TextBox>
+
+                <Button Classes="Ghost" Command="{Binding ClearFinishedCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <avalonia:MaterialIcon Kind="Broom" Width="16" Height="16"/>
+                        <TextBlock Text="{c:Localize ClearCompleted}"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- Main Card -->
+        <lumina:LuminaCard Grid.Row="1" Padding="0" ClipToBounds="True">
+            <Grid RowDefinitions="Auto, *">
+                <!-- Filter bar -->
+                <Border Padding="16,10" Background="{DynamicResource LuminaBackgroundBrush}" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource LuminaBorderSubtleBrush}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <RadioButton Classes="TextPill" Content="{c:Localize All}" IsChecked="True" Command="{Binding SetFilterCommand}" CommandParameter="All"/>
+                        <RadioButton Classes="TextPill" Content="{c:Localize Active}" Command="{Binding SetFilterCommand}" CommandParameter="Active"/>
+                        <RadioButton Classes="TextPill" Content="{c:Localize Completed}" Command="{Binding SetFilterCommand}" CommandParameter="Completed"/>
+                        <RadioButton Classes="TextPill" Content="{c:Localize Failed}" Command="{Binding SetFilterCommand}" CommandParameter="Failed"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- List Content -->
+                <Grid Grid.Row="1">
+                    <!-- Empty State -->
+                    <StackPanel IsVisible="{Binding HasNoTransfers}" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12">
+                        <avalonia:MaterialIcon Kind="FolderSwapOutline" Width="54" Height="54" Foreground="{DynamicResource LuminaTextTertiaryBrush}" HorizontalAlignment="Center" Opacity="0.5"/>
+                        <TextBlock Text="{c:Localize NoTransfersFound}" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
+                        <TextBlock Text="{c:Localize NoTransfersHint}" FontSize="13" TextWrapping="Wrap" TextAlignment="Center" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+                    </StackPanel>
+
+                    <!-- Items List -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding FilteredTransfers}"
+                                      Padding="8">
+                            <ItemsControl.Styles>
+                                <Style Selector="Border.TransferCard:pointerover">
+                                    <Setter Property="BorderBrush" Value="{DynamicResource LuminaBorderBrush}"/>
+                                </Style>
+                            </ItemsControl.Styles>
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Spacing="4"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="m:TransferItem">
+                                    <Border Classes="TransferCard" Padding="12,10" CornerRadius="{DynamicResource AppRadiusSm}"
+                                            Background="{DynamicResource LuminaBackgroundBrush}"
+                                            BorderThickness="1" BorderBrush="{DynamicResource LuminaBorderSubtleBrush}">
+                                        <Border.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="{c:Localize OpenFolder}"
+                                                          Command="{Binding $parent[UserControl].DataContext.OpenLocalFolderCommand}"
+                                                          CommandParameter="{Binding}">
+                                                    <MenuItem.Icon><avalonia:MaterialIcon Kind="FolderOpenOutline"/></MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem Header="{c:Localize Retry}"
+                                                          Command="{Binding $parent[UserControl].DataContext.RetryTransferCommand}"
+                                                          CommandParameter="{Binding}"
+                                                          IsEnabled="{Binding CanRetry}">
+                                                    <MenuItem.Icon><avalonia:MaterialIcon Kind="Refresh"/></MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem Header="{c:Localize Cancel}"
+                                                      Command="{Binding $parent[UserControl].DataContext.CancelTransferCommand}"
+                                                      CommandParameter="{Binding}"
+                                                      IsEnabled="{Binding CanCancel}">
+                                                    <MenuItem.Icon><avalonia:MaterialIcon Kind="Close"/></MenuItem.Icon>
+                                                </MenuItem>
+                                                <Separator/>
+                                                <MenuItem Header="{c:Localize Delete}"
+                                                          Command="{Binding $parent[UserControl].DataContext.RemoveTransferCommand}"
+                                                          CommandParameter="{Binding}">
+                                                    <MenuItem.Icon><avalonia:MaterialIcon Kind="DeleteOutline"/></MenuItem.Icon>
+                                                </MenuItem>
+                                            </ContextMenu>
+                                        </Border.ContextMenu>
+                                        <Grid ColumnDefinitions="Auto, *, Auto, Auto" RowDefinitions="Auto, Auto">
+                                            <!-- Col 0, RowSpan 2: Icon -->
+                                            <Border Grid.Column="0" Grid.RowSpan="2"
+                                                    Width="38" Height="38" CornerRadius="{DynamicResource AppRadiusMd}"
+                                                    Background="{DynamicResource LuminaPrimaryBgBrush}"
+                                                    VerticalAlignment="Center" Margin="0,0,12,0">
+                                                <avalonia:MaterialIcon Kind="{Binding IconKind}" Width="20" Height="20"
+                                                                       Foreground="{DynamicResource LuminaPrimaryBrush}"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+
+                                            <!-- Col 1, Row 0: Name & Status Badges -->
+                                            <StackPanel Grid.Column="1" Grid.Row="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" FontSize="13"
+                                                           Foreground="{DynamicResource LuminaTextPrimaryBrush}"
+                                                           VerticalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis" MaxWidth="360"/>
+                                                <!-- Status Badges -->
+                                                <Border IsVisible="{Binding IsRunning}" Classes="Badge" Background="{DynamicResource LuminaPrimaryBgBrush}" Padding="6,1.5">
+                                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                                        <avalonia:MaterialIcon Kind="SwapVertical" Width="11" Height="11" Foreground="{DynamicResource LuminaPrimaryBrush}"/>
+                                                        <TextBlock Text="{c:Localize Active}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource LuminaPrimaryBrush}"/>
+                                                    </StackPanel>
+                                                </Border>
+                                                <Border IsVisible="{Binding IsCompleted}" Classes="Badge" Background="{DynamicResource LuminaSuccessBgBrush}" Padding="6,1.5">
+                                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                                        <avalonia:MaterialIcon Kind="Check" Width="11" Height="11" Foreground="{DynamicResource LuminaSuccessBrush}"/>
+                                                        <TextBlock Text="{c:Localize Completed}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource LuminaSuccessBrush}"/>
+                                                    </StackPanel>
+                                                </Border>
+                                                <Border IsVisible="{Binding IsFailed}" Classes="Badge" Background="{DynamicResource LuminaDangerBgBrush}" Padding="6,1.5"
+                                                        ToolTip.Tip="{Binding ErrorMessage}">
+                                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                                        <avalonia:MaterialIcon Kind="AlertCircleOutline" Width="11" Height="11" Foreground="{DynamicResource LuminaDangerBrush}"/>
+                                                        <TextBlock Text="{c:Localize Failed}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource LuminaDangerBrush}"/>
+                                                    </StackPanel>
+                                                </Border>
+                                                <Border IsVisible="{Binding IsQueued}" Classes="Badge" Background="{DynamicResource LuminaSurfaceBrush}" Padding="6,1.5">
+                                                    <TextBlock Text="排队中" FontSize="10" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+                                                </Border>
+                                                <Border IsVisible="{Binding IsCanceled}" Classes="Badge" Background="{DynamicResource LuminaSurfaceBrush}" Padding="6,1.5">
+                                                    <TextBlock Text="已取消" FontSize="10" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+                                                </Border>
+                                                <!-- Compression format badge -->
+                                                <Border IsVisible="{Binding IsCompressed}" Classes="Badge" Background="{DynamicResource LuminaPrimaryBgBrush}" Padding="6,1.5">
+                                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                                        <avalonia:MaterialIcon Kind="ArchiveOutline" Width="11" Height="11" Foreground="{DynamicResource LuminaPrimaryBrush}"/>
+                                                        <TextBlock Text="{Binding CompressionFormat}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource LuminaPrimaryBrush}"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+
+                                            <!-- Col 1, Row 1: SessionTarget • RemotePath • DirectorySubStatus (strictly left-aligned on one single line) -->
+                                            <StackPanel Grid.Column="1" Grid.Row="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,5,0,0">
+                                                <TextBlock Text="{Binding SessionTarget}" FontSize="11" FontWeight="Medium"
+                                                           Foreground="{DynamicResource LuminaPrimaryBrush}" VerticalAlignment="Center"/>
+                                                <TextBlock Text="•" FontSize="11" Foreground="{DynamicResource LuminaTextTertiaryBrush}" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding RemotePath}" FontSize="11" Foreground="{DynamicResource LuminaTextSecondaryBrush}"
+                                                           TextTrimming="CharacterEllipsis" MaxWidth="360" VerticalAlignment="Center"/>
+
+                                                <!-- Inline Directory/Compression Sub-status -->
+                                                <TextBlock Text="•" FontSize="11" Foreground="{DynamicResource LuminaTextTertiaryBrush}" VerticalAlignment="Center"
+                                                           IsVisible="{Binding HasDirectorySummary}"/>
+                                                <TextBlock Text="{Binding DirectorySubStatus}" FontSize="11" FontWeight="Medium"
+                                                           Foreground="{DynamicResource LuminaPrimaryBrush}"
+                                                           VerticalAlignment="Center"
+                                                           IsVisible="{Binding HasDirectorySummary}"
+                                                           TextTrimming="CharacterEllipsis" MaxWidth="300"/>
+                                            </StackPanel>
+
+                                            <!-- Col 2, Row 0: Progress Size & Speed & Percentage -->
+                                            <Grid Grid.Column="2" Grid.Row="0" ColumnDefinitions="*, Auto" Width="220" Margin="14,0,14,0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding DisplayProgress}" FontSize="11"
+                                                           Foreground="{DynamicResource LuminaTextSecondaryBrush}" VerticalAlignment="Center"/>
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding DisplaySpeed}" FontSize="11" FontWeight="Medium"
+                                                               Foreground="{DynamicResource LuminaSuccessBrush}"
+                                                               IsVisible="{Binding IsRunning}"/>
+                                                    <TextBlock Text="{Binding DisplayPercentage}" FontSize="11" FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource LuminaPrimaryBrush}"/>
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <!-- Col 2, Row 1: Progress Bar perfectly matching Col 2 width -->
+                                            <ProgressBar Grid.Column="2" Grid.Row="1"
+                                                         Value="{Binding ProgressPercentage}" Minimum="0" Maximum="100"
+                                                         Width="220" Height="4" CornerRadius="2"
+                                                         Margin="14,5,14,0"
+                                                         VerticalAlignment="Center"
+                                                         Background="{DynamicResource LuminaBorderSubtleBrush}"
+                                                         Foreground="{DynamicResource LuminaPrimaryBrush}"/>
+
+                                            <!-- Col 3, RowSpan 2: Action Buttons vertically centered -->
+                                            <StackPanel Grid.Column="3" Grid.RowSpan="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                <!-- Open Folder -->
+                                                <Button Classes="Ghost IconOnly Compact"
+                                                        Command="{Binding $parent[UserControl].DataContext.OpenLocalFolderCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip.Tip="{c:Localize OpenFolder}">
+                                                    <avalonia:MaterialIcon Kind="FolderOpenOutline" Width="16" Height="16"/>
+                                                </Button>
+
+                                                <!-- Cancel (if queued/running) -->
+                                                <Button Classes="Ghost IconOnly Compact"
+                                                        Command="{Binding $parent[UserControl].DataContext.CancelTransferCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip.Tip="{c:Localize Cancel}"
+                                                        IsVisible="{Binding CanCancel}">
+                                                    <avalonia:MaterialIcon Kind="Close" Width="16" Height="16"/>
+                                                </Button>
+
+                                                <!-- Retry (if failed/canceled) -->
+                                                <Button Classes="Ghost IconOnly Compact"
+                                                        Command="{Binding $parent[UserControl].DataContext.RetryTransferCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip.Tip="{c:Localize Retry}"
+                                                        IsVisible="{Binding CanRetry}">
+                                                    <avalonia:MaterialIcon Kind="Refresh" Width="16" Height="16"/>
+                                                </Button>
+
+                                                <!-- Remove -->
+                                                <Button Classes="Ghost IconOnly Compact"
+                                                        Command="{Binding $parent[UserControl].DataContext.RemoveTransferCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip.Tip="{c:Localize Delete}">
+                                                    <avalonia:MaterialIcon Kind="DeleteOutline" Width="16" Height="16"/>
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
+        </lumina:LuminaCard>
+    </Grid>
+</UserControl>

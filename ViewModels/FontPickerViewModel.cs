@@ -9,36 +9,65 @@ namespace JxTerminal.ViewModels;
 
 public partial class FontPickerViewModel : ViewModelBase
 {
-    private readonly IEnumerable<string> _allFonts;
+    private readonly IReadOnlyList<string> _monospaceFonts;
+    private readonly IReadOnlyList<string> _allSystemFonts;
 
     [ObservableProperty]
     private string _searchText = "";
 
     [ObservableProperty]
-    private ObservableCollection<string> _filteredFonts;
+    private bool _showAllFonts;
+
+    [ObservableProperty]
+    private ObservableCollection<string> _filteredFonts = new();
 
     [ObservableProperty]
     private string? _selectedFont;
 
     public event EventHandler<string?>? RequestClose;
 
-    public FontPickerViewModel(IEnumerable<string> fonts, string currentFont)
+    public FontPickerViewModel(IReadOnlyList<string> monospaceFonts, IReadOnlyList<string> allSystemFonts, string currentFont)
     {
-        _allFonts = fonts;
-        _filteredFonts = new ObservableCollection<string>(_allFonts);
-        _selectedFont = _allFonts.Contains(currentFont) ? currentFont : null;
+        _monospaceFonts = monospaceFonts;
+        _allSystemFonts = allSystemFonts;
+
+        // Default is false (not opened).
+        // If current font is not in monospace list but exists in all system fonts,
+        // automatically turn on ShowAllFonts so the current selection is visible.
+        bool isCurrentInMonospace = monospaceFonts.Any(f => f.Equals(currentFont, StringComparison.OrdinalIgnoreCase));
+        _showAllFonts = !isCurrentInMonospace && allSystemFonts.Any(f => f.Equals(currentFont, StringComparison.OrdinalIgnoreCase));
+
+        _selectedFont = currentFont;
+
+        ApplyFilter();
     }
 
-    partial void OnSearchTextChanged(string value)
+    public FontPickerViewModel(IEnumerable<string> fonts, string currentFont)
+        : this(fonts.ToList(), fonts.ToList(), currentFont)
     {
-        if (string.IsNullOrWhiteSpace(value))
+    }
+
+    partial void OnSearchTextChanged(string value) => ApplyFilter();
+
+    partial void OnShowAllFontsChanged(bool value) => ApplyFilter();
+
+    private void ApplyFilter()
+    {
+        var baseList = ShowAllFonts ? _allSystemFonts : _monospaceFonts;
+        if (string.IsNullOrWhiteSpace(SearchText))
         {
-            FilteredFonts = new ObservableCollection<string>(_allFonts);
+            FilteredFonts = new ObservableCollection<string>(baseList);
         }
         else
         {
-            var filtered = _allFonts.Where(f => f.Contains(value, StringComparison.OrdinalIgnoreCase));
+            var filtered = baseList.Where(f => f.Contains(SearchText, StringComparison.OrdinalIgnoreCase));
             FilteredFonts = new ObservableCollection<string>(filtered);
+        }
+
+        // Keep selected item valid if possible
+        if (!string.IsNullOrEmpty(SelectedFont) && FilteredFonts.Contains(SelectedFont))
+        {
+            // SelectedFont is in current filtered list
         }
     }
 

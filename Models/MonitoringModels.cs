@@ -8,7 +8,6 @@ namespace JxTerminal.Models;
 public partial class ProcessInfo : ObservableObject
 {
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(DisplayCpu))]
     private int _pid;
     
     [ObservableProperty]

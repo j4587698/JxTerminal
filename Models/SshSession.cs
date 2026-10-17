@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Renci.SshNet;
 
@@ -17,6 +19,7 @@ public class SshSession : ITerminalSession
     private readonly string _password;
     private readonly SshAuthenticationType _authType;
     private readonly string _keyFilePath;
+    private readonly string _privateKeyContent;
     private readonly string _passphrase;
     private readonly Encoding _encoding;
 
@@ -26,7 +29,13 @@ public class SshSession : ITerminalSession
 
     // Stateful codec so multi-byte characters split across reads survive.
     private readonly Decoder _decoder;
-    private readonly Encoder _encoder = Encoding.UTF8.GetEncoder();
+    private readonly Encoder _encoder;
+
+    /// <summary>
+    /// Serializes all SFTP operations for this session: SSH.NET's SftpClient is not
+    /// thread-safe, so listings and transfers must not run concurrently on it.
+    /// </summary>
+    public SemaphoreSlim SftpLock { get; } = new(1, 1);
 
     public event Action<string>? DataReceived;
     public event Action? Connected;
@@ -54,9 +63,19 @@ public class SshSession : ITerminalSession
     /// <summary>Key seen during a connect attempt that still awaits a user decision.</summary>
     private (string Received, string? Known)? _pendingKey;
 
+    // Guards against raising Disconnected more than once per connection lifetime.
+    private int _disconnectedInvoked;
+
+    // Window dimensions (persists across connect lifecycle so CreateShellStream uses the actual size)
+    private int _cols = 80;
+    private int _rows = 24;
+    private int _width = 800;
+    private int _height = 600;
+
     public SshSession(string host, int port, string username, string password,
         SshAuthenticationType authType = SshAuthenticationType.Password,
-        string keyFilePath = "", string passphrase = "", string encodingName = "UTF-8")
+        string keyFilePath = "", string passphrase = "", string encodingName = "UTF-8",
+        string privateKeyContent = "")
     {
         Host = host;
         Port = port;
@@ -64,6 +83,7 @@ public class SshSession : ITerminalSession
         _password = password;
         _authType = authType;
         _keyFilePath = keyFilePath;
+        _privateKeyContent = privateKeyContent;
         _passphrase = passphrase;
         try { _encoding = Encoding.GetEncoding(string.IsNullOrWhiteSpace(encodingName) ? "UTF-8" : encodingName); }
         catch (ArgumentException) { _encoding = Encoding.UTF8; }
@@ -78,6 +98,7 @@ public class SshSession : ITerminalSession
     /// </summary>
     public async Task ConnectAsync()
     {
+        HostKeyRejected = false;
         var outcome = await ConnectCoreAsync();
 
         if (outcome == ConnectOutcome.NeedsKeyDecision)
@@ -107,54 +128,118 @@ public class SshSession : ITerminalSession
 
             Services.KnownHostsService.Trust(Host, Port, pending!.Value.Received);
             outcome = await ConnectCoreAsync();
+            if (outcome == ConnectOutcome.NeedsKeyDecision)
+            {
+                // The key changed between trusting and reconnecting: refuse rather than loop.
+                _pendingKey = null;
+                HostKeyRejected = true;
+                ErrorOccurred?.Invoke(new System.Security.SecurityException("HostKeyRejected"));
+            }
+        }
+    }
+
+    public ConnectionInfo BuildConnectionInfo()
+    {
+        var methods = new List<AuthenticationMethod>();
+
+        if (_authType == SshAuthenticationType.Key)
+        {
+            PrivateKeyFile? keyFile = null;
+            if (!string.IsNullOrWhiteSpace(_privateKeyContent))
+            {
+                using var stream = new MemoryStream(Encoding.UTF8.GetBytes(_privateKeyContent));
+                keyFile = string.IsNullOrEmpty(_passphrase)
+                    ? new PrivateKeyFile(stream)
+                    : new PrivateKeyFile(stream, _passphrase);
+            }
+            else if (!string.IsNullOrWhiteSpace(_keyFilePath) && File.Exists(_keyFilePath))
+            {
+                keyFile = string.IsNullOrEmpty(_passphrase)
+                    ? new PrivateKeyFile(_keyFilePath)
+                    : new PrivateKeyFile(_keyFilePath, _passphrase);
+            }
+
+            if (keyFile != null)
+            {
+                methods.Add(new PrivateKeyAuthenticationMethod(Username, keyFile));
+            }
+            else
+            {
+                methods.Add(new PasswordAuthenticationMethod(Username, _password));
+            }
+        }
+        else
+        {
+            // Password or Ask (Ask should have provided password here)
+            methods.Add(new PasswordAuthenticationMethod(Username, _password));
+            methods.Add(new KeyboardInteractiveAuthenticationMethod(Username)); // Fallback
+        }
+
+        var connectionInfo = new ConnectionInfo(Host, Port, Username, methods.ToArray());
+        connectionInfo.Timeout = TimeSpan.FromSeconds(15);
+
+        // Handle keyboard interactive if needed
+        foreach (var method in connectionInfo.AuthenticationMethods)
+        {
+            if (method is KeyboardInteractiveAuthenticationMethod kiam)
+            {
+                kiam.AuthenticationPrompt += (sender, e) =>
+                {
+                    foreach (var prompt in e.Prompts)
+                    {
+                        var request = prompt.Request.ToLowerInvariant();
+                        // Single-prompt keyboard-interactive is almost always the
+                        // password echo; multi-prompt (e.g. OTP) only answers the
+                        // password entry and leaves the rest empty rather than
+                        // sending the password to a verification-code field.
+                        if (e.Prompts.Count() == 1
+                            || request.Contains("password") || request.Contains("passwd")
+                            || prompt.Request.Contains("密码"))
+                        {
+                            prompt.Response = _password;
+                        }
+                    }
+                };
+            }
+        }
+
+        return connectionInfo;
+    }
+
+    /// <summary>
+    /// Creates and connects a dedicated SFTP client for background transfers.
+    /// This avoids holding SftpLock on the shared UI client, allowing concurrent file browsing.
+    /// Caller is responsible for disposing the returned client.
+    /// </summary>
+    public SftpClient? CreateDedicatedSftpClient()
+    {
+        if (!IsConnected) return null;
+        try
+        {
+            var info = BuildConnectionInfo();
+            var client = new SftpClient(info);
+            client.HostKeyReceived += OnHostKeyReceived;
+            client.Connect();
+            return client;
+        }
+        catch (Exception ex)
+        {
+            Services.AppLog.Warn($"CreateDedicatedSftpClient failed: {ex.Message}");
+            return null;
         }
     }
 
     private async Task<ConnectOutcome> ConnectCoreAsync()
     {
+        // A reconnect reuses this session object; drop any half-dead previous client
+        // so its DataReceived callbacks cannot duplicate output.
+        CleanupClient();
+
         try
         {
             return await Task.Run(() =>
             {
-                var methods = new List<AuthenticationMethod>();
-
-                if (_authType == SshAuthenticationType.Key && !string.IsNullOrWhiteSpace(_keyFilePath) && File.Exists(_keyFilePath))
-                {
-                    var keyFile = string.IsNullOrEmpty(_passphrase)
-                        ? new PrivateKeyFile(_keyFilePath)
-                        : new PrivateKeyFile(_keyFilePath, _passphrase);
-
-                    methods.Add(new PrivateKeyAuthenticationMethod(Username, keyFile));
-                }
-                else
-                {
-                    // Password or Ask (Ask should have provided password here)
-                    methods.Add(new PasswordAuthenticationMethod(Username, _password));
-                    methods.Add(new KeyboardInteractiveAuthenticationMethod(Username)); // Fallback
-                }
-
-                var connectionInfo = new ConnectionInfo(Host, Port, Username, methods.ToArray());
-                connectionInfo.Timeout = TimeSpan.FromSeconds(15);
-
-                // Handle keyboard interactive if needed
-                foreach (var method in connectionInfo.AuthenticationMethods)
-                {
-                    if (method is KeyboardInteractiveAuthenticationMethod kiam)
-                    {
-                        kiam.AuthenticationPrompt += (sender, e) =>
-                        {
-                            foreach (var prompt in e.Prompts)
-                            {
-                                var request = prompt.Request.ToLowerInvariant();
-                                if (request.Contains("password") || request.Contains("passwd") || prompt.Request.Contains("密码"))
-                                {
-                                    prompt.Response = _password;
-                                }
-                            }
-                        };
-                    }
-                }
-
+                var connectionInfo = BuildConnectionInfo();
                 _pendingKey = null;
                 _sshClient = new SshClient(connectionInfo)
                 {
@@ -171,13 +256,48 @@ public class SshSession : ITerminalSession
                     return ConnectOutcome.NeedsKeyDecision;
                 }
 
-                // Create shell stream
-                _shellStream = _sshClient.CreateShellStream("xterm-256color", 80, 24, 800, 600, 1024);
+                // Create shell stream with the actual negotiated/measured terminal dimensions
+                _shellStream = _sshClient.CreateShellStream("xterm-256color", (uint)_cols, (uint)_rows, (uint)_width, (uint)_height, 1024);
+                try { _shellStream.ChangeWindowSize((uint)_cols, (uint)_rows, (uint)_width, (uint)_height); } catch { }
                 _shellStream.DataReceived += (s, e) => DataReceived?.Invoke(Decode(e.Data));
 
-                _sftpClient = new SftpClient(connectionInfo);
-                _sftpClient.HostKeyReceived += OnHostKeyReceived;
-                _sftpClient.Connect();
+                // Drain any early data received between CreateShellStream and attaching DataReceived
+                try
+                {
+                    while (_shellStream.DataAvailable)
+                    {
+                        var buf = new byte[4096];
+                        int read = _shellStream.Read(buf, 0, buf.Length);
+                        if (read > 0)
+                        {
+                            var slice = new byte[read];
+                            Array.Copy(buf, slice, read);
+                            DataReceived?.Invoke(Decode(slice));
+                        }
+                        else break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Services.AppLog.Warn($"ShellStream initial drain error: {ex.Message}");
+                }
+
+                try
+                {
+                    _sftpClient = new SftpClient(connectionInfo);
+                    _sftpClient.HostKeyReceived += OnHostKeyReceived;
+                    _sftpClient.Connect();
+                }
+                catch (Exception ex)
+                {
+                    Services.AppLog.Warn($"SFTP connection initialization skipped: {ex.Message}");
+                }
+
+                // The SFTP attempt may have tripped the key callback; the main channel is
+                // already established, so don't leak a stale pending decision into the
+                // next connect attempt.
+                _pendingKey = null;
+                Interlocked.Exchange(ref _disconnectedInvoked, 0);
 
                 Connected?.Invoke();
                 return ConnectOutcome.Connected;
@@ -185,6 +305,15 @@ public class SshSession : ITerminalSession
         }
         catch (Exception ex)
         {
+            // If the connection was aborted by OnHostKeyReceived (e.CanTrust = false),
+            // SSH.NET throws SshConnectionException. We intercept this as NeedsKeyDecision
+            // rather than a fatal connection error, allowing the user to verify and trust the host key.
+            if (_pendingKey != null)
+            {
+                CleanupClient();
+                return ConnectOutcome.NeedsKeyDecision;
+            }
+
             ErrorOccurred?.Invoke(ex);
             return ConnectOutcome.Failed;
         }
@@ -192,10 +321,20 @@ public class SshSession : ITerminalSession
 
     private void OnHostKeyReceived(object? sender, Renci.SshNet.Common.HostKeyEventArgs e)
     {
-        var received = e.FingerPrintSHA256;
+        // Always derive the SHA256 fingerprint from the raw key bytes ourselves so the
+        // stored format does not depend on which fingerprints the SSH.NET build exposes
+        // (FingerPrintSHA256 vs MD5 hex changed across versions and caused spurious
+        // "unknown host key" prompts for already-trusted servers).
+        var received = e.HostKey is { Length: > 0 } hostKey
+            ? ComputeSha256Fingerprint(hostKey)
+            : (!string.IsNullOrEmpty(e.FingerPrintSHA256)
+                ? e.FingerPrintSHA256.TrimEnd('=')
+                : (e.FingerPrint != null ? Convert.ToHexString(e.FingerPrint) : string.Empty));
+
         var known = Services.KnownHostsService.GetFingerprint(Host, Port);
 
-        if (known != null && string.Equals(known, received, StringComparison.Ordinal))
+        if (!string.IsNullOrEmpty(received) && known != null
+            && string.Equals(known.TrimEnd('='), received, StringComparison.Ordinal))
         {
             e.CanTrust = true;
             return;
@@ -203,9 +342,13 @@ public class SshSession : ITerminalSession
 
         // Never block inside the library callback: record the fingerprint, refuse this
         // attempt, and let the async pipeline ask the user before retrying.
-        _pendingKey ??= (received, known);
+        _pendingKey = (received, known);
         e.CanTrust = false;
     }
+
+    /// <summary>OpenSSH-style SHA256 fingerprint: base64 without padding.</summary>
+    private static string ComputeSha256Fingerprint(byte[] hostKey)
+        => Convert.ToBase64String(System.Security.Cryptography.SHA256.HashData(hostKey)).TrimEnd('=');
 
     private void CleanupClient()
     {
@@ -234,7 +377,7 @@ public class SshSession : ITerminalSession
         return buffer;
     }
 
-    public async Task<string> ExecuteCommandAsync(string command)
+    public async Task<string> ExecuteCommandAsync(string command, TimeSpan? timeout = null)
     {
         return await Task.Run(() =>
         {
@@ -243,11 +386,14 @@ public class SshSession : ITerminalSession
                 try
                 {
                     var cmd = _sshClient.CreateCommand(command);
-                    cmd.CommandTimeout = TimeSpan.FromSeconds(20);
+                    cmd.CommandTimeout = timeout ?? TimeSpan.FromSeconds(20);
                     return cmd.Execute();
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    // Callers (system monitor, SFTP probes) treat "" as "no data";
+                    // log so a dead channel is at least diagnosable.
+                    Services.AppLog.Warn($"ExecuteCommandAsync failed for '{command}': {ex.Message}");
                     return string.Empty;
                 }
             }
@@ -259,17 +405,40 @@ public class SshSession : ITerminalSession
     {
         if (_shellStream != null && IsConnected)
         {
-            var bytes = Encode(data);
-            _shellStream.Write(bytes, 0, bytes.Length);
-            _shellStream.Flush();
+            try
+            {
+                var bytes = Encode(data);
+                _shellStream.Write(bytes, 0, bytes.Length);
+                _shellStream.Flush();
+            }
+            catch (Exception ex)
+            {
+                // The link can die between the IsConnected check and the write;
+                // never let that bubble up through a UI input event.
+                Services.AppLog.Warn($"SshSession.Send failed: {ex.Message}");
+                ErrorOccurred?.Invoke(ex);
+            }
         }
     }
 
     public void Resize(int rows, int cols, int width, int height)
     {
+        if (cols <= 0 || rows <= 0) return;
+        _cols = cols;
+        _rows = rows;
+        if (width > 0) _width = width;
+        if (height > 0) _height = height;
+
         if (_shellStream != null && IsConnected)
         {
-            try { _shellStream.ChangeWindowSize((uint)cols, (uint)rows, (uint)width, (uint)height); } catch { }
+            try
+            {
+                _shellStream.ChangeWindowSize((uint)_cols, (uint)_rows, (uint)_width, (uint)_height);
+            }
+            catch (Exception ex)
+            {
+                Services.AppLog.Warn($"SshSession.ChangeWindowSize failed: {ex.Message}");
+            }
         }
     }
 
@@ -280,6 +449,7 @@ public class SshSession : ITerminalSession
             CleanupClient();
         }
         catch { /* ignore */ }
-        Disconnected?.Invoke();
+        if (Interlocked.Exchange(ref _disconnectedInvoked, 1) == 0)
+            Disconnected?.Invoke();
     }
 }

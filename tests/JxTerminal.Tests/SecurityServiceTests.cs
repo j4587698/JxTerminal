@@ -1,4 +1,6 @@
-﻿using JxTerminal.Services;
+using System;
+using JxTerminal.Models;
+using JxTerminal.Services;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace JxTerminal.Tests;

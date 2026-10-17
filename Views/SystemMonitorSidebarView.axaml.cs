@@ -3,6 +3,7 @@ using Avalonia.Input;
 using Avalonia.VisualTree;
 using JxTerminal.Models;
 using JxTerminal.ViewModels;
+using VisualTreeAttachmentEventArgs = Avalonia.VisualTreeAttachmentEventArgs;
 
 namespace JxTerminal.Views;
 
@@ -11,24 +12,40 @@ public partial class SystemMonitorSidebarView : UserControl
     public SystemMonitorSidebarView()
     {
         InitializeComponent();
-        AttachedToVisualTree += (_, _) =>
-        {
-            // Hand the platform file dialogs to the SFTP view model (parameterless commands).
-            if (TopLevel.GetTopLevel(this)?.StorageProvider is { } storage
-                && DataContext is TerminalViewModel { Sftp: { } sftp })
-            {
-                sftp.SetStorageProvider(storage);
-            }
+        AttachedToVisualTree += OnAttached;
+        DetachedFromVisualTree += OnDetached;
+    }
 
-            // Drag & drop upload target.
-            var list = this.FindControl<ListBox>("SftpFileList");
-            if (list != null)
-            {
-                DragDrop.SetAllowDrop(list, true);
-                list.AddHandler(DragDrop.DragOverEvent, SftpList_DragOver);
-                list.AddHandler(DragDrop.DropEvent, SftpList_Drop);
-            }
-        };
+    private void OnAttached(object? sender, VisualTreeAttachmentEventArgs e)
+    {
+        // Hand the platform file dialogs to the SFTP view model (parameterless commands).
+        if (TopLevel.GetTopLevel(this)?.StorageProvider is { } storage
+            && DataContext is TerminalViewModel { Sftp: { } sftp })
+        {
+            sftp.SetStorageProvider(storage);
+        }
+
+        // Drag & drop upload target.
+        var list = this.FindControl<ListBox>("SftpFileList");
+        if (list != null)
+        {
+            DragDrop.SetAllowDrop(list, true);
+            // RemoveHandler first: re-attachment must not stack duplicate handlers.
+            list.RemoveHandler(DragDrop.DragOverEvent, SftpList_DragOver);
+            list.RemoveHandler(DragDrop.DropEvent, SftpList_Drop);
+            list.AddHandler(DragDrop.DragOverEvent, SftpList_DragOver);
+            list.AddHandler(DragDrop.DropEvent, SftpList_Drop);
+        }
+    }
+
+    private void OnDetached(object? sender, VisualTreeAttachmentEventArgs e)
+    {
+        var list = this.FindControl<ListBox>("SftpFileList");
+        if (list != null)
+        {
+            list.RemoveHandler(DragDrop.DragOverEvent, SftpList_DragOver);
+            list.RemoveHandler(DragDrop.DropEvent, SftpList_Drop);
+        }
     }
 
     private TerminalViewModel? FindViewModel(Control control)

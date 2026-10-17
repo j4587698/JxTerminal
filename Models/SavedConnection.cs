@@ -1,10 +1,29 @@
 using System;
 using System.Text.Json.Serialization;
+using CommunityToolkit.Mvvm.ComponentModel;
 using JxTerminal.Services;
+using TinyDb.Attributes;
 
 namespace JxTerminal.Models;
 
-public class SavedConnection
+public enum PingStatus
+{
+    None,
+    Pinging,
+    Success,
+    Timeout
+}
+
+public enum PingLevel
+{
+    Pinging,
+    Fast,
+    Medium,
+    Slow,
+    Timeout
+}
+
+public class SavedConnection : ObservableObject
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = "New Connection";
@@ -16,19 +35,35 @@ public class SavedConnection
     public string Username { get; set; } = "";
 
     [JsonIgnore]
+    [BsonIgnore]
     public string Password { get; set; } = "";
+
+    /// <summary>
+    /// True when a stored/ imported ciphertext failed to decrypt (e.g. the file came from
+    /// another machine whose master key differs). The password is empty in that case; the
+    /// flag lets the UI tell the user instead of silently dropping it.
+    /// </summary>
+    [JsonIgnore]
+    public bool PasswordDecryptFailed { get; private set; }
 
     // AOT-friendly serialization property for Password
     public string EncryptedPassword
     {
         get => SecurityService.Encrypt(Password);
-        set => Password = SecurityService.Decrypt(value);
+        set
+        {
+            var decrypted = SecurityService.Decrypt(value);
+            PasswordDecryptFailed = !string.IsNullOrEmpty(value) && decrypted.Length == 0;
+            Password = decrypted;
+        }
     }
 
     public SshAuthenticationType AuthenticationType { get; set; } = SshAuthenticationType.Password;
     public string KeyFilePath { get; set; } = "";
+    public Guid? KeyStoreId { get; set; }
     
     [JsonIgnore]
+    [BsonIgnore]
     public string Passphrase { get; set; } = ""; // For private key
 
     // AOT-friendly serialization property for Passphrase
@@ -64,12 +99,142 @@ public class SavedConnection
     };
 
     /// <summary>
+    /// Connection endpoint without username prefix (e.g. "38.76.219.52:22", "COM3 @ 9600" or "PowerShell").
+    /// </summary>
+    [JsonIgnore]
+    public string EndpointDisplay => Type switch
+    {
+        ConnectionType.Local => string.IsNullOrWhiteSpace(ShellPath) ? "PowerShell" : ShellPath,
+        ConnectionType.Serial => $"{SerialPortName} • {BaudRate} bps",
+        _ => string.IsNullOrWhiteSpace(Host) ? "-" : $"{Host}:{Port}"
+    };
+
+    /// <summary>
+    /// True if this connection specifies a username.
+    /// </summary>
+    [JsonIgnore]
+    public bool HasUsername => !string.IsNullOrWhiteSpace(Username) && Type is ConnectionType.Ssh or ConnectionType.Telnet;
+
+    /// <summary>
+    /// Authentication type badge label (e.g. "密码", "私钥", "询问").
+    /// </summary>
+    [JsonIgnore]
+    public string AuthBadgeLabel
+    {
+        get
+        {
+            var l = LocalizationService.Instance;
+            return Type switch
+            {
+                ConnectionType.Ssh => AuthenticationType switch
+                {
+                    SshAuthenticationType.Key => l["PrivateKey"],
+                    SshAuthenticationType.Ask => l["AskInteractive"],
+                    _ => l["Password"]
+                },
+                _ => string.Empty
+            };
+        }
+    }
+
+    /// <summary>
+    /// True if this connection has an authentication badge to show.
+    /// </summary>
+    [JsonIgnore]
+    public bool HasAuthBadge => Type == ConnectionType.Ssh;
+
+    [JsonIgnore]
+    public Material.Icons.MaterialIconKind AuthBadgeIcon => AuthenticationType switch
+    {
+        SshAuthenticationType.Key => Material.Icons.MaterialIconKind.KeyVariant,
+        SshAuthenticationType.Ask => Material.Icons.MaterialIconKind.HelpCircleOutline,
+        _ => Material.Icons.MaterialIconKind.LockOutline
+    };
+
+    private PingStatus _pingStatus = PingStatus.None;
+    [JsonIgnore]
+    public PingStatus PingStatus
+    {
+        get => _pingStatus;
+        set
+        {
+            if (SetProperty(ref _pingStatus, value))
+            {
+                OnPropertyChanged(nameof(PingDisplay));
+                OnPropertyChanged(nameof(PingLevel));
+                OnPropertyChanged(nameof(HasPing));
+                OnPropertyChanged(nameof(IsPinging));
+            }
+        }
+    }
+
+    private int? _pingMs;
+    [JsonIgnore]
+    public int? PingMs
+    {
+        get => _pingMs;
+        set
+        {
+            if (SetProperty(ref _pingMs, value))
+            {
+                OnPropertyChanged(nameof(PingDisplay));
+                OnPropertyChanged(nameof(PingLevel));
+                OnPropertyChanged(nameof(HasPing));
+            }
+        }
+    }
+
+    [JsonIgnore]
+    public bool CanPing => Type is ConnectionType.Ssh or ConnectionType.Telnet && !string.IsNullOrWhiteSpace(Host);
+
+    [JsonIgnore]
+    public bool HasPing => CanPing && PingStatus != PingStatus.None;
+
+    [JsonIgnore]
+    public bool IsPinging => PingStatus == PingStatus.Pinging;
+
+    [JsonIgnore]
+    public PingLevel PingLevel => PingStatus switch
+    {
+        PingStatus.Pinging => PingLevel.Pinging,
+        PingStatus.Timeout => PingLevel.Timeout,
+        PingStatus.Success => PingMs switch
+        {
+            < 100 => PingLevel.Fast,
+            < 250 => PingLevel.Medium,
+            _ => PingLevel.Slow
+        },
+        _ => PingLevel.Pinging
+    };
+
+    [JsonIgnore]
+    public string PingDisplay => PingStatus switch
+    {
+        PingStatus.Pinging => "...",
+        PingStatus.Success => $"{PingMs} ms",
+        PingStatus.Timeout => LocalizationService.Instance["Timeout"] ?? "超时",
+        _ => string.Empty
+    };
+
+    /// <summary>
     /// Protocol label as commonly written by SSH clients (SSH / Telnet / Serial / Local).
     /// </summary>
     [JsonIgnore]
     public string TypeLabel => Type switch
     {
         ConnectionType.Ssh => "SSH",
+        ConnectionType.Telnet => "Telnet",
+        ConnectionType.Serial => "Serial",
+        _ => "Local"
+    };
+
+    /// <summary>
+    /// Style class suffix for protocol-specific badges and chips (Ssh, Telnet, Serial, Local).
+    /// </summary>
+    [JsonIgnore]
+    public string ProtocolClass => Type switch
+    {
+        ConnectionType.Ssh => "Ssh",
         ConnectionType.Telnet => "Telnet",
         ConnectionType.Serial => "Serial",
         _ => "Local"
@@ -102,12 +267,15 @@ public class SavedConnection
         _ => "1"
     };
 
+    /// <summary>
+    /// Creates an exact clone of this connection (with a new ID).
+    /// </summary>
     public SavedConnection Clone()
     {
         return new SavedConnection
         {
-            Id = Guid.NewGuid(), // Clone usually implies a new entity
-            Name = this.Name + " (Copy)",
+            Id = Guid.NewGuid(),
+            Name = this.Name,
             Type = this.Type,
             Host = this.Host,
             Port = this.Port,
@@ -115,6 +283,7 @@ public class SavedConnection
             Password = this.Password,
             AuthenticationType = this.AuthenticationType,
             KeyFilePath = this.KeyFilePath,
+            KeyStoreId = this.KeyStoreId,
             Passphrase = this.Passphrase,
             SerialPortName = this.SerialPortName,
             BaudRate = this.BaudRate,
@@ -125,5 +294,15 @@ public class SavedConnection
             GroupName = this.GroupName,
             ShellPath = this.ShellPath
         };
+    }
+
+    /// <summary>
+    /// Creates a duplicated connection with " (Copy)" appended to the name.
+    /// </summary>
+    public SavedConnection Duplicate()
+    {
+        var copy = Clone();
+        copy.Name = this.Name + " (Copy)";
+        return copy;
     }
 }

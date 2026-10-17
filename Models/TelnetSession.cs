@@ -49,13 +49,14 @@ public class TelnetSession : ITerminalSession
     private TcpClient? _client;
     private NetworkStream? _stream;
     private CancellationTokenSource? _cts;
-    private bool _disconnectedInvoked;
+    // Guards against raising Disconnected more than once per connection lifetime.
+    private int _disconnectedInvoked;
 
     private ParseState _state = ParseState.Data;
     private byte _pendingCommand;
     private readonly List<byte> _subnegotiation = new();
     private readonly Decoder _decoder;
-    private readonly Encoder _encoder = Encoding.UTF8.GetEncoder();
+    private readonly Encoder _encoder;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
 
     private bool _nawsEnabled;
@@ -85,9 +86,13 @@ public class TelnetSession : ITerminalSession
         try
         {
             _client = new TcpClient();
-            await _client.ConnectAsync(Host, Port);
+            // TcpClient has no built-in connect timeout; impose one so an
+            // unreachable host cannot hang the connect pipeline forever.
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            await _client.ConnectAsync(Host, Port, timeoutCts.Token);
             _stream = _client.GetStream();
             _cts = new CancellationTokenSource();
+            Interlocked.Exchange(ref _disconnectedInvoked, 0);
 
             // Announce the options we are willing to support up front; servers that do not care
             // will simply refuse them.
@@ -98,8 +103,9 @@ public class TelnetSession : ITerminalSession
 
             Connected?.Invoke();
 
-            // Start reading loop
-            _ = ReadLoop();
+            // Start reading loop. Capture locals so a reconnect (which replaces the
+            // fields) cannot make the old loop read from the new connection.
+            _ = ReadLoop(_client, _stream, _cts);
         }
         catch (Exception ex)
         {
@@ -107,16 +113,16 @@ public class TelnetSession : ITerminalSession
         }
     }
 
-    private async Task ReadLoop()
+    private async Task ReadLoop(TcpClient client, NetworkStream stream, CancellationTokenSource cts)
     {
         try
         {
             var buffer = new byte[4096];
             var payload = new List<byte>(4096);
 
-            while (_client != null && _client.Connected && _stream != null && !_cts!.IsCancellationRequested)
+            while (client.Connected && !cts.IsCancellationRequested)
             {
-                int read = await _stream.ReadAsync(buffer, 0, buffer.Length, _cts.Token);
+                int read = await stream.ReadAsync(buffer, 0, buffer.Length, cts.Token);
                 if (read == 0) break; // Disconnected
 
                 payload.Clear();
@@ -143,6 +149,9 @@ public class TelnetSession : ITerminalSession
         finally
         {
             Dispose();
+            // Safe here: this loop no longer uses the CTS, and user-triggered Dispose
+            // runs while this same read path is already unwinding.
+            cts.Dispose();
         }
     }
 
@@ -328,9 +337,8 @@ public class TelnetSession : ITerminalSession
 
     private void FireDisconnectedOnce()
     {
-        if (_disconnectedInvoked) return;
-        _disconnectedInvoked = true;
-        Disconnected?.Invoke();
+        if (Interlocked.Exchange(ref _disconnectedInvoked, 1) == 0)
+            Disconnected?.Invoke();
     }
 
     public void Send(string data)
@@ -372,6 +380,7 @@ public class TelnetSession : ITerminalSession
     {
         _cts?.Cancel();
         _stream?.Dispose();
+        _stream = null;
         _client?.Dispose();
         _client = null;
         FireDisconnectedOnce();

@@ -90,9 +90,65 @@ public static class SecurityService
         }
     }
 
-    public static string Encrypt(string plainText)
+    /// <summary>
+    /// Derives a 256-bit encryption key from a user password and salt using PBKDF2 (100,000 iterations).
+    /// </summary>
+    public static byte[] DeriveKey(string password, string salt)
+    {
+        var saltBytes = Encoding.UTF8.GetBytes("JxTerminal_Sync_Salt_" + salt);
+        return Rfc2898DeriveBytes.Pbkdf2(
+            Encoding.UTF8.GetBytes(password),
+            saltBytes,
+            100_000,
+            HashAlgorithmName.SHA256,
+            32);
+    }
+
+    private static readonly System.Threading.AsyncLocal<byte[]?> _ambientKey = new();
+
+    /// <summary>
+    /// Optional provider to supply the currently logged-in user's sync key as a fallback for decryption.
+    /// </summary>
+    public static Func<byte[]?>? SyncKeyProvider { get; set; }
+
+    /// <summary>
+    /// Gets the currently active key: either the ambient key set by WithKey, or the local MasterKey.
+    /// </summary>
+    public static byte[] ActiveKey => _ambientKey.Value ?? MasterKey;
+
+    /// <summary>
+    /// Temporarily activates a key for the current async flow (e.g. during sync snapshot serialization/deserialization).
+    /// </summary>
+    public static IDisposable WithKey(byte[]? key)
+    {
+        if (key == null) return EmptyDisposable.Instance;
+        var previous = _ambientKey.Value;
+        _ambientKey.Value = key;
+        return new KeyScope(previous);
+    }
+
+    private sealed class KeyScope : IDisposable
+    {
+        private readonly byte[]? _previous;
+        public KeyScope(byte[]? previous) => _previous = previous;
+        public void Dispose() => _ambientKey.Value = _previous;
+    }
+
+    private sealed class EmptyDisposable : IDisposable
+    {
+        public static readonly EmptyDisposable Instance = new();
+        public void Dispose() { }
+    }
+
+    public static string Encrypt(string plainText) => EncryptWithKey(plainText, ActiveKey);
+
+    /// <summary>
+    /// Encrypts plaintext with a specified 32-byte key using AES-256-GCM.
+    /// </summary>
+    public static string EncryptWithKey(string plainText, byte[] key)
     {
         if (string.IsNullOrEmpty(plainText)) return "";
+        if (key == null || key.Length != 32) throw new ArgumentException("Key must be 32 bytes.", nameof(key));
 
         try
         {
@@ -101,7 +157,7 @@ public static class SecurityService
             var cipher = new byte[plain.Length];
             var tag = new byte[TagSize];
 
-            using (var aes = new AesGcm(MasterKey, TagSize))
+            using (var aes = new AesGcm(key, TagSize))
             {
                 aes.Encrypt(nonce, plain, cipher, tag);
             }
@@ -115,14 +171,58 @@ public static class SecurityService
         }
         catch (Exception ex)
         {
-            AppLog.Warn($"Encryption failed: {ex.Message}");
-            return "";
+            // Never persist "" for a non-empty secret: that would silently destroy the
+            // stored password. Fail loudly so the caller's save path aborts instead.
+            AppLog.Error($"Encryption failed: {ex.Message}");
+            throw new InvalidOperationException("Failed to encrypt a secret; the data was not saved.", ex);
         }
     }
 
     public static string Decrypt(string cipherText)
     {
+        var key = ActiveKey;
+        var decrypted = DecryptWithKey(cipherText, key);
+        if (!string.IsNullOrEmpty(decrypted))
+        {
+            return decrypted;
+        }
+
+        // If ActiveKey was overridden and failed, try local MasterKey
+        if (key != MasterKey)
+        {
+            decrypted = DecryptWithKey(cipherText, MasterKey);
+            if (!string.IsNullOrEmpty(decrypted))
+            {
+                return decrypted;
+            }
+        }
+
+        // If neither worked, try the active sync key provider if available
+        var syncKey = SyncKeyProvider?.Invoke();
+        if (syncKey != null && syncKey != key && syncKey != MasterKey)
+        {
+            decrypted = DecryptWithKey(cipherText, syncKey);
+            if (!string.IsNullOrEmpty(decrypted))
+            {
+                return decrypted;
+            }
+        }
+
+        if (cipherText.StartsWith(V2Prefix, StringComparison.Ordinal))
+        {
+            return "";
+        }
+
+        return DecryptLegacy(cipherText);
+    }
+
+    /// <summary>
+    /// Decrypts ciphertext with a specified 32-byte key using AES-256-GCM.
+    /// </summary>
+    public static string DecryptWithKey(string cipherText, byte[] key)
+    {
         if (string.IsNullOrEmpty(cipherText)) return "";
+        if (key == null || key.Length != 32) return "";
 
         try
         {
@@ -136,12 +236,12 @@ public static class SecurityService
                 var cipher = payload.AsSpan(NonceSize + TagSize);
                 var plain = new byte[cipher.Length];
 
-                using var aes = new AesGcm(MasterKey, TagSize);
+                using var aes = new AesGcm(key, TagSize);
                 aes.Decrypt(nonce, cipher, tag, plain);
                 return Encoding.UTF8.GetString(plain);
             }
 
-            return DecryptLegacy(cipherText);
+            return "";
         }
         catch (Exception ex)
         {
@@ -156,22 +256,29 @@ public static class SecurityService
     /// </summary>
     private static string DecryptLegacy(string cipherText)
     {
-        var fullCipher = Convert.FromBase64String(cipherText);
-        if (fullCipher.Length <= 16) return "";
+        try
+        {
+            var fullCipher = Convert.FromBase64String(cipherText);
+            if (fullCipher.Length <= 16) return "";
 
-        using var aes = Aes.Create();
-        var keyBytes = new byte[32];
-        Array.Copy(LegacyKey, keyBytes, Math.Min(LegacyKey.Length, 32));
-        aes.Key = keyBytes;
+            using var aes = Aes.Create();
+            var keyBytes = new byte[32];
+            Array.Copy(LegacyKey, keyBytes, Math.Min(LegacyKey.Length, 32));
+            aes.Key = keyBytes;
 
-        var iv = new byte[16];
-        Array.Copy(fullCipher, 0, iv, 0, 16);
-        aes.IV = iv;
+            var iv = new byte[16];
+            Array.Copy(fullCipher, 0, iv, 0, 16);
+            aes.IV = iv;
 
-        using var decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
-        using var ms = new MemoryStream(fullCipher, 16, fullCipher.Length - 16);
-        using var cs = new CryptoStream(ms, decryptor, CryptoStreamMode.Read);
-        using var sr = new StreamReader(cs);
-        return sr.ReadToEnd();
+            using var decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
+            using var ms = new MemoryStream(fullCipher, 16, fullCipher.Length - 16);
+            using var cs = new CryptoStream(ms, decryptor, CryptoStreamMode.Read);
+            using var sr = new StreamReader(cs);
+            return sr.ReadToEnd();
+        }
+        catch
+        {
+            return "";
+        }
     }
 }

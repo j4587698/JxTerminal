@@ -17,6 +17,12 @@ public partial class TerminalListViewModel : ViewModelBase
 
     partial void OnSelectedTabChanged(TerminalViewModel? value)
     {
+        if (value == null && Tabs.Count > 0)
+        {
+            SelectedTab = Tabs[0];
+            return;
+        }
+
         foreach (var tab in Tabs)
             tab.IsActiveTab = tab == value;
 
@@ -39,6 +45,10 @@ public partial class TerminalListViewModel : ViewModelBase
     private void Tabs_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         HasTabs = Tabs.Count > 0;
+        if (SelectedTab == null && Tabs.Count > 0)
+        {
+            SelectedTab = Tabs[0];
+        }
         
         if (e.NewItems != null)
         {
@@ -59,12 +69,19 @@ public partial class TerminalListViewModel : ViewModelBase
 
     private void OnTabRequestClose(TerminalViewModel tab)
     {
+        int index = Tabs.IndexOf(tab);
         Tabs.Remove(tab);
         tab.IsActiveTab = false;
-        tab.Dispose(); // Ensure resources are freed
 
-        // Re-tag the remaining tabs so exactly one is marked active.
-        if (SelectedTab != null) SelectedTab.IsActiveTab = true;
+        // If the closed tab was selected, move the selection to a neighbor BEFORE
+        // disposing: otherwise SelectedTab keeps pointing at a disposed view model
+        // (window title, snippet sending, sidebar bindings).
+        if (ReferenceEquals(SelectedTab, tab))
+        {
+            SelectedTab = Tabs.Count > 0 ? Tabs[Math.Min(Math.Max(index, 0), Tabs.Count - 1)] : null;
+        }
+
+        tab.Dispose(); // Ensure resources are freed
     }
 
     [RelayCommand]
@@ -84,6 +101,28 @@ public partial class TerminalListViewModel : ViewModelBase
 
     [RelayCommand]
     private void PreviousTab() => CycleTab(-1);
+
+    [RelayCommand]
+    private void ToggleAi()
+    {
+        var tab = SelectedTab ?? Tabs.FirstOrDefault();
+        if (tab != null)
+        {
+            if (SelectedTab == null) SelectedTab = tab;
+            tab.ToggleAi();
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleSftp()
+    {
+        var tab = SelectedTab ?? Tabs.FirstOrDefault();
+        if (tab != null)
+        {
+            if (SelectedTab == null) SelectedTab = tab;
+            tab.ToggleSftp();
+        }
+    }
 
     /// <summary>Ctrl+1..9 support: jumps to the Nth tab (1-based), ignoring out-of-range.</summary>
     public void SelectTabByIndex(int index)

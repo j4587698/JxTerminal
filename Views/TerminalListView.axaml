@@ -59,22 +59,26 @@
         <!-- Content State -->
         <Grid IsVisible="{Binding HasTabs}" RowDefinitions="Auto, *">
             <!-- Tab header row -->
-            <Border Padding="12,10,12,0"
+            <Border Height="34"
+                    Padding="6,0,8,0"
                     Background="Transparent"
                     BorderBrush="{DynamicResource LuminaDividerBrush}"
                     BorderThickness="0,0,0,1">
                 <Grid ColumnDefinitions="*, Auto">
                     <!-- Tab items -->
                     <ListBox Classes="Tabs" ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}"
+                             SelectionMode="AlwaysSelected"
+                             VerticalAlignment="Center"
                              ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Disabled">
                         <ListBox.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" Spacing="2"/>
+                                <StackPanel Orientation="Horizontal" Spacing="0"/>
                             </ItemsPanelTemplate>
                         </ListBox.ItemsPanel>
                         <ListBox.ItemTemplate>
                             <DataTemplate DataType="vm:TerminalViewModel">
-                                <StackPanel Orientation="Horizontal" Spacing="8" Background="Transparent"
+                                <StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent"
+                                            VerticalAlignment="Center"
                                             PointerPressed="Tab_PointerPressed"
                                             ToolTip.Tip="{Binding Title}">
                                     <StackPanel.ContextMenu>
@@ -85,25 +89,30 @@
                                             <MenuItem Header="{c:Localize Disconnect}" Command="{Binding DisconnectCommand}" IsVisible="{Binding IsConnected}"><MenuItem.Icon><avalonia:MaterialIcon Kind="PowerPlugOff"/></MenuItem.Icon></MenuItem>
                                             <Separator/>
                                             <MenuItem Header="{c:Localize Close}" Command="{Binding CloseCommand}"><MenuItem.Icon><avalonia:MaterialIcon Kind="Close"/></MenuItem.Icon></MenuItem>
+                                            <MenuItem Header="{c:Localize CloseOtherTabs}" Command="{Binding $parent[UserControl].DataContext.CloseOtherTabsCommand}" CommandParameter="{Binding}"><MenuItem.Icon><avalonia:MaterialIcon Kind="CloseBoxMultipleOutline"/></MenuItem.Icon></MenuItem>
+                                            <MenuItem Header="{c:Localize CloseTabsToLeft}" Command="{Binding $parent[UserControl].DataContext.CloseLeftTabsCommand}" CommandParameter="{Binding}"><MenuItem.Icon><avalonia:MaterialIcon Kind="ArrowLeftBox"/></MenuItem.Icon></MenuItem>
+                                            <MenuItem Header="{c:Localize CloseTabsToRight}" Command="{Binding $parent[UserControl].DataContext.CloseRightTabsCommand}" CommandParameter="{Binding}"><MenuItem.Icon><avalonia:MaterialIcon Kind="ArrowRightBox"/></MenuItem.Icon></MenuItem>
                                         </ContextMenu>
                                     </StackPanel.ContextMenu>
-                                    <Ellipse Width="7" Height="7" VerticalAlignment="Center"
+                                    <lumina:LuminaLoading Size="10" StrokeThickness="2" VerticalAlignment="Center"
+                                                         IsVisible="{Binding IsConnecting}"/>
+                                    <Ellipse Width="6" Height="6" VerticalAlignment="Center"
                                              Fill="{DynamicResource LuminaSuccessBrush}"
                                              IsVisible="{Binding IsConnected}"/>
-                                    <Ellipse Width="7" Height="7" VerticalAlignment="Center"
+                                    <Ellipse Width="6" Height="6" VerticalAlignment="Center"
                                              Fill="{DynamicResource LuminaBorderStrongBrush}"
-                                             IsVisible="{Binding !IsConnected}"/>
-                                    <Ellipse Width="7" Height="7" VerticalAlignment="Center"
+                                             IsVisible="{Binding ShowDisconnectedDot}"/>
+                                    <Ellipse Width="6" Height="6" VerticalAlignment="Center"
                                              ToolTip.Tip="{c:Localize UnseenOutput}"
                                              Classes="UnseenDot"
                                              Fill="{DynamicResource LuminaWarningBrush}"
                                              IsVisible="{Binding HasUnseenOutput}"/>
-                                    <TextBlock Text="{Binding Title}" VerticalAlignment="Center" FontSize="13"
-                                               MaxWidth="160" TextTrimming="CharacterEllipsis"
-                                               Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                                    <Button Command="{Binding CloseCommand}" Classes="Ghost IconOnly Compact"
-                                            CornerRadius="{DynamicResource AppRadiusPill}" Margin="2,0,-4,0">
-                                        <avalonia:MaterialIcon Kind="Close" Width="13" Height="13" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+                                    <TextBlock Text="{Binding Title}" VerticalAlignment="Center" FontSize="12"
+                                               FontWeight="Medium"
+                                               MaxWidth="150" TextTrimming="CharacterEllipsis"/>
+                                    <Button Command="{Binding CloseCommand}" Classes="TabClose"
+                                            ToolTip.Tip="{c:Localize Close}">
+                                        <avalonia:MaterialIcon Kind="Close" Width="11" Height="11" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
                                     </Button>
                                 </StackPanel>
                             </DataTemplate>
@@ -111,17 +120,27 @@
                     </ListBox>
 
                     <!-- Actions -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="10,0,0,4">
-                        <Button Classes="Ghost IconOnly"
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                        <Border Width="1" Height="14" Background="{DynamicResource LuminaDividerBrush}" Margin="2,0,4,0"/>
+                        <Button Classes="TabAction"
                                 Command="{Binding CreateConnectionCommand}"
                                 ToolTip.Tip="{c:Localize NewTab}">
-                            <avalonia:MaterialIcon Kind="Plus" Width="18" Height="18" Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
+                            <avalonia:MaterialIcon Kind="Plus" Width="16" Height="16" Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
                         </Button>
-                        <Button Classes="Ghost IconOnly" Command="{Binding SelectedTab.ToggleSftpCommand}"
-                                ToolTip.Tip="{c:Localize ToggleDetail}">
-                            <Panel>
-                                <avalonia:MaterialIcon Kind="ViewDashboardVariant" Width="18" Height="18" Foreground="{DynamicResource LuminaTextSecondaryBrush}" IsVisible="{Binding SelectedTab.IsSftpVisible, Converter={x:Static BoolConverters.Not}}"/>
-                                <avalonia:MaterialIcon Kind="ViewDashboardVariant" Width="18" Height="18" Foreground="{DynamicResource LuminaPrimaryBrush}" IsVisible="{Binding SelectedTab.IsSftpVisible}"/>
+                        <Button Classes="TabAction" Command="{Binding ToggleAiCommand}"
+                                IsEnabled="{Binding HasTabs}"
+                                ToolTip.Tip="{c:Localize AiAssistantTooltip}">
+                            <Panel Background="Transparent">
+                                <avalonia:MaterialIcon Kind="SparklesOutline" Width="16" Height="16" Foreground="{DynamicResource LuminaTextSecondaryBrush}" IsVisible="{Binding SelectedTab.IsAiVisible, Converter={x:Static BoolConverters.Not}}"/>
+                                <avalonia:MaterialIcon Kind="Sparkles" Width="16" Height="16" Foreground="{DynamicResource LuminaPrimaryBrush}" IsVisible="{Binding SelectedTab.IsAiVisible}"/>
+                            </Panel>
+                        </Button>
+                        <Button Classes="TabAction" Command="{Binding ToggleSftpCommand}"
+                                IsEnabled="{Binding HasTabs}"
+                                ToolTip.Tip="{c:Localize ToggleDetailTooltip}">
+                            <Panel Background="Transparent">
+                                <avalonia:MaterialIcon Kind="ViewDashboardVariant" Width="16" Height="16" Foreground="{DynamicResource LuminaTextSecondaryBrush}" IsVisible="{Binding SelectedTab.IsSftpVisible, Converter={x:Static BoolConverters.Not}}"/>
+                                <avalonia:MaterialIcon Kind="ViewDashboardVariant" Width="16" Height="16" Foreground="{DynamicResource LuminaPrimaryBrush}" IsVisible="{Binding SelectedTab.IsSftpVisible}"/>
                             </Panel>
                         </Button>
                     </StackPanel>
@@ -136,10 +155,14 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" MinWidth="320"/>
                                 <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <!-- Terminal area -->
+                            <!-- Terminal area: square corners — rounded corners clip text at the
+                                 corners, and the block cursor/scrollbar need pixel-true edges.
+                                 Small padding keeps glyphs off the border. -->
                             <ThemeVariantScope RequestedThemeVariant="Dark" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                                <lumina:LuminaCard Margin="12" CornerRadius="{DynamicResource AppRadiusLg}" Padding="0" ClipToBounds="True" Background="{Binding Settings.BackgroundColor, Converter={StaticResource ColorToBrushConverter}}" BorderThickness="1" BorderBrush="{DynamicResource LuminaBorderDefaultBrush}">
+                                <lumina:LuminaCard Margin="12" CornerRadius="0" Padding="4,2" ClipToBounds="True" Background="{Binding Settings.BackgroundColor, Converter={StaticResource ColorToBrushConverter}}" BorderThickness="1" BorderBrush="{DynamicResource LuminaBorderDefaultBrush}">
                                 <Grid ColumnDefinitions="*, Auto">
                                     <ctrl:TerminalControl x:Name="terminalControl" Controller="{Binding}"
                                                        FontFamily="{Binding Settings.FontFamily}" FontSize="{Binding Settings.FontSize, Mode=TwoWay}"
@@ -148,6 +171,7 @@
                                                        BackgroundImage="{Binding Settings.BackgroundImage}" BackgroundImageOpacity="{Binding Settings.BackgroundImageOpacity}"
                                                        ColorScheme="{Binding Settings.ColorScheme}" SelectionBackground="{Binding Settings.ColorScheme.SelectionBackground}"
                                                        CopyOnSelect="{Binding Settings.CopyOnSelect}" CursorStyle="{Binding Settings.CursorStyle}"
+                                                       EnableSuggestions="{Binding Settings.EnableSuggestions}"
                                                        SearchQuery="{Binding SearchText}" SearchMatchCase="{Binding SearchMatchCase}"/>
                                     <ScrollBar Grid.Column="1" HorizontalAlignment="Right" Orientation="Vertical" Minimum="0"
                                                Maximum="{Binding #terminalControl.ScrollMaximum}" Value="{Binding #terminalControl.ScrollPosition, Mode=TwoWay}"
@@ -180,19 +204,19 @@
                                             </TextBlock>
                                             <ToggleButton IsChecked="{Binding SearchMatchCase}" Classes="Ghost IconOnly Compact"
                                                           ToolTip.Tip="{c:Localize MatchCase}">
-                                                <avalonia:MaterialIcon Kind="FormatLetterCase" Width="16" Height="16"/>
+                                                <avalonia:MaterialIcon Kind="FormatLetterCase" Width="16" Height="16" IsHitTestVisible="False"/>
                                             </ToggleButton>
                                             <Button Classes="Ghost IconOnly Compact" Click="FindPrevious_Click"
                                                     ToolTip.Tip="{c:Localize PreviousMatch}">
-                                                <avalonia:MaterialIcon Kind="ChevronUp" Width="16" Height="16"/>
+                                                <avalonia:MaterialIcon Kind="ChevronUp" Width="16" Height="16" IsHitTestVisible="False"/>
                                             </Button>
                                             <Button Classes="Ghost IconOnly Compact" Click="FindNext_Click"
                                                     ToolTip.Tip="{c:Localize NextMatch}">
-                                                <avalonia:MaterialIcon Kind="ChevronDown" Width="16" Height="16"/>
+                                                <avalonia:MaterialIcon Kind="ChevronDown" Width="16" Height="16" IsHitTestVisible="False"/>
                                             </Button>
                                             <Button Classes="Ghost IconOnly Compact" Command="{Binding CloseSearchCommand}"
                                                     ToolTip.Tip="{c:Localize Close}">
-                                                <avalonia:MaterialIcon Kind="Close" Width="16" Height="16"/>
+                                                <avalonia:MaterialIcon Kind="Close" Width="16" Height="16" IsHitTestVisible="False"/>
                                             </Button>
                                         </StackPanel>
                                     </Border>
@@ -200,20 +224,38 @@
                                     <!-- Overlay / Status Message -->
                                     <Grid Grid.ColumnSpan="2" IsVisible="{Binding ShowOverlay}" Background="{DynamicResource LuminaOverlayScrimBrush}">
                                         <Border Classes="Card" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="32,26" BoxShadow="{DynamicResource LuminaShadowFloating}">
-                                            <StackPanel Spacing="16">
-                                                <avalonia:MaterialIcon Kind="AlertCircleOutline" Width="40" Height="40" Foreground="{DynamicResource LuminaWarningBrush}" HorizontalAlignment="Center"/>
-                                                <TextBlock Text="{Binding StatusMessage}" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" MaxWidth="280" TextWrapping="Wrap" TextAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                                                <Button Content="{c:Localize Reconnect}" Command="{Binding ReconnectCommand}" Classes="Primary" HorizontalAlignment="Center" Padding="18,9"/>
-                                            </StackPanel>
+                                            <Panel>
+                                                <!-- Connecting State -->
+                                                <StackPanel Spacing="16" IsVisible="{Binding IsConnecting}" HorizontalAlignment="Center">
+                                                    <lumina:LuminaLoading Size="36" StrokeThickness="3" HorizontalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding StatusMessage}" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" MaxWidth="320" TextWrapping="Wrap" TextAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                                    <Button Content="{c:Localize Cancel}" Command="{Binding CloseCommand}" Classes="Secondary" HorizontalAlignment="Center" Padding="18,8"/>
+                                                </StackPanel>
+
+                                                <!-- Disconnected / Error State -->
+                                                <StackPanel Spacing="16" IsVisible="{Binding !IsConnecting}" HorizontalAlignment="Center">
+                                                    <avalonia:MaterialIcon Kind="AlertCircleOutline" Width="40" Height="40" Foreground="{DynamicResource LuminaWarningBrush}" HorizontalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding StatusMessage}" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" MaxWidth="320" TextWrapping="Wrap" TextAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                                    <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+                                                        <Button Content="{c:Localize Reconnect}" Command="{Binding ReconnectCommand}" Classes="Primary" Padding="18,8"/>
+                                                        <Button Content="{c:Localize Close}" Command="{Binding CloseCommand}" Classes="Secondary" Padding="18,8"/>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Panel>
                                         </Border>
                                     </Grid>
                                 </Grid>
                             </lumina:LuminaCard>
                             </ThemeVariantScope>
-                            <!-- Sidebar -->
-                            <Grid Grid.Column="1" Width="320" MinWidth="200" IsVisible="{Binding IsSftpVisible}">
-                                <v:SystemMonitorSidebarView Margin="0,12,12,12"/>
-                            </Grid>                        </Grid>
+                            <!-- AI assistant panel -->
+                            <Grid Grid.Column="1" ColumnDefinitions="380" IsVisible="{Binding IsAiVisible}">
+                                <v:AiAssistantView Grid.Column="0" Margin="0,12,12,12" DataContext="{Binding AiAssistant}"/>
+                            </Grid>
+                            <!-- Sidebar (fixed width; a GridSplitter here has no adjacent resizable column) -->
+                            <Grid Grid.Column="2" ColumnDefinitions="420" IsVisible="{Binding IsSftpVisible}">
+                                <v:SystemMonitorSidebarView Grid.Column="0" Margin="0,12,12,12"/>
+                            </Grid>
+                        </Grid>
                     </DataTemplate>
                 </ContentControl.ContentTemplate>
             </ContentControl>

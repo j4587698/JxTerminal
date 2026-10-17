@@ -4,12 +4,14 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using System;
+using System.IO;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using JxTerminal.Models;
 using JxTerminal.Services;
+using JxTerminal.Services.ImportExport;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using JxTerminal.Views;
@@ -44,7 +46,7 @@ public partial class NavigationItem : ObservableObject
         if (group != null)
         {
             Count = group.Connections.Count;
-            // Assuming we might want to listen to collection changes in the future for live updates
+            group.Connections.CollectionChanged += (_, _) => Count = group.Connections.Count;
         }
     }
 }
@@ -139,6 +141,11 @@ public partial class HostListViewModel : ViewModelBase
 
     public Action? RequestAddGroupUI { get; set; }
 
+    /// <summary>Raised when the global search entry (Ctrl+K) wants the search box focused.</summary>
+    public event Action? SearchFocusRequested;
+
+    public void RequestSearchFocus() => SearchFocusRequested?.Invoke();
+
     public HostListViewModel(MainWindowViewModel mainViewModel)
     {
         _mainViewModel = mainViewModel;
@@ -150,16 +157,36 @@ public partial class HostListViewModel : ViewModelBase
         LoadData();
     }
 
+    /// <summary>
+    /// Re-reads connections from the data store. Used after a cloud restore so the
+    /// host list reflects the restored configuration immediately.
+    /// </summary>
+    public void ReloadData() => LoadData();
+
     private async void LoadData()
     {
-        var loaded = await DataStore.LoadConnectionsAsync();
-        Groups.Clear();
-        foreach (var group in loaded)
+        try
         {
-            Groups.Add(group);
+            var loaded = await DataStore.LoadConnectionsAsync();
+            Groups.Clear();
+            foreach (var group in loaded)
+            {
+                Groups.Add(group);
+            }
+            RebuildNavigationTree();
+            UpdateDisplay();
+            _ = PingAllVisibleHostsAsync();
+
+            if (DataStore.ConnectionsLoadFailed)
+            {
+                var l = LocalizationService.Instance;
+                _mainViewModel.ShowMessageDialog(l["Warning"], l["ConnectionsFileCorrupt"]);
+            }
         }
-        RebuildNavigationTree();
-        UpdateDisplay();
+        catch (Exception ex)
+        {
+            AppLog.Error($"LoadData failed: {ex.Message}");
+        }
     }
 
     private void RebuildNavigationTree()
@@ -247,9 +274,16 @@ public partial class HostListViewModel : ViewModelBase
 
     private async void SaveData()
     {
-        await DataStore.SaveConnectionsAsync(Groups);
-        RebuildNavigationTree();
-        UpdateDisplay();
+        try
+        {
+            await DataStore.SaveConnectionsAsync(Groups);
+            RebuildNavigationTree();
+            UpdateDisplay();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"SaveData failed: {ex.Message}");
+        }
     }
 
     [RelayCommand]
@@ -257,7 +291,6 @@ public partial class HostListViewModel : ViewModelBase
     {
         var vm = new AddGroupViewModel();
         var view = new AddGroupView() { DataContext = vm };
-        view.Margin = new Thickness(24);
         var tcs = new TaskCompletionSource<string?>();
 
         void OnClose(object? sender, object? result)
@@ -268,7 +301,9 @@ public partial class HostListViewModel : ViewModelBase
         }
         vm.RequestClose += OnClose;
 
-        _mainViewModel.ShowDialog(view);
+        // External dismiss (Esc/overlay) resolves with null so the awaiter cannot hang.
+        _mainViewModel.RegisterDialogDismissFallback(() => tcs.TrySetResult(null));
+        _mainViewModel.ShowDialog(view, LocalizationService.Instance["CreateGroupTitle"]);
 
         var resultName = await tcs.Task;
 
@@ -322,29 +357,37 @@ public partial class HostListViewModel : ViewModelBase
 
     private async void OpenConnectionDialog(List<string> groupNames, SavedConnection? existing)
     {
-        var vm = existing != null
-            ? new AddConnectionViewModel(existing, groupNames)
-            : new AddConnectionViewModel(groupNames);
-
-        var view = new AddConnectionView() { DataContext = vm };
-        view.Margin = new Thickness(24);
-        var tcs = new TaskCompletionSource<SavedConnection?>();
-
-        void OnClose(object? sender, object? result)
+        try
         {
-             vm.RequestClose -= OnClose;
-             tcs.TrySetResult(result as SavedConnection);
-             _mainViewModel.CloseDialog();
+            var vm = existing != null
+                ? new AddConnectionViewModel(existing, groupNames)
+                : new AddConnectionViewModel(groupNames);
+
+            var view = new AddConnectionView() { DataContext = vm };
+            var tcs = new TaskCompletionSource<SavedConnection?>();
+
+            void OnClose(object? sender, object? result)
+            {
+                 vm.RequestClose -= OnClose;
+                 tcs.TrySetResult(result as SavedConnection);
+                 _mainViewModel.CloseDialog();
+            }
+            vm.RequestClose += OnClose;
+
+            // External dismiss (Esc/overlay) resolves with null so the awaiter cannot hang.
+            _mainViewModel.RegisterDialogDismissFallback(() => tcs.TrySetResult(null));
+            _mainViewModel.ShowDialog(view, LocalizationService.Instance["ConnectionDetails"]);
+
+            var connection = await tcs.Task;
+
+            if (connection != null)
+            {
+                HandleConnectionResult(connection);
+            }
         }
-        vm.RequestClose += OnClose;
-
-        _mainViewModel.ShowDialog(view);
-
-        var connection = await tcs.Task;
-
-        if (connection != null)
+        catch (Exception ex)
         {
-            HandleConnectionResult(connection);
+            AppLog.Error($"OpenConnectionDialog failed: {ex.Message}");
         }
     }
     
@@ -418,6 +461,163 @@ public partial class HostListViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    public void DuplicateConnection(SavedConnection connection)
+    {
+        if (connection == null) return;
+        var copy = connection.Duplicate();
+        AddConnectionToGroup(copy);
+        SaveData();
+    }
+
+    [RelayCommand]
+    public async Task ExportConnections()
+    {
+        var l = LocalizationService.Instance;
+        try
+        {
+            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+                && desktop.MainWindow?.StorageProvider is { } storage)
+            {
+                var file = await storage.SaveFilePickerAsync(new Avalonia.Platform.Storage.FilePickerSaveOptions
+                {
+                    Title = l["ExportConnections"],
+                    SuggestedFileName = "jxterminal-connections.json"
+                });
+
+                if (file != null)
+                {
+                    var fullPath = file.Path.LocalPath;
+                    await ImportExportService.Instance.ExportConnectionsAsync(fullPath, Groups);
+                    _mainViewModel.ShowMessageDialog(l["Success"], l["ExportSuccess"]);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"ExportConnections failed: {ex.Message}");
+            _mainViewModel.ShowMessageDialog(l["Error"], string.Format(l["ExportFailed"], ex.Message));
+        }
+    }
+
+    [RelayCommand]
+    public async Task ImportConnections()
+    {
+        var l = LocalizationService.Instance;
+        try
+        {
+            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+                && desktop.MainWindow?.StorageProvider is { } storage)
+            {
+                var files = await storage.OpenFilePickerAsync(new Avalonia.Platform.Storage.FilePickerOpenOptions
+                {
+                    Title = l["ImportConnections"],
+                    AllowMultiple = false
+                });
+
+                if (files.Count > 0)
+                {
+                    var fullPath = files[0].Path.LocalPath;
+                    var imported = await ImportExportService.Instance.ImportConnectionsAsync(fullPath);
+
+                    int total = 0;
+                    int decryptFailed = 0;
+                    foreach (var g in imported)
+                    {
+                        // Regenerate IDs so importing the same file twice cannot produce
+                        // duplicate identities that confuse edit/delete lookups.
+                        foreach (var c in g.Connections)
+                        {
+                            c.Id = Guid.NewGuid();
+                            total++;
+                            if (c.PasswordDecryptFailed) decryptFailed++;
+                        }
+
+                        var existing = Groups.FirstOrDefault(x => x.Name == g.Name);
+                        if (existing == null)
+                        {
+                            Groups.Add(g);
+                        }
+                        else
+                        {
+                            foreach (var c in g.Connections) existing.Connections.Add(c);
+                        }
+                    }
+                    SaveData();
+                    _mainViewModel.ShowMessageDialog(l["Success"], string.Format(l["ImportSuccess"], total));
+
+                    // Passwords were encrypted with the origin machine's master key; on a
+                    // different machine they cannot be decrypted.
+                    if (decryptFailed > 0)
+                    {
+                        _mainViewModel.ShowMessageDialog(l["Warning"],
+                            string.Format(l["ImportPasswordsLost"], decryptFailed));
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"ImportConnections failed: {ex.Message}");
+            _mainViewModel.ShowMessageDialog(l["Error"], string.Format(l["ImportFailed"], ex.Message));
+        }
+    }
+
+    [RelayCommand]
+    public async Task ImportSshConfig()
+    {
+        var l = LocalizationService.Instance;
+        try
+        {
+            var defaultSshConfig = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ssh", "config");
+
+            string content = "";
+            if (File.Exists(defaultSshConfig))
+            {
+                content = await File.ReadAllTextAsync(defaultSshConfig);
+            }
+            else if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+                && desktop.MainWindow?.StorageProvider is { } storage)
+            {
+                var files = await storage.OpenFilePickerAsync(new Avalonia.Platform.Storage.FilePickerOpenOptions
+                {
+                    Title = l["ImportSshConfig"],
+                    AllowMultiple = false
+                });
+                if (files.Count > 0)
+                {
+                    content = await File.ReadAllTextAsync(files[0].Path.LocalPath);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(content))
+            {
+                var connections = ImportExportService.Instance.ParseOpenSshConfig(content);
+                if (connections.Count > 0)
+                {
+                    var group = Groups.FirstOrDefault(g => g.Name == "SSH Config");
+                    if (group == null)
+                    {
+                        group = new ConnectionGroup("SSH Config");
+                        Groups.Add(group);
+                    }
+                    foreach (var c in connections)
+                    {
+                        c.Id = Guid.NewGuid();
+                        group.Connections.Add(c);
+                    }
+                    SaveData();
+                    _mainViewModel.ShowMessageDialog(l["Success"], string.Format(l["ImportSuccess"], connections.Count));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error($"ImportSshConfig failed: {ex.Message}");
+            _mainViewModel.ShowMessageDialog(l["Error"], string.Format(l["ImportFailed"], ex.Message));
+        }
+    }
+
+    [RelayCommand]
     public async Task QuickConnectLocal()
     {
         var localConnection = new SavedConnection
@@ -426,5 +626,71 @@ public partial class HostListViewModel : ViewModelBase
             Type = ConnectionType.Local
         };
         await _mainViewModel.Connect(localConnection);
+    }
+
+    [RelayCommand]
+    public void RefreshPing()
+    {
+        _ = PingAllVisibleHostsAsync();
+    }
+
+    [RelayCommand]
+    public async Task PingSingle(SavedConnection connection)
+    {
+        if (connection == null) return;
+        await PingHostAsync(connection);
+    }
+
+    public async Task PingAllVisibleHostsAsync()
+    {
+        var connectionsToPing = Groups
+            .SelectMany(g => g.Connections)
+            .Where(c => c.CanPing)
+            .Distinct()
+            .ToList();
+
+        if (connectionsToPing.Count == 0) return;
+
+        using var semaphore = new System.Threading.SemaphoreSlim(6);
+        var tasks = connectionsToPing.Select(async conn =>
+        {
+            await semaphore.WaitAsync();
+            try
+            {
+                await PingHostAsync(conn);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks);
+    }
+
+    public async Task PingHostAsync(SavedConnection connection)
+    {
+        if (!connection.CanPing) return;
+
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            connection.PingStatus = PingStatus.Pinging;
+        });
+
+        var latency = await JxTerminal.Services.Network.PingService.MeasureLatencyAsync(connection.Host, connection.Port);
+
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (latency.HasValue)
+            {
+                connection.PingMs = latency.Value;
+                connection.PingStatus = PingStatus.Success;
+            }
+            else
+            {
+                connection.PingMs = null;
+                connection.PingStatus = PingStatus.Timeout;
+            }
+        });
     }
 }

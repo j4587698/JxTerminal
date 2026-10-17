@@ -7,8 +7,11 @@ using System.Linq;
 using System.Text.Json;
 using Avalonia.Platform;
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace JxTerminal.Services
 {
+    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
     public class LocalizationService : INotifyPropertyChanged
     {
         private static LocalizationService? _instance;
@@ -81,7 +84,8 @@ namespace JxTerminal.Services
                 {
                     using var stream = AssetLoader.Open(uri);
                     using var reader = new StreamReader(stream);
-                    return JsonSerializer.Deserialize<Dictionary<string, string>>(reader.ReadToEnd())
+                    var json = reader.ReadToEnd();
+                    return JsonSerializer.Deserialize(json, AppJsonContext.Default.DictionaryStringString)
                            ?? new Dictionary<string, string>();
                 }
 
@@ -92,6 +96,42 @@ namespace JxTerminal.Services
                 System.Diagnostics.Debug.WriteLine($"Error loading localization resources: {ex.Message}");
             }
             return new Dictionary<string, string>();
+        }
+
+        public IObservable<object?> GetObservable(string key) => new LocalizationObservable(key);
+
+        private sealed class LocalizationObservable : IObservable<object?>
+        {
+            private readonly string _key;
+
+            public LocalizationObservable(string key)
+            {
+                _key = key;
+            }
+
+            public IDisposable Subscribe(IObserver<object?> observer)
+            {
+                observer.OnNext(Instance[_key]);
+
+                void Handler(object? sender, PropertyChangedEventArgs e)
+                {
+                    observer.OnNext(Instance[_key]);
+                }
+
+                Instance.PropertyChanged += Handler;
+                return new ActionDisposable(() => Instance.PropertyChanged -= Handler);
+            }
+
+            private sealed class ActionDisposable : IDisposable
+            {
+                private Action? _action;
+                public ActionDisposable(Action action) => _action = action;
+                public void Dispose()
+                {
+                    var a = System.Threading.Interlocked.Exchange(ref _action, null);
+                    a?.Invoke();
+                }
+            }
         }
     }
 }

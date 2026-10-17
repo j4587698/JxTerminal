@@ -5,34 +5,61 @@
              xmlns:vm="using:JxTerminal.ViewModels"
              xmlns:c="using:JxTerminal.Converters"
              xmlns:lumina="clr-namespace:LuminaUI.Controls;assembly=LuminaUI"
-             mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="300"
+             xmlns:avalonia="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="500"
              x:Class="JxTerminal.Views.SnippetEditView"
              x:DataType="vm:SnippetEditViewModel">
-    <UserControl.Resources>
-        <c:StringLocalizationConverter x:Key="LocalizeConverter"/>
-    </UserControl.Resources>
-    <lumina:LuminaCard CornerRadius="{DynamicResource AppRadiusLg}" Padding="22" VerticalAlignment="Center" HorizontalAlignment="Center" MinWidth="380"
-                       Background="{DynamicResource LuminaSurfaceBrush}" BorderBrush="{DynamicResource LuminaBorderDefaultBrush}" BorderThickness="1">
-        <StackPanel Spacing="16">
-            <TextBlock Text="{Binding TitleKey, Converter={StaticResource LocalizeConverter}}" Classes="CardTitle" FontSize="17"/>
-
-            <StackPanel Spacing="6">
-                <TextBlock Text="{c:Localize SnippetName}" Classes="PropLabel" HorizontalAlignment="Left"/>
-                <TextBox Text="{Binding Name, Mode=TwoWay}" PlaceholderText="{c:Localize SnippetNamePlaceholder}"/>
+    <Grid Width="460" RowDefinitions="Auto, Auto, Auto, Auto" Margin="0,0,0,4">
+        <!-- Name Field -->
+        <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,16">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <avalonia:MaterialIcon Kind="TagOutline" Width="15" Height="15" Foreground="{DynamicResource LuminaTextSecondaryBrush}" VerticalAlignment="Center"/>
+                <TextBlock Text="{c:Localize SnippetName}" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
             </StackPanel>
-
-            <StackPanel Spacing="6">
-                <TextBlock Text="{c:Localize SnippetCommand}" Classes="PropLabel" HorizontalAlignment="Left"/>
-                <TextBox Text="{Binding Command, Mode=TwoWay}"
-                         PlaceholderText="{c:Localize SnippetCommandPlaceholder}"
-                         FontFamily="Consolas, monospace"
-                         AcceptsReturn="False"/>
-            </StackPanel>
-
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,6,0,0">
-                 <Button Content="{c:Localize Cancel}" Command="{Binding CancelCommand}" Classes="Ghost"/>
-                 <Button Content="{c:Localize Save}" Command="{Binding ConfirmCommand}" Classes="Primary"/>
-            </StackPanel>
+            <TextBox Text="{Binding Name, Mode=TwoWay}"
+                     PlaceholderText="{c:Localize SnippetNamePlaceholder}"
+                     Classes="Rounded"
+                     Height="36"/>
         </StackPanel>
-    </lumina:LuminaCard>
+
+        <!-- Command Field -->
+        <StackPanel Grid.Row="1" Spacing="6" Margin="0,0,0,14">
+            <Grid ColumnDefinitions="*, Auto">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <avalonia:MaterialIcon Kind="ConsoleLine" Width="15" Height="15" Foreground="{DynamicResource LuminaTextSecondaryBrush}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{c:Localize SnippetCommand}" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                </StackPanel>
+                <TextBlock Grid.Column="1" Text="Shell / Bash / Script" FontSize="11" Foreground="{DynamicResource LuminaTextTertiaryBrush}" VerticalAlignment="Center"/>
+            </Grid>
+            <TextBox Text="{Binding Command, Mode=TwoWay}"
+                     PlaceholderText="{c:Localize SnippetCommandPlaceholder}"
+                     FontFamily="Cascadia Mono, Consolas, monospace"
+                     FontSize="13"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     MinHeight="100"
+                     MaxHeight="180"
+                     Padding="10,8"
+                     CornerRadius="{DynamicResource AppRadiusSm}"/>
+        </StackPanel>
+
+        <!-- Tip Banner -->
+        <Border Grid.Row="2" Background="{DynamicResource LuminaStateHoverBrush}" CornerRadius="{DynamicResource AppRadiusSm}" Padding="12,9" Margin="0,0,0,20">
+            <Grid ColumnDefinitions="Auto, *">
+                <avalonia:MaterialIcon Grid.Column="0" Kind="InformationOutline" Width="16" Height="16" Foreground="{DynamicResource LuminaPrimaryBrush}" VerticalAlignment="Top" Margin="0,1,8,0"/>
+                <TextBlock Grid.Column="1" Text="{c:Localize SnippetTip}" FontSize="12" LineHeight="17" Foreground="{DynamicResource LuminaTextSecondaryBrush}" TextWrapping="Wrap"/>
+            </Grid>
+        </Border>
+
+        <!-- Action Buttons Footer -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+            <Button Content="{c:Localize Cancel}" Command="{Binding CancelCommand}" Classes="Ghost" IsCancel="True" MinWidth="75"/>
+            <Button Command="{Binding ConfirmCommand}" Classes="Primary" IsDefault="True" MinWidth="85">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <avalonia:MaterialIcon Kind="Check" Width="15" Height="15"/>
+                    <TextBlock Text="{c:Localize Save}"/>
+                </StackPanel>
+            </Button>
+        </StackPanel>
+    </Grid>
 </UserControl>

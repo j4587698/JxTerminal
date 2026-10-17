@@ -4,25 +4,19 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:JxTerminal.ViewModels"
              xmlns:c="using:JxTerminal.Converters"
-             xmlns:lumina="clr-namespace:LuminaUI.Controls;assembly=LuminaUI"
-             mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="250"
+             mc:Ignorable="d" d:DesignWidth="360"
              x:Class="JxTerminal.Views.AddGroupView"
              x:DataType="vm:AddGroupViewModel">
-    <lumina:LuminaCard CornerRadius="{DynamicResource AppRadiusLg}" Padding="22" Margin="24" VerticalAlignment="Center" HorizontalAlignment="Center" MinWidth="320"
-                       Background="{DynamicResource LuminaSurfaceBrush}" BorderBrush="{DynamicResource LuminaBorderDefaultBrush}" BorderThickness="1">
-        <StackPanel Spacing="16">
-            <TextBlock Text="{c:Localize CreateGroupTitle}" Classes="CardTitle" FontSize="17"/>
-
-            <StackPanel Spacing="6">
-                <TextBlock Text="{c:Localize GroupName}" Classes="PropLabel" HorizontalAlignment="Left"/>
-                <TextBox Text="{Binding GroupName, Mode=TwoWay}" PlaceholderText="{c:Localize GroupNamePlaceholder}"/>
-            </StackPanel>
-
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,6,0,0">
-                 <Button Content="{c:Localize Cancel}" Command="{Binding CancelCommand}" Classes="Ghost"/>
-                 <Button Content="{c:Localize Create}" Command="{Binding ConfirmCommand}" Classes="Primary"/>
-            </StackPanel>
+    <StackPanel Width="340" Spacing="16">
+        <StackPanel Spacing="6">
+            <TextBlock Text="{c:Localize GroupName}" Classes="PropLabel" HorizontalAlignment="Left"/>
+            <TextBox Text="{Binding GroupName, Mode=TwoWay}" PlaceholderText="{c:Localize GroupNamePlaceholder}"/>
         </StackPanel>
-    </lumina:LuminaCard>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,6,0,0">
+             <Button Content="{c:Localize Cancel}" Command="{Binding CancelCommand}" Classes="Ghost" IsCancel="True"/>
+             <Button Content="{c:Localize Create}" Command="{Binding ConfirmCommand}" Classes="Primary" IsDefault="True"/>
+        </StackPanel>
+    </StackPanel>
 </UserControl>
 

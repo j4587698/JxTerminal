@@ -18,12 +18,23 @@ public partial class AddConnectionView : UserControl
     protected override void OnDataContextChanged(EventArgs e)
     {
         base.OnDataContextChanged(e);
+
+        // Unhook from the PREVIOUS view model first; otherwise every swap leaks the
+        // subscription and the old VM can still raise the picker.
+        if (_hookedViewModel != null)
+        {
+            _hookedViewModel.RequestPickKeyFile -= PickKeyFile;
+            _hookedViewModel = null;
+        }
+
         if (DataContext is AddConnectionViewModel vm)
         {
-            vm.RequestPickKeyFile -= PickKeyFile;
             vm.RequestPickKeyFile += PickKeyFile;
+            _hookedViewModel = vm;
         }
     }
+
+    private AddConnectionViewModel? _hookedViewModel;
 
     private async Task<string?> PickKeyFile()
     {
@@ -32,7 +43,7 @@ public partial class AddConnectionView : UserControl
 
         var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Select Private Key",
+            Title = Services.LocalizationService.Instance["SelectPrivateKey"],
             AllowMultiple = false
         });
 

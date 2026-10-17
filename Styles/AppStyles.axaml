@@ -1,8 +1,35 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:lumina="clr-namespace:LuminaUI.Controls;assembly=LuminaUI"
         xmlns:icons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia">
 
     <Styles.Resources>
+        <!-- ===== Semantic Colors ===== -->
+        <SolidColorBrush x:Key="LuminaSuccessBrush" Color="#10B981" />
+        <SolidColorBrush x:Key="LuminaSuccessBgBrush" Color="#2210B981" />
+        <SolidColorBrush x:Key="LuminaWarningBrush" Color="#F59E0B" />
+        <SolidColorBrush x:Key="LuminaWarningBgBrush" Color="#22F59E0B" />
+        <SolidColorBrush x:Key="LuminaDangerBrush" Color="#EF4444" />
+        <SolidColorBrush x:Key="LuminaDangerBgBrush" Color="#22EF4444" />
+        <SolidColorBrush x:Key="LuminaInfoBrush" Color="#0EA5E9" />
+        <SolidColorBrush x:Key="LuminaInfoBgBrush" Color="#220EA5E9" />
+        <SolidColorBrush x:Key="LuminaCyanBrush" Color="#06B6D4" />
+        <SolidColorBrush x:Key="LuminaCyanBgBrush" Color="#2206B6D4" />
+        <SolidColorBrush x:Key="LuminaPurpleBrush" Color="#8B5CF6" />
+        <SolidColorBrush x:Key="LuminaPurpleBgBrush" Color="#228B5CF6" />
+        <SolidColorBrush x:Key="LuminaBlueBrush" Color="#3B82F6" />
+        <SolidColorBrush x:Key="LuminaBlueBgBrush" Color="#223B82F6" />
+
+        <!-- ===== Protocol Palette ===== -->
+        <SolidColorBrush x:Key="AppSshBrush" Color="#3B82F6" />
+        <SolidColorBrush x:Key="AppSshBgBrush" Color="#263B82F6" />
+        <SolidColorBrush x:Key="AppTelnetBrush" Color="#F59E0B" />
+        <SolidColorBrush x:Key="AppTelnetBgBrush" Color="#26F59E0B" />
+        <SolidColorBrush x:Key="AppSerialBrush" Color="#A855F7" />
+        <SolidColorBrush x:Key="AppSerialBgBrush" Color="#26A855F7" />
+        <SolidColorBrush x:Key="AppLocalBrush" Color="#10B981" />
+        <SolidColorBrush x:Key="AppLocalBgBrush" Color="#2610B981" />
+
         <!-- ===== Spacing scale ===== -->
         <Thickness x:Key="AppPagePadding">20</Thickness>
         <Thickness x:Key="AppCardPadding">18</Thickness>
@@ -132,11 +159,70 @@
         <Setter Property="Foreground" Value="{DynamicResource LuminaPrimaryBrush}" />
     </Style>
 
+    <!-- Protocol-specific badges -->
+    <Style Selector="Border.Badge.Ssh">
+        <Setter Property="Background" Value="{DynamicResource AppSshBgBrush}" />
+    </Style>
+    <Style Selector="Border.Badge.Ssh > TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource AppSshBrush}" />
+    </Style>
+
+    <Style Selector="Border.Badge.Telnet">
+        <Setter Property="Background" Value="{DynamicResource AppTelnetBgBrush}" />
+    </Style>
+    <Style Selector="Border.Badge.Telnet > TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource AppTelnetBrush}" />
+    </Style>
+
+    <Style Selector="Border.Badge.Serial">
+        <Setter Property="Background" Value="{DynamicResource AppSerialBgBrush}" />
+    </Style>
+    <Style Selector="Border.Badge.Serial > TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource AppSerialBrush}" />
+    </Style>
+
+    <Style Selector="Border.Badge.Local">
+        <Setter Property="Background" Value="{DynamicResource AppLocalBgBrush}" />
+    </Style>
+    <Style Selector="Border.Badge.Local > TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource AppLocalBrush}" />
+    </Style>
+
     <Style Selector="Border.IconChip">
         <Setter Property="Background" Value="{DynamicResource LuminaPrimaryBgBrush}" />
         <Setter Property="CornerRadius" Value="{DynamicResource AppRadiusMd}" />
-        <Setter Property="Width" Value="40" />
-        <Setter Property="Height" Value="40" />
+        <Setter Property="Width" Value="36" />
+        <Setter Property="Height" Value="36" />
+    </Style>
+
+    <Style Selector="Border.IconChip.Ssh">
+        <Setter Property="Background" Value="{DynamicResource AppSshBgBrush}" />
+    </Style>
+    <Style Selector="Border.IconChip.Telnet">
+        <Setter Property="Background" Value="{DynamicResource AppTelnetBgBrush}" />
+    </Style>
+    <Style Selector="Border.IconChip.Serial">
+        <Setter Property="Background" Value="{DynamicResource AppSerialBgBrush}" />
+    </Style>
+    <Style Selector="Border.IconChip.Local">
+        <Setter Property="Background" Value="{DynamicResource AppLocalBgBrush}" />
+    </Style>
+
+    <!-- Metric Card Styles for Sidebar -->
+    <Style Selector="Border.MetricCard">
+        <Setter Property="Background" Value="{DynamicResource LuminaBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource LuminaBorderSubtleBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource AppRadiusMd}" />
+        <Setter Property="Padding" Value="12,10" />
+    </Style>
+
+    <Style Selector="Border.SectionCard">
+        <Setter Property="Background" Value="{DynamicResource LuminaBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource LuminaBorderSubtleBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource AppRadiusMd}" />
+        <Setter Property="Padding" Value="14" />
     </Style>
 
     <!-- ======================================================= -->
@@ -144,12 +230,12 @@
     <!-- ======================================================= -->
     <Style Selector="RadioButton.SegTab">
         <Setter Property="Width" Value="34" />
-        <Setter Property="Height" Value="34" />
+        <Setter Property="Height" Value="30" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="Foreground" Value="{DynamicResource LuminaTextTertiaryBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource LuminaTextSecondaryBrush}" />
         <Setter Property="Template">
             <ControlTemplate>
                 <Border Name="PART_Background"
@@ -160,9 +246,9 @@
                             <BrushTransition Property="Background" Duration="0:0:0.12" />
                         </Transitions>
                     </Border.Transitions>
-                    <icons:MaterialIcon Kind="{TemplateBinding Content}"
-                                        Width="18"
-                                        Height="18"
+                    <icons:MaterialIcon Kind="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                        Width="16"
+                                        Height="16"
                                         HorizontalAlignment="Center"
                                         VerticalAlignment="Center"
                                         Foreground="{TemplateBinding Foreground}" />
@@ -182,71 +268,273 @@
     </Style>
 
     <!-- ======================================================= -->
+    <!--  TEXT PILL TABS                                         -->
+    <!-- ======================================================= -->
+    <Style Selector="RadioButton.TextPill">
+        <Setter Property="Height" Value="30" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource LuminaTextSecondaryBrush}" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Name="PART_Background"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="{DynamicResource AppRadiusPill}"
+                        Padding="{TemplateBinding Padding}">
+                    <Border.Transitions>
+                        <Transitions>
+                            <BrushTransition Property="Background" Duration="0:0:0.12" />
+                        </Transitions>
+                    </Border.Transitions>
+                    <ContentPresenter Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      RecognizesAccessKey="True" />
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+    <Style Selector="RadioButton.TextPill:pointerover">
+        <Setter Property="Background" Value="{DynamicResource LuminaStateHoverBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource LuminaTextPrimaryBrush}" />
+    </Style>
+
+    <Style Selector="RadioButton.TextPill:checked">
+        <Setter Property="Background" Value="{DynamicResource LuminaPrimaryBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource LuminaPrimaryForegroundBrush}" />
+    </Style>
+
+    <!-- ======================================================= -->
+    <!-- ======================================================= -->
     <!--  TERMINAL TABS                                          -->
     <!-- ======================================================= -->
     <Style Selector="ListBox.Tabs">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Padding" Value="0" />
+        <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
     <Style Selector="ListBox.Tabs ListBoxItem">
         <Setter Property="Padding" Value="0" />
-        <Setter Property="Margin" Value="0" />
+        <Setter Property="Margin" Value="0,0,3,0" />
         <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <ControlTemplate>
-                <Panel>
-                    <Border Name="PART_Background"
-                            Background="{TemplateBinding Background}"
-                            CornerRadius="10,10,0,0"
-                            Padding="12,8">
-                        <Border.Transitions>
-                            <Transitions>
-                                <BrushTransition Property="Background" Duration="0:0:0.12" />
-                            </Transitions>
-                        </Border.Transitions>
-                        <ContentPresenter Content="{TemplateBinding Content}"
-                                          ContentTemplate="{TemplateBinding ContentTemplate}" />
-                    </Border>
-                    <Border Name="PART_Indicator"
-                            Height="2"
-                            Margin="10,0"
-                            VerticalAlignment="Bottom"
-                            CornerRadius="2,2,0,0"
-                            Background="Transparent" />
-                </Panel>
+                <Border Name="PART_Background"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="6"
+                        Padding="8,0,4,0"
+                        Height="26"
+                        VerticalAlignment="Center">
+                    <Border.Transitions>
+                        <Transitions>
+                            <BrushTransition Property="Background" Duration="0:0:0.1" />
+                            <BrushTransition Property="BorderBrush" Duration="0:0:0.1" />
+                        </Transitions>
+                    </Border.Transitions>
+                    <ContentPresenter Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      VerticalAlignment="Center" />
+                </Border>
             </ControlTemplate>
         </Setter>
     </Style>
 
+    <Style Selector="ListBox.Tabs ListBoxItem TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource LuminaTextSecondaryBrush}" />
+    </Style>
+
     <Style Selector="ListBox.Tabs ListBoxItem:pointerover">
         <Setter Property="Background" Value="{DynamicResource LuminaStateHoverBrush}" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+
+    <Style Selector="ListBox.Tabs ListBoxItem:pointerover TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource LuminaTextPrimaryBrush}" />
     </Style>
 
     <Style Selector="ListBox.Tabs ListBoxItem:selected">
         <Setter Property="Background" Value="{DynamicResource LuminaSurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource LuminaBorderDefaultBrush}" />
     </Style>
 
-    <Style Selector="ListBox.Tabs ListBoxItem:selected /template/ Border#PART_Indicator">
-        <Setter Property="Background" Value="{DynamicResource LuminaPrimaryBrush}" />
+    <Style Selector="ListBox.Tabs ListBoxItem:selected TextBlock">
+        <Setter Property="Foreground" Value="{DynamicResource LuminaTextPrimaryBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <!-- Tab Close Button -->
+    <Style Selector="Button.TabClose">
+        <Setter Property="Width" Value="18" />
+        <Setter Property="Height" Value="18" />
+        <Setter Property="MinWidth" Value="18" />
+        <Setter Property="MinHeight" Value="18" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="9" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Opacity" Value="0.6" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.1" />
+            </Transitions>
+        </Setter>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Name="PART_Border"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{TemplateBinding CornerRadius}">
+                    <Border.Transitions>
+                        <Transitions>
+                            <BrushTransition Property="Background" Duration="0:0:0.1" />
+                        </Transitions>
+                    </Border.Transitions>
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      Padding="{TemplateBinding Padding}"
+                                      RecognizesAccessKey="True"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+    <Style Selector="Button.TabClose:pointerover">
+        <Setter Property="Opacity" Value="1.0" />
+    </Style>
+
+    <Style Selector="Button.TabClose:pointerover /template/ Border#PART_Border">
+        <Setter Property="Background" Value="{DynamicResource LuminaStateHoverBrush}" />
+    </Style>
+
+    <Style Selector="Button.TabClose:pressed /template/ Border#PART_Border">
+        <Setter Property="Background" Value="{DynamicResource LuminaDangerBgBrush}" />
+    </Style>
+
+    <!-- Tab Action Buttons (+, AI, SFTP) -->
+    <Style Selector="Button.TabAction">
+        <Setter Property="Width" Value="30" />
+        <Setter Property="Height" Value="30" />
+        <Setter Property="MinWidth" Value="30" />
+        <Setter Property="MinHeight" Value="30" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Name="PART_Border"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{TemplateBinding CornerRadius}">
+                    <Border.Transitions>
+                        <Transitions>
+                            <BrushTransition Property="Background" Duration="0:0:0.1" />
+                        </Transitions>
+                    </Border.Transitions>
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      Padding="{TemplateBinding Padding}"
+                                      RecognizesAccessKey="True"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+    <Style Selector="Button.TabAction:pointerover /template/ Border#PART_Border">
+        <Setter Property="Background" Value="{DynamicResource LuminaStateHoverBrush}" />
+    </Style>
+
+    <Style Selector="Button.TabAction:pressed /template/ Border#PART_Border">
+        <Setter Property="Background" Value="{DynamicResource LuminaStateActiveBrush}" />
+    </Style>
+
+    <Style Selector="Button.TabAction:disabled">
+        <Setter Property="Opacity" Value="0.4" />
     </Style>
 
     <!-- ======================================================= -->
     <!--  MISC                                                   -->
     <!-- ======================================================= -->
-    <Style Selector="Button.IconOnly">
+    <Style Selector="Button.IconOnly, ToggleButton.IconOnly">
         <Setter Property="Width" Value="34" />
         <Setter Property="Height" Value="34" />
+        <Setter Property="MinWidth" Value="34" />
+        <Setter Property="MinHeight" Value="34" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="CornerRadius" Value="{DynamicResource AppRadiusSm}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Name="PART_Border"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="{TemplateBinding CornerRadius}">
+                    <Border.Transitions>
+                        <Transitions>
+                            <BrushTransition Property="Background" Duration="0:0:0.1" />
+                        </Transitions>
+                    </Border.Transitions>
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      Padding="{TemplateBinding Padding}"
+                                      RecognizesAccessKey="True"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                </Border>
+            </ControlTemplate>
+        </Setter>
     </Style>
 
-    <Style Selector="Button.IconOnly.Compact">
+    <Style Selector="Button.IconOnly:pointerover /template/ Border#PART_Border, ToggleButton.IconOnly:pointerover /template/ Border#PART_Border">
+        <Setter Property="Background" Value="{DynamicResource LuminaStateHoverBrush}" />
+    </Style>
+
+    <Style Selector="Button.IconOnly:pressed /template/ Border#PART_Border, ToggleButton.IconOnly:pressed /template/ Border#PART_Border">
+        <Setter Property="Background" Value="{DynamicResource LuminaStateActiveBrush}" />
+    </Style>
+
+    <Style Selector="ToggleButton.IconOnly:checked /template/ Border#PART_Border">
+        <Setter Property="Background" Value="{DynamicResource LuminaPrimaryBgBrush}" />
+    </Style>
+
+    <Style Selector="Button.IconOnly.Compact, ToggleButton.IconOnly.Compact">
         <Setter Property="Width" Value="28" />
         <Setter Property="Height" Value="28" />
+        <Setter Property="MinWidth" Value="28" />
+        <Setter Property="MinHeight" Value="28" />
     </Style>
 
     <Style Selector="ProgressBar.Thin">
@@ -259,6 +547,34 @@
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Padding" Value="0" />
         <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
+    <!-- Hide unused chevron in LuminaNavigationItem when empty to reclaim space -->
+    <Style Selector="lumina|LuminaNavigationItem:empty /template/ PathIcon#PART_Chevron">
+        <Setter Property="IsVisible" Value="False" />
+    </Style>
+
+    <!-- Compact TitleBar -->
+    <Style Selector="lumina|LuminaTitleBar">
+        <Setter Property="Height" Value="34" />
+    </Style>
+
+    <!-- LuminaDialog compact & polished styling -->
+    <Style Selector="lumina|LuminaDialog">
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Background" Value="{DynamicResource LuminaSurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource LuminaBorderDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{DynamicResource AppRadiusLg}" />
+        <Setter Property="Padding" Value="20" />
+    </Style>
+
+    <Style Selector="lumina|LuminaDialog /template/ TextBlock#PART_TitleText">
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource LuminaTextPrimaryBrush}" />
+        <Setter Property="Margin" Value="0,0,0,16" />
     </Style>
 
 </Styles>

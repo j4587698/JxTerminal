@@ -37,9 +37,15 @@ public class SerialSession : ITerminalSession
         Handshake = handshake;
         try { _encoding = Encoding.GetEncoding(string.IsNullOrWhiteSpace(encodingName) ? "UTF-8" : encodingName); }
         catch (ArgumentException) { _encoding = Encoding.UTF8; }
+        _decoder = _encoding.GetDecoder();
     }
 
     private readonly Encoding _encoding;
+    // Stateful decoder: honors the configured encoding and survives multi-byte
+    // characters split across reads.
+    private readonly Decoder _decoder;
+    // Guards against raising Disconnected more than once per connection lifetime.
+    private int _disconnectedInvoked;
 
     public async Task ConnectAsync()
     {
@@ -57,6 +63,7 @@ public class SerialSession : ITerminalSession
                 
                 _serialPort.Open();
                 _cts = new CancellationTokenSource();
+                Interlocked.Exchange(ref _disconnectedInvoked, 0);
 
                 Connected?.Invoke();
                 
@@ -77,8 +84,9 @@ public class SerialSession : ITerminalSession
             // System.IO.Ports doesn't have Async Read properly for streams in some versions/implementations 
             // but BaseStream.ReadAsync should work.
             if (_serialPort == null) return;
-            
+
             var buffer = new byte[4096];
+            var chars = new char[_encoding.GetMaxCharCount(buffer.Length)];
             var stream = _serialPort.BaseStream;
 
             while (_serialPort.IsOpen && !_cts!.IsCancellationRequested)
@@ -86,8 +94,12 @@ public class SerialSession : ITerminalSession
                 int read = await stream.ReadAsync(buffer, 0, buffer.Length, _cts.Token);
                 if (read > 0)
                 {
-                    string data = Encoding.UTF8.GetString(buffer, 0, read);
-                    DataReceived?.Invoke(data);
+                    // Decode with the session's configured encoding (not hardcoded UTF-8);
+                    // flush:false keeps a trailing partial multi-byte sequence for the
+                    // next read instead of emitting replacement characters.
+                    int count = _decoder.GetChars(buffer, 0, read, chars, 0, false);
+                    if (count > 0)
+                        DataReceived?.Invoke(new string(chars, 0, count));
                 }
             }
         }
@@ -124,11 +136,14 @@ public class SerialSession : ITerminalSession
     public void Dispose()
     {
         _cts?.Cancel();
-        if (_serialPort != null && _serialPort.IsOpen)
+        var port = Interlocked.Exchange(ref _serialPort, null);
+        if (port != null)
         {
-            try { _serialPort.Close(); } catch { }
+            try { if (port.IsOpen) port.Close(); } catch { }
+            port.Dispose();
         }
-        _serialPort?.Dispose();
-        Disconnected?.Invoke();
+        // The CTS outlives the loop teardown; it is replaced on reconnect.
+        if (Interlocked.Exchange(ref _disconnectedInvoked, 1) == 0)
+            Disconnected?.Invoke();
     }
 }

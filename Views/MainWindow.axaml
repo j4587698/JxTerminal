@@ -14,19 +14,14 @@
                      MinHeight="560"
                      x:Class="JxTerminal.Views.MainWindow"
                      x:DataType="vm:MainWindowViewModel"
-                     Icon="/Assets/avalonia-logo.ico"
+                     Icon="/Assets/jxterminal.ico"
                       Title="{Binding WindowTitle}"
                       WindowChromeMode="Extended"
-                     ExtendedSystemButtonMode="Auto"
-                     UseWindowGlass="True">
+                      ExtendedSystemButtonMode="Auto"
+                      UseWindowGlass="True">
     <lumina:LuminaWindow.TitleBarLeftContent>
-        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-            <Border Width="24" Height="24" CornerRadius="6"
-                    Background="{DynamicResource LuminaPrimaryBgBrush}">
-                <avalonia:MaterialIcon Kind="ConsoleLine"
-                                       Foreground="{DynamicResource LuminaPrimaryBrush}"
-                                       Width="14" Height="14"/>
-            </Border>
+        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="6,0,0,0">
+            <Image Source="/Assets/jxterminal-glyph.png" Width="18" Height="18" VerticalAlignment="Center"/>
             <TextBlock Text="JxTerminal"
                        FontSize="12"
                        FontWeight="SemiBold"
@@ -40,6 +35,10 @@
         </StackPanel>
     </lumina:LuminaWindow.TitleBarLeftContent>
 
+
+
+    <!-- Renders MaterialIconKind values (navigation item icons) as actual icons.
+         Removing this template makes the nav pane show raw enum names. -->
     <lumina:LuminaWindow.DataTemplates>
         <DataTemplate DataType="icons:MaterialIconKind">
             <avalonia:MaterialIcon Kind="{Binding}" Width="18" Height="18" />
@@ -48,9 +47,12 @@
 
     <lumina:LuminaWindow.KeyBindings>
         <!-- Ctrl+W / Ctrl+T are left to the shell; use Shift variants so bash keeps its bindings. -->
+        <KeyBinding Gesture="Ctrl+K" Command="{Binding FocusHostSearchCommand}"/>
         <KeyBinding Gesture="Ctrl+Shift+T" Command="{Binding TerminalList.CreateConnectionCommand}"/>
         <KeyBinding Gesture="Ctrl+Shift+W" Command="{Binding TerminalList.CloseCurrentTabCommand}"/>
         <KeyBinding Gesture="Ctrl+Shift+F" Command="{Binding TerminalList.SelectedTab.ToggleSearchCommand}"/>
+        <KeyBinding Gesture="Ctrl+Shift+I" Command="{Binding TerminalList.ToggleAiCommand}"/>
+        <KeyBinding Gesture="Ctrl+Shift+M" Command="{Binding TerminalList.ToggleSftpCommand}"/>
         <KeyBinding Gesture="Ctrl+Tab" Command="{Binding TerminalList.NextTabCommand}"/>
         <KeyBinding Gesture="Ctrl+Shift+Tab" Command="{Binding TerminalList.PreviousTabCommand}"/>
         <KeyBinding Gesture="Ctrl+PageDown" Command="{Binding TerminalList.NextTabCommand}"/>
@@ -68,70 +70,47 @@
 
     <Grid>
         <lumina:LuminaShell ShellKey="Root"
-                            OpenPaneLength="228"
-                            IsMenuOpen="True"
+                            CanCompactMenu="True"
+                            IsCompactMenuEnabled="True"
+                            OpenPaneLength="176"
+                            IsMenuOpen="False"
                             Padding="0"
                             IsShellChromeVisible="True"
                             IsShellHeaderVisible="False"
                             AutoApplyPageMetadata="False"
-                            ActiveNavigationKey="{Binding SelectedNavigationKey, Mode=TwoWay}"
-                            DialogContent="{Binding DialogContent}"
-                            IsDialogOpen="{Binding IsDialogOpen}">
-            <lumina:LuminaShell.MenuHeader>
-                <StackPanel Orientation="Horizontal" Spacing="10" Margin="14,8,14,8" VerticalAlignment="Center">
-                    <Border Classes="IconChip" Width="30" Height="30">
-                        <avalonia:MaterialIcon Kind="ConsoleLine"
-                                               Foreground="{DynamicResource LuminaPrimaryBrush}"
-                                               Width="18"
-                                               Height="18" />
-                    </Border>
-                    <TextBlock Text="JxTerminal"
-                               FontWeight="Bold"
-                               FontSize="15"
-                               VerticalAlignment="Center"
-                               Foreground="{DynamicResource LuminaTextPrimaryBrush}" />
-                </StackPanel>
-            </lumina:LuminaShell.MenuHeader>
-
+                            DialogContent="{Binding DialogContent, Mode=TwoWay}"
+                            IsDialogOpen="{Binding IsDialogOpen, Mode=TwoWay}">
             <lumina:LuminaShell.MenuContent>
-                <lumina:LuminaNavigationView SelectedKey="{Binding SelectedNavigationKey, Mode=TwoWay}">
+                <lumina:LuminaNavigationView SelectedKey="{Binding SelectedNavigationKey, Mode=TwoWay}" Margin="0,8,0,0">
                     <lumina:LuminaNavigationItem NavigationKey="HostList"
                                                 Header="{c:Localize HostList}"
-                                                Command="{Binding NavigateToHostListCommand}" Icon="{x:Static icons:MaterialIconKind.ServerNetwork}">
-                        
-                    </lumina:LuminaNavigationItem>
+                                                Command="{Binding NavigateToHostListCommand}"
+                                                Icon="{x:Static icons:MaterialIconKind.ServerNetwork}"/>
 
                     <lumina:LuminaNavigationItem NavigationKey="Terminal"
                                                 Header="{c:Localize Terminal}"
-                                                Command="{Binding NavigateToTerminalCommand}" Icon="{x:Static icons:MaterialIconKind.ConsoleLine}">
-                        
-                    </lumina:LuminaNavigationItem>
+                                                Command="{Binding NavigateToTerminalCommand}"
+                                                Icon="{x:Static icons:MaterialIconKind.ConsoleLine}"/>
 
                     <lumina:LuminaNavigationItem NavigationKey="Transfer"
                                                 Header="{c:Localize Transfer}"
-                                                Command="{Binding NavigateToPlaceholderCommand}"
-                                                CommandParameter="Transfer" Icon="{x:Static icons:MaterialIconKind.FolderSwap}">
-                        
-                    </lumina:LuminaNavigationItem>
+                                                Command="{Binding NavigateToTransferCommand}"
+                                                Icon="{x:Static icons:MaterialIconKind.FolderSwapOutline}"/>
 
                     <lumina:LuminaNavigationItem NavigationKey="Snippets"
                                                  Header="{c:Localize Snippets}"
-                                                 Command="{Binding NavigateToSnippetsCommand}" Icon="{x:Static icons:MaterialIconKind.CodeBraces}">
-
-                    </lumina:LuminaNavigationItem>
+                                                 Command="{Binding NavigateToSnippetsCommand}"
+                                                 Icon="{x:Static icons:MaterialIconKind.CodeBraces}"/>
 
                     <lumina:LuminaNavigationItem NavigationKey="Keys"
                                                 Header="{c:Localize Keys}"
-                                                Command="{Binding NavigateToPlaceholderCommand}"
-                                                CommandParameter="Keys" Icon="{x:Static icons:MaterialIconKind.KeyVariant}">
-                        
-                    </lumina:LuminaNavigationItem>
+                                                Command="{Binding NavigateToKeysCommand}"
+                                                Icon="{x:Static icons:MaterialIconKind.KeyVariant}"/>
 
                     <lumina:LuminaNavigationItem NavigationKey="Settings"
                                                 Header="{c:Localize Settings}"
-                                                Command="{Binding NavigateToSettingsCommand}" Icon="{x:Static icons:MaterialIconKind.Cog}">
-                        
-                    </lumina:LuminaNavigationItem>
+                                                Command="{Binding NavigateToSettingsCommand}"
+                                                Icon="{x:Static icons:MaterialIconKind.CogOutline}"/>
                 </lumina:LuminaNavigationView>
             </lumina:LuminaShell.MenuContent>
 
@@ -145,23 +124,5 @@
                 </TransitioningContentControl.PageTransition>
             </TransitioningContentControl>
         </lumina:LuminaShell>
-
-        <Border Background="{DynamicResource LuminaOverlayScrimBrush}"
-                IsVisible="{Binding IsBusyOverlayVisible}">
-            <Border Classes="Card"
-                    Padding="34,28"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    BoxShadow="{DynamicResource LuminaShadowFloating}">
-                <StackPanel HorizontalAlignment="Center" Spacing="16">
-                    <lumina:LuminaLoading Size="36" StrokeThickness="3" />
-                    <TextBlock Text="{c:Localize StatusConnecting}"
-                               Foreground="{DynamicResource LuminaTextPrimaryBrush}"
-                               FontSize="14"
-                               FontWeight="SemiBold"
-                               HorizontalAlignment="Center"/>
-                </StackPanel>
-            </Border>
-        </Border>
     </Grid>
 </lumina:LuminaWindow>

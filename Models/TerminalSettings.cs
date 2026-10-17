@@ -3,28 +3,78 @@ using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.Json.Serialization;
 
 namespace JxTerminal.Models;
 
 public partial class TerminalSettings : ObservableObject
 {
+    private static TerminalColorScheme CreateDefaultColorScheme()
+    {
+        var scheme = (TerminalColorScheme)TerminalColorSchemes.Default.Clone();
+        scheme.IsBuiltIn = true;
+        return scheme;
+    }
+
+    private TerminalColorScheme _colorScheme = CreateDefaultColorScheme();
+
     /// <summary>
     /// The active color scheme. Contains all terminal colors including foreground, background, ANSI 16, selection, etc.
     /// </summary>
-    [ObservableProperty]
-    [property: JsonIgnore]
-    private TerminalColorScheme _colorScheme = (TerminalColorScheme)TerminalColorSchemes.Default.Clone();
+    [JsonIgnore]
+    public TerminalColorScheme ColorScheme
+    {
+        get => _colorScheme;
+        set
+        {
+            var old = _colorScheme;
+            if (SetProperty(ref _colorScheme, value))
+            {
+                OnColorSchemeChanged(old, value);
+            }
+        }
+    }
+
+    private string _colorSchemeName = "Default";
 
     /// <summary>
     /// Name of the active color scheme for serialization. 
     /// If it matches a built-in preset name, the preset will be loaded on deserialization.
     /// </summary>
-    [ObservableProperty]
-    private string _colorSchemeName = "Default";
+    public string ColorSchemeName
+    {
+        get => _colorSchemeName;
+        set
+        {
+            if (SetProperty(ref _colorSchemeName, value))
+            {
+                if (ColorScheme == null || ColorScheme.Name != value)
+                {
+                    var preset = TerminalColorSchemes.GetAllPresets().Find(p => p.Name == value);
+                    if (preset != null)
+                    {
+                        ColorScheme = (TerminalColorScheme)preset.Clone();
+                        ColorScheme.IsBuiltIn = true;
+                    }
+                }
+            }
+        }
+    }
+
+    private System.Collections.Generic.List<TerminalColorScheme> _customColorSchemes = new();
 
     /// <summary>
-    /// Custom color scheme data for serialization. Only serialized when using a non-built-in scheme.
+    /// All saved custom color schemes. Persisted across sessions so custom schemes are never lost.
+    /// </summary>
+    public System.Collections.Generic.List<TerminalColorScheme> CustomColorSchemes
+    {
+        get => _customColorSchemes;
+        set => SetProperty(ref _customColorSchemes, value ?? new());
+    }
+
+    /// <summary>
+    /// Custom color scheme data for backward-compatible serialization.
     /// </summary>
     public TerminalColorScheme? CustomColorScheme
     {
@@ -33,12 +83,38 @@ public partial class TerminalSettings : ObservableObject
         {
             if (value != null)
             {
+                value.IsBuiltIn = false;
+                if (!CustomColorSchemes.Any(s => s.Name == value.Name))
+                {
+                    CustomColorSchemes.Add(value);
+                }
                 ColorScheme = value;
             }
         }
     }
 
-    partial void OnColorSchemeChanged(TerminalColorScheme? oldValue, TerminalColorScheme newValue)
+    private string _language = "zh-CN";
+    public string Language
+    {
+        get => _language;
+        set => SetProperty(ref _language, value);
+    }
+
+    private string _themeMode = "Dark";
+    public string ThemeMode
+    {
+        get => _themeMode;
+        set => SetProperty(ref _themeMode, value);
+    }
+
+    private string _accentColor = "#2563EB";
+    public string AccentColor
+    {
+        get => _accentColor;
+        set => SetProperty(ref _accentColor, value);
+    }
+
+    private void OnColorSchemeChanged(TerminalColorScheme? oldValue, TerminalColorScheme newValue)
     {
         if (oldValue != null)
         {
@@ -49,9 +125,10 @@ public partial class TerminalSettings : ObservableObject
             newValue.PropertyChanged += OnColorSchemePropertyChanged;
             ColorSchemeName = newValue.Name;
         }
-        // Notify that derived properties have changed
+        // Notify that derived and child properties have changed
         OnPropertyChanged(nameof(BackgroundColor));
         OnPropertyChanged(nameof(ForegroundColor));
+        OnPropertyChanged(nameof(ColorScheme));
     }
 
     private void OnColorSchemePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -62,6 +139,20 @@ public partial class TerminalSettings : ObservableObject
         else if (e.PropertyName == nameof(TerminalColorScheme.Foreground))
             OnPropertyChanged(nameof(ForegroundColor));
         
+        // If current scheme is custom, ensure the matching custom scheme in CustomColorSchemes is kept up-to-date
+        if (!ColorScheme.IsBuiltIn)
+        {
+            var idx = CustomColorSchemes.FindIndex(s => s.Name == ColorScheme.Name);
+            if (idx >= 0)
+            {
+                CustomColorSchemes[idx] = ColorScheme;
+            }
+            else
+            {
+                CustomColorSchemes.Add(ColorScheme);
+            }
+        }
+
         // Trigger a general change notification for auto-save
         OnPropertyChanged(nameof(ColorScheme));
     }
@@ -104,60 +195,226 @@ public partial class TerminalSettings : ObservableObject
         }
     }
 
-    private const string DefaultFontFamily = "DejaVu Sans Mono, Liberation Mono, Consolas, monospace";
+    public const string DefaultFontFamily = "DejaVu Sans Mono, Liberation Mono, Consolas, monospace";
 
-    [ObservableProperty]
     private string _fontFamily = DefaultFontFamily;
-
-    partial void OnFontFamilyChanged(string value)
+    public string FontFamily
     {
-        if (string.IsNullOrWhiteSpace(value) && value != DefaultFontFamily)
+        get => _fontFamily;
+        set
         {
-            FontFamily = DefaultFontFamily;
+            if (string.IsNullOrWhiteSpace(value) && value != DefaultFontFamily)
+            {
+                value = DefaultFontFamily;
+            }
+            SetProperty(ref _fontFamily, value);
         }
     }
 
-    [ObservableProperty]
     private double _fontSize = 14;
+    public double FontSize
+    {
+        get => _fontSize;
+        set => SetProperty(ref _fontSize, value);
+    }
 
-    [ObservableProperty]
     private bool _enableColors = true;
+    public bool EnableColors
+    {
+        get => _enableColors;
+        set => SetProperty(ref _enableColors, value);
+    }
 
-    [ObservableProperty]
     private int _scrollbackLines = 1000;
+    public int ScrollbackLines
+    {
+        get => _scrollbackLines;
+        set => SetProperty(ref _scrollbackLines, value);
+    }
 
     /// <summary>
     /// Shell launched for local PTY sessions: PowerShell, Cmd, Wsl or Bash.
     /// </summary>
-    [ObservableProperty]
     private string _localShellKind = "Auto";
+    public string LocalShellKind
+    {
+        get => _localShellKind;
+        set => SetProperty(ref _localShellKind, value);
+    }
 
     /// <summary>
     /// Text encoding for remote sessions (SSH/Telnet/Serial), e.g. "UTF-8" or "GBK".
     /// </summary>
-    [ObservableProperty]
     private string _remoteEncoding = "UTF-8";
+    public string RemoteEncoding
+    {
+        get => _remoteEncoding;
+        set => SetProperty(ref _remoteEncoding, value);
+    }
 
     /// <summary>Automatically copy selected terminal text to the clipboard.</summary>
-    [ObservableProperty]
     private bool _copyOnSelect;
+    public bool CopyOnSelect
+    {
+        get => _copyOnSelect;
+        set => SetProperty(ref _copyOnSelect, value);
+    }
 
     /// <summary>Cursor shape: Block, Bar or Underline.</summary>
-    [ObservableProperty]
     private string _cursorStyle = "Block";
-
-    [ObservableProperty]
-    private string? _backgroundImagePath;
-
-    [ObservableProperty]
-    private double _backgroundImageOpacity = 0.3;
-
-    [ObservableProperty]
-    [property: JsonIgnore]
-    private IImage? _backgroundImage;
-
-    partial void OnBackgroundImagePathChanged(string? value)
+    public string CursorStyle
     {
+        get => _cursorStyle;
+        set => SetProperty(ref _cursorStyle, value);
+    }
+
+    /// <summary>
+    /// When true, command-line connection requests will be sent to the running instance
+    /// and opened as a new tab. When false, a new independent window/process is always created.
+    /// </summary>
+    private bool _reuseWindowForCommandLine = true;
+    public bool ReuseWindowForCommandLine
+    {
+        get => _reuseWindowForCommandLine;
+        set => SetProperty(ref _reuseWindowForCommandLine, value);
+    }
+
+    // ---------------- AI assistant ----------------
+
+    /// <summary>
+    /// OpenAI-compatible chat completions base URL, e.g. https://api.openai.com/v1
+    /// (works with OpenAI, DeepSeek, Qwen, Ollama and other compatible providers).
+    /// Empty disables the assistant.
+    /// </summary>
+    private string _aiEndpoint = "";
+    public string AiEndpoint
+    {
+        get => _aiEndpoint;
+        set => SetProperty(ref _aiEndpoint, value);
+    }
+
+    /// <summary>Model name sent in chat completion requests, e.g. gpt-4o-mini.</summary>
+    private string _aiModel = "";
+    public string AiModel
+    {
+        get => _aiModel;
+        set => SetProperty(ref _aiModel, value);
+    }
+
+    /// <summary>
+    /// When true, the assistant may write to the terminal directly (one-click control).
+    /// When false, every send_input tool call asks for confirmation first.
+    /// </summary>
+    private bool _aiAutoApproveCommands = true;
+    public bool AiAutoApproveCommands
+    {
+        get => _aiAutoApproveCommands;
+        set => SetProperty(ref _aiAutoApproveCommands, value);
+    }
+
+    /// <summary>
+    /// Maximum tool-call rounds per user request to prevent infinite loops (default 25).
+    /// </summary>
+    private int _aiMaxToolRounds = 25;
+    public int AiMaxToolRounds
+    {
+        get => _aiMaxToolRounds;
+        set => SetProperty(ref _aiMaxToolRounds, value);
+    }
+
+    private string _aiApiKey = "";
+
+    /// <summary>API key for the AI endpoint. Never serialized in plain text.</summary>
+    [JsonIgnore]
+    public string AiApiKey
+    {
+        get => _aiApiKey;
+        set
+        {
+            if (_aiApiKey != value)
+            {
+                _aiApiKey = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    /// <summary>AOT-friendly encrypted serialization property for <see cref="AiApiKey"/>.</summary>
+    public string EncryptedAiApiKey
+    {
+        get => Services.SecurityService.Encrypt(AiApiKey);
+        set => AiApiKey = Services.SecurityService.Decrypt(value);
+    }
+
+    /// <summary>True when both endpoint and API key are set and the assistant can be used.</summary>
+    [JsonIgnore]
+    public bool IsAiConfigured =>
+        !string.IsNullOrWhiteSpace(AiEndpoint) && !string.IsNullOrWhiteSpace(AiApiKey);
+
+    private bool _enableSuggestions = true;
+    public bool EnableSuggestions
+    {
+        get => _enableSuggestions;
+        set => SetProperty(ref _enableSuggestions, value);
+    }
+
+    /// <summary>Maximum number of executed terminal commands preserved in history (LRU).</summary>
+    private int _historyRetentionLimit = 1000;
+    public int HistoryRetentionLimit
+    {
+        get => _historyRetentionLimit;
+        set => SetProperty(ref _historyRetentionLimit, value);
+    }
+
+    private FolderTransferMode _folderTransferMode = FolderTransferMode.TarGz;
+    public FolderTransferMode FolderTransferMode
+    {
+        get => _folderTransferMode;
+        set => SetProperty(ref _folderTransferMode, value);
+    }
+
+    private bool _autoExtractAfterTransfer = true;
+    public bool AutoExtractAfterTransfer
+    {
+        get => _autoExtractAfterTransfer;
+        set => SetProperty(ref _autoExtractAfterTransfer, value);
+    }
+
+    private string? _backgroundImagePath;
+    public string? BackgroundImagePath
+    {
+        get => _backgroundImagePath;
+        set
+        {
+            if (SetProperty(ref _backgroundImagePath, value))
+            {
+                OnBackgroundImagePathChanged(value);
+            }
+        }
+    }
+
+    private double _backgroundImageOpacity = 0.3;
+    public double BackgroundImageOpacity
+    {
+        get => _backgroundImageOpacity;
+        set => SetProperty(ref _backgroundImageOpacity, value);
+    }
+
+    private IImage? _backgroundImage;
+    [JsonIgnore]
+    public IImage? BackgroundImage
+    {
+        get => _backgroundImage;
+        set => SetProperty(ref _backgroundImage, value);
+    }
+
+    private void OnBackgroundImagePathChanged(string? value)
+    {
+        // Release the previous bitmap so replacing the wallpaper does not leak
+        // decoded image memory.
+        if (BackgroundImage is IDisposable disposable)
+            disposable.Dispose();
+
         if (string.IsNullOrWhiteSpace(value))
         {
             BackgroundImage = null;
@@ -184,7 +441,7 @@ public partial class TerminalSettings : ObservableObject
     }
 
     /// <summary>
-    /// Apply a color scheme by name. If it matches a built-in preset, use that; otherwise keep current custom scheme.
+    /// Apply a color scheme by reference. If it is built-in, clones it; otherwise applies the custom scheme and syncs CustomColorSchemes.
     /// </summary>
     public void ApplyScheme(TerminalColorScheme scheme)
     {
@@ -192,33 +449,63 @@ public partial class TerminalSettings : ObservableObject
         {
             ColorScheme = (TerminalColorScheme)scheme.Clone();
             ColorScheme.IsBuiltIn = true;
+            ColorSchemeName = scheme.Name;
         }
         else
         {
             ColorScheme = scheme;
+            ColorSchemeName = scheme.Name;
+            var idx = CustomColorSchemes.FindIndex(s => s.Name == scheme.Name);
+            if (idx >= 0)
+            {
+                CustomColorSchemes[idx] = scheme;
+            }
+            else
+            {
+                CustomColorSchemes.Add(scheme);
+            }
         }
     }
 
     /// <summary>
     /// Resolve color scheme after deserialization. 
-    /// Called after loading settings from JSON to link scheme name to actual preset.
+    /// Called after loading settings from JSON to link scheme name to actual preset or saved custom scheme.
     /// </summary>
     public void ResolveColorScheme()
     {
-        // If CustomColorScheme was deserialized, it's already set
-        if (ColorScheme != null && !string.IsNullOrEmpty(ColorScheme.Name) && ColorScheme.Name != "Default")
+        // 1. Check if active scheme matches one in CustomColorSchemes
+        var custom = CustomColorSchemes.Find(s => s.Name == ColorSchemeName);
+        if (custom != null)
         {
-            // Already resolved from CustomColorScheme setter
+            custom.IsBuiltIn = false;
+            ColorScheme = custom;
             return;
         }
 
-        // Try to find a built-in preset matching the name
+        // 2. Backward compatibility: if CustomColorScheme was deserialized
+        if (ColorScheme != null && !ColorScheme.IsBuiltIn && ColorScheme.Name == ColorSchemeName)
+        {
+            if (!CustomColorSchemes.Any(s => s.Name == ColorScheme.Name))
+            {
+                CustomColorSchemes.Add(ColorScheme);
+            }
+            return;
+        }
+
+        // 3. Try to find a built-in preset matching the name
         var preset = TerminalColorSchemes.GetAllPresets()
             .Find(p => p.Name == ColorSchemeName);
         if (preset != null)
         {
             ColorScheme = (TerminalColorScheme)preset.Clone();
             ColorScheme.IsBuiltIn = true;
+            return;
         }
+
+        // 4. Default fallback
+        var defaultPreset = TerminalColorSchemes.Default;
+        ColorScheme = (TerminalColorScheme)defaultPreset.Clone();
+        ColorScheme.IsBuiltIn = true;
+        ColorSchemeName = defaultPreset.Name;
     }
 }

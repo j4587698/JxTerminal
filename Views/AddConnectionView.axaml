@@ -4,14 +4,12 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:JxTerminal.ViewModels"
              xmlns:c="using:JxTerminal.Converters"
-             xmlns:lumina="clr-namespace:LuminaUI.Controls;assembly=LuminaUI"
-             mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="450"
+             mc:Ignorable="d" d:DesignWidth="460"
              x:Class="JxTerminal.Views.AddConnectionView"
              x:DataType="vm:AddConnectionViewModel">
-    <lumina:LuminaCard CornerRadius="{DynamicResource AppRadiusLg}" Padding="22" Margin="24" VerticalAlignment="Center" HorizontalAlignment="Center" MinWidth="380"
-                       Background="{DynamicResource LuminaSurfaceBrush}" BorderBrush="{DynamicResource LuminaBorderDefaultBrush}" BorderThickness="1">
+    <!-- Serial mode is tall; never let the dialog clip on minimum-height windows. -->
+    <ScrollViewer MaxHeight="540" Width="460" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Spacing="14">
-            <TextBlock Text="{c:Localize ConnectionDetails}" Classes="CardTitle" FontSize="17"/>
 
             <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto, Auto">
                  <TextBlock Text="{c:Localize Name}" VerticalAlignment="Center" Margin="0,0,10,0"/>
@@ -32,8 +30,10 @@
 
             <!-- Host/Port (SSH/Telnet) -->
             <Grid ColumnDefinitions="*, Auto" RowDefinitions="Auto, Auto" IsVisible="{Binding !IsSerial}">
-                <TextBox Grid.Row="0" Text="{Binding Host}" PlaceholderText="{c:Localize Host}" />
-                <NumericUpDown Grid.Row="0" Grid.Column="1" Value="{Binding Port}" Minimum="1" Maximum="65535" Margin="10,0,0,0" MinWidth="100"/>
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="{c:Localize Host}" Classes="PropLabel" Margin="0,0,0,4"/>
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="{c:Localize Port}" Classes="PropLabel" Margin="10,0,0,4"/>
+                <TextBox Grid.Row="1" Grid.Column="0" Text="{Binding Host}" PlaceholderText="{c:Localize Host}" />
+                <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding Port}" Minimum="1" Maximum="65535" Margin="10,0,0,0" MinWidth="100"/>
             </Grid>
 
             <!-- Serial Fields -->
@@ -52,30 +52,68 @@
 
                     <TextBlock Grid.Row="2" Grid.Column="0" Text="{c:Localize Parity}" Classes="PropLabel" HorizontalAlignment="Left"/>
                     <TextBlock Grid.Row="2" Grid.Column="2" Text="{c:Localize StopBits}" Classes="PropLabel" HorizontalAlignment="Left"/>
-                    <ComboBox Grid.Row="3" Grid.Column="0" ItemsSource="{Binding AvailableParities}" SelectedItem="{Binding Parity}" HorizontalAlignment="Stretch" Margin="0,3,0,0"/>
-                    <ComboBox Grid.Row="3" Grid.Column="2" ItemsSource="{Binding AvailableStopBits}" SelectedItem="{Binding StopBits}" HorizontalAlignment="Stretch" Margin="0,3,0,0"/>
+                    <ComboBox Grid.Row="3" Grid.Column="0" ItemsSource="{Binding AvailableParities}" SelectedItem="{Binding Parity}" HorizontalAlignment="Stretch" Margin="0,3,0,0">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Converter={x:Static c:SerialEnumDisplayConverter.Instance}}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <ComboBox Grid.Row="3" Grid.Column="2" ItemsSource="{Binding AvailableStopBits}" SelectedItem="{Binding StopBits}" HorizontalAlignment="Stretch" Margin="0,3,0,0">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Converter={x:Static c:SerialEnumDisplayConverter.Instance}}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
                 </Grid>
 
                 <StackPanel Spacing="3">
                     <TextBlock Text="{c:Localize FlowControl}" Classes="PropLabel" HorizontalAlignment="Left"/>
-                    <ComboBox ItemsSource="{Binding AvailableHandshakes}" SelectedItem="{Binding Handshake}" HorizontalAlignment="Stretch"/>
+                    <ComboBox ItemsSource="{Binding AvailableHandshakes}" SelectedItem="{Binding Handshake}" HorizontalAlignment="Stretch">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Converter={x:Static c:SerialEnumDisplayConverter.Instance}}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
                 </StackPanel>
             </StackPanel>
 
             <!-- SSH Fields -->
             <StackPanel IsVisible="{Binding IsSsh}" Spacing="10">
-                <TextBox Text="{Binding Username}" PlaceholderText="{c:Localize Username}" />
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{c:Localize Username}" Classes="PropLabel"/>
+                    <TextBox Text="{Binding Username}" PlaceholderText="{c:Localize Username}" />
+                </StackPanel>
                 
-                <TextBlock Text="{c:Localize AuthenticationMethod}" Margin="0,5,0,0"/>
-                <ComboBox SelectedIndex="{Binding AuthenticationType}" HorizontalAlignment="Stretch">
-                    <ComboBoxItem Content="{c:Localize Password}"/>
-                    <ComboBoxItem Content="{c:Localize PrivateKey}"/>
-                    <ComboBoxItem Content="{c:Localize AskInteractive}"/>
-                </ComboBox>
+                <StackPanel Spacing="4">
+                    <TextBlock Text="{c:Localize AuthenticationMethod}" Classes="PropLabel"/>
+                    <ComboBox SelectedIndex="{Binding AuthenticationType}" HorizontalAlignment="Stretch">
+                        <ComboBoxItem Content="{c:Localize Password}"/>
+                        <ComboBoxItem Content="{c:Localize PrivateKey}"/>
+                        <ComboBoxItem Content="{c:Localize AskInteractive}"/>
+                    </ComboBox>
+                </StackPanel>
 
-                <TextBox Text="{Binding Password}" PlaceholderText="{c:Localize Password}" PasswordChar="*" IsVisible="{Binding IsPasswordAuth}" />
+                <StackPanel IsVisible="{Binding IsPasswordAuth}" Spacing="4">
+                    <TextBlock Text="{c:Localize Password}" Classes="PropLabel"/>
+                    <TextBox Text="{Binding Password}" PlaceholderText="{c:Localize Password}" PasswordChar="*" />
+                </StackPanel>
                 
-                <StackPanel IsVisible="{Binding IsKeyAuth}" Spacing="5">
+                <StackPanel IsVisible="{Binding IsKeyAuth}" Spacing="6">
+                    <TextBlock Text="{c:Localize SelectKeyFromStore}" Classes="PropLabel" IsVisible="{Binding AvailableKeyStoreKeys.Count}"/>
+                    <ComboBox ItemsSource="{Binding AvailableKeyStoreKeys}"
+                              SelectedItem="{Binding SelectedKeyStoreKey}"
+                              HorizontalAlignment="Stretch"
+                              IsVisible="{Binding AvailableKeyStoreKeys.Count}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Name, StringFormat='{}🔑 {0}'}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <TextBlock Text="{c:Localize OrCustomKeyPath}" Classes="PropLabel" Margin="0,4,0,0"/>
                     <Grid ColumnDefinitions="*, Auto">
                         <TextBox Text="{Binding KeyFilePath}" PlaceholderText="{c:Localize KeyPath}" />
                         <Button Command="{Binding SelectKeyFileCommand}" Content="..." Margin="5,0,0,0" Classes="Outline"/>
@@ -87,10 +125,10 @@
             </StackPanel>
             
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,10,0,0">
-                <Button Command="{Binding CancelCommand}" Content="{c:Localize Cancel}" Classes="Ghost"/>
-                <Button Command="{Binding SaveCommand}" Content="{c:Localize Save}" Classes="Primary"/>
+                <Button x:Name="CancelDialogButton" Command="{Binding CancelCommand}" Content="{c:Localize Cancel}" Classes="Ghost" IsCancel="True"/>
+                <Button x:Name="SaveDialogButton" Command="{Binding SaveCommand}" Content="{c:Localize Save}" Classes="Primary" IsDefault="True"/>
             </StackPanel>
         </StackPanel>
-    </lumina:LuminaCard>
+    </ScrollViewer>
 </UserControl>
 

@@ -6,381 +6,1100 @@
              xmlns:vm="using:JxTerminal.ViewModels"
              xmlns:c="using:JxTerminal.Converters"
              xmlns:lumina="clr-namespace:LuminaUI.Controls;assembly=LuminaUI"
+             xmlns:avalonia="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              xmlns:generic="clr-namespace:System.Collections.Generic;assembly=System.Collections"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             mc:Ignorable="d" d:DesignWidth="1050" d:DesignHeight="750"
              x:Class="JxTerminal.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
     <UserControl.Resources>
         <c:ColorToHexConverter x:Key="ColorToHexConverter"/>
         <c:ColorToBrushConverter x:Key="ColorToBrushConverter"/>
         <c:StringLocalizationConverter x:Key="LocalizeConverter"/>
+        <c:InvertBoolConverter x:Key="InvertBoolConverter"/>
     </UserControl.Resources>
 
     <UserControl.Styles>
-        <!-- One consistent "setting row" rhythm across the whole page -->
+        <!-- Master Navigation ListBox -->
+        <Style Selector="ListBox.SettingsNav">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+        <Style Selector="ListBox.SettingsNav ListBoxItem">
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="CornerRadius" Value="{DynamicResource AppRadiusSm}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="ListBox.SettingsNav ListBoxItem:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource LuminaStateHoverBrush}"/>
+        </Style>
+        <Style Selector="ListBox.SettingsNav ListBoxItem:selected /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource LuminaPrimaryBgBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource LuminaBorderSubtleBrush}"/>
+        </Style>
+        <Style Selector="ListBox.SettingsNav ListBoxItem:selected TextBlock.NavTitle">
+            <Setter Property="Foreground" Value="{DynamicResource LuminaPrimaryBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="ListBox.SettingsNav ListBoxItem:selected avalonia|MaterialIcon">
+            <Setter Property="Foreground" Value="{DynamicResource LuminaPrimaryBrush}"/>
+        </Style>
+
+        <!-- Setting Row Layout & Unified Control Sizing -->
         <Style Selector="Grid.SettingRow">
-            <Setter Property="MinHeight" Value="34"/>
+            <Setter Property="MinHeight" Value="44"/>
+            <Setter Property="Margin" Value="0,4"/>
+        </Style>
+        <Style Selector="Grid.SettingRow > ComboBox">
+            <Setter Property="Width" Value="320"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Grid.SettingRow > NumericUpDown">
+            <Setter Property="Width" Value="320"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Grid.SettingRow > TextBox">
+            <Setter Property="Width" Value="320"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Grid.SettingRow > ToggleSwitch">
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style Selector="StackPanel.Swatch">
+            <Setter Property="Spacing" Value="4"/>
+            <Setter Property="Margin" Value="2"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
         <Style Selector="StackPanel.Swatch > TextBlock">
             <Setter Property="FontSize" Value="10"/>
             <Setter Property="Foreground" Value="{DynamicResource LuminaTextTertiaryBrush}"/>
-        </Style>
-        <Style Selector="StackPanel.Swatch">
-            <Setter Property="Spacing" Value="4"/>
-            <Setter Property="Margin" Value="0,0,12,10"/>
-        </Style>
-        <Style Selector="TabControl WrapPanel > StackPanel">
-            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto, *">
-        <StackPanel Margin="24,20,24,16" Spacing="2">
-            <TextBlock Text="{c:Localize Settings}" Classes="PageTitle"/>
-            <TextBlock Text="{c:Localize SettingsTip}" Classes="PageSubtitle"/>
-        </StackPanel>
+    <!-- Master-Detail Root -->
+    <Grid ColumnDefinitions="240, *">
+        <!-- Left Master Navigation Sidebar -->
+        <Border Grid.Column="0"
+                BorderBrush="{DynamicResource LuminaBorderSubtleBrush}"
+                BorderThickness="0,0,1,0"
+                Padding="16,20,14,16">
+            <Grid RowDefinitions="Auto, *">
+                <!-- Sidebar Header -->
+                <StackPanel Grid.Row="0" Margin="4,0,4,18" Spacing="4">
+                    <TextBlock Text="{c:Localize Settings}" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                    <TextBlock Text="{c:Localize SettingsTip}" FontSize="11" Foreground="{DynamicResource LuminaTextTertiaryBrush}" TextWrapping="Wrap"/>
+                </StackPanel>
 
-        <TabControl Grid.Row="1" TabStripPlacement="Left" Margin="14,0,24,20">
-            <!-- General Section -->
-            <TabItem Header="{c:Localize General}">
-                <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,14,0">
-                    <StackPanel Margin="16,0,0,0" Spacing="14" VerticalAlignment="Top">
-                        <Border Classes="Card" Padding="18">
-                            <StackPanel Spacing="14">
-                                <TextBlock Text="{c:Localize Appearance}" Classes="GroupTitle"/>
-
-                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
-                                    <StackPanel Spacing="2" VerticalAlignment="Center">
-                                        <TextBlock Text="{c:Localize Language}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                                        <TextBlock Text="{c:Localize LanguageDesc}" Classes="Hint"/>
-                                    </StackPanel>
-                                    <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableLanguages}" SelectedItem="{Binding SelectedLanguage}" MinWidth="184" VerticalAlignment="Center">
-                                         <ComboBox.ItemTemplate>
-                                             <DataTemplate>
-                                                 <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                                             </DataTemplate>
-                                         </ComboBox.ItemTemplate>
-                                    </ComboBox>
-                                </Grid>
-
-                                <Border Classes="Divider"/>
-
-                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
-                                    <StackPanel Spacing="2" VerticalAlignment="Center">
-                                        <TextBlock Text="{c:Localize Theme}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                                        <TextBlock Text="{c:Localize ThemeDesc}" Classes="Hint"/>
-                                    </StackPanel>
-                                    <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableThemes}" SelectedItem="{Binding SelectedBaseTheme}" MinWidth="184" VerticalAlignment="Center">
-                                         <ComboBox.ItemTemplate>
-                                             <DataTemplate>
-                                                 <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                                             </DataTemplate>
-                                         </ComboBox.ItemTemplate>
-                                    </ComboBox>
-                                </Grid>
-
-                                <Border Classes="Divider"/>
-
-                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
-                                    <StackPanel Spacing="2" VerticalAlignment="Center">
-                                        <TextBlock Text="{c:Localize PrimaryColor}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                                        <TextBlock Text="{c:Localize PrimaryColorDesc}" Classes="Hint"/>
-                                    </StackPanel>
-                                    <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableColors}" SelectedItem="{Binding SelectedColor}" MinWidth="184" VerticalAlignment="Center">
-                                         <ComboBox.ItemTemplate>
-                                             <DataTemplate>
-                                                 <StackPanel Orientation="Horizontal" Spacing="9">
-                                                     <Border Background="{Binding Color, Converter={StaticResource ColorToBrushConverter}}" Width="14" Height="14" CornerRadius="7" VerticalAlignment="Center"/>
-                                                     <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                                                 </StackPanel>
-                                             </DataTemplate>
-                                         </ComboBox.ItemTemplate>
-                                    </ComboBox>
-                                </Grid>
+                <!-- Navigation ListBox -->
+                <ListBox Grid.Row="1"
+                         Classes="SettingsNav"
+                         SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}"
+                         SelectionMode="Single">
+                    <!-- 0: General -->
+                    <ListBoxItem>
+                        <Grid ColumnDefinitions="Auto, *">
+                            <Border Width="32" Height="32" CornerRadius="6" Background="{DynamicResource LuminaSurfaceBrush}"
+                                    VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <avalonia:MaterialIcon Kind="Tune" Width="18" Height="18" Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" Spacing="1">
+                                <TextBlock Text="{c:Localize GeneralSettings}" Classes="NavTitle" FontSize="13" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                <TextBlock Text="{c:Localize Appearance}" FontSize="11" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
                             </StackPanel>
-                        </Border>
+                        </Grid>
+                    </ListBoxItem>
+
+                    <!-- 1: Terminal -->
+                    <ListBoxItem>
+                        <Grid ColumnDefinitions="Auto, *">
+                            <Border Width="32" Height="32" CornerRadius="6" Background="{DynamicResource LuminaSurfaceBrush}"
+                                    VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <avalonia:MaterialIcon Kind="ConsoleLine" Width="18" Height="18" Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" Spacing="1">
+                                <TextBlock Text="{c:Localize TerminalSettings}" Classes="NavTitle" FontSize="13" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                <TextBlock Text="字体、编码与行为" FontSize="11" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+                            </StackPanel>
+                        </Grid>
+                    </ListBoxItem>
+
+                    <!-- 2: AI Assistant -->
+                    <ListBoxItem>
+                        <Grid ColumnDefinitions="Auto, *">
+                            <Border Width="32" Height="32" CornerRadius="6" Background="{DynamicResource LuminaSurfaceBrush}"
+                                    VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <avalonia:MaterialIcon Kind="RobotOutline" Width="18" Height="18" Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" Spacing="1">
+                                <TextBlock Text="{c:Localize AiSettingsTitle}" Classes="NavTitle" FontSize="13" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                <TextBlock Text="大模型与自动化" FontSize="11" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+                            </StackPanel>
+                        </Grid>
+                    </ListBoxItem>
+
+                    <!-- 3: Color Schemes -->
+                    <ListBoxItem>
+                        <Grid ColumnDefinitions="Auto, *">
+                            <Border Width="32" Height="32" CornerRadius="6" Background="{DynamicResource LuminaSurfaceBrush}"
+                                    VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <avalonia:MaterialIcon Kind="Palette" Width="18" Height="18" Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" Spacing="1">
+                                <TextBlock Text="{c:Localize ColorSchemeSettings}" Classes="NavTitle" FontSize="13" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                <TextBlock Text="色彩主题与实时预览" FontSize="11" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+                            </StackPanel>
+                        </Grid>
+                    </ListBoxItem>
+
+                    <!-- 4: About -->
+                    <ListBoxItem>
+                        <Grid ColumnDefinitions="Auto, *">
+                            <Border Width="32" Height="32" CornerRadius="6" Background="{DynamicResource LuminaSurfaceBrush}"
+                                    VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <avalonia:MaterialIcon Kind="InformationOutline" Width="18" Height="18" Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" Spacing="1">
+                                <TextBlock Text="{c:Localize About}" Classes="NavTitle" FontSize="13" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                <TextBlock Text="应用与数据目录" FontSize="11" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+                            </StackPanel>
+                        </Grid>
+                    </ListBoxItem>
+
+                    <!-- 5: Cloud Sync -->
+                    <ListBoxItem>
+                        <Grid ColumnDefinitions="Auto, *">
+                            <Border Width="32" Height="32" CornerRadius="6" Background="{DynamicResource LuminaSurfaceBrush}"
+                                    VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <avalonia:MaterialIcon Kind="CloudSyncOutline" Width="18" Height="18" Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" Spacing="1">
+                                <TextBlock Text="{c:Localize CloudSync}" Classes="NavTitle" FontSize="13" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                <TextBlock Text="多设备配置实时同步" FontSize="11" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+                            </StackPanel>
+                        </Grid>
+                    </ListBoxItem>
+                </ListBox>
+            </Grid>
+        </Border>
+
+        <!-- Right Content Area -->
+        <ScrollViewer Grid.Column="1"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      Padding="28,20,32,28">
+            <Grid>
+                <!-- ==================== Tab 0: General ==================== -->
+                <StackPanel IsVisible="{Binding IsTabGeneral}" Spacing="18" HorizontalAlignment="Stretch">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{c:Localize GeneralSettings}" Classes="PageTitle"/>
+                        <TextBlock Text="自定义应用全局语言、外观主题与界面强调色" Classes="PageSubtitle"/>
                     </StackPanel>
-                </ScrollViewer>
-            </TabItem>
 
-            <!-- Terminal Section -->
-            <TabItem Header="{c:Localize Terminal}">
-                <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,14,0">
-                    <StackPanel Margin="16,0,0,0" Spacing="14" VerticalAlignment="Top">
+                    <!-- Appearance Card -->
+                    <lumina:LuminaCard Padding="20">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="{c:Localize Appearance}" Classes="GroupTitle"/>
 
-                        <!-- Font -->
-                        <Border Classes="Card" Padding="18">
-                            <StackPanel Spacing="14">
-                                <TextBlock Text="{c:Localize Font}" Classes="GroupTitle"/>
+                            <!-- Language -->
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize Language}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="{c:Localize LanguageDesc}" Classes="Hint"/>
+                                </StackPanel>
+                                <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableLanguages}" SelectedItem="{Binding SelectedLanguage}">
+                                     <ComboBox.ItemTemplate>
+                                         <DataTemplate>
+                                             <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                         </DataTemplate>
+                                     </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </Grid>
 
-                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
-                                    <StackPanel Spacing="2" VerticalAlignment="Center">
-                                        <TextBlock Text="{c:Localize FontFamily}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                                        <TextBlock Text="{c:Localize MonospaceRecommended}" Classes="Hint"/>
-                                    </StackPanel>
-                                    <Grid Grid.Column="1" ColumnDefinitions="*, Auto" VerticalAlignment="Center">
-                                        <TextBox Text="{Binding Settings.FontFamily}" MinWidth="184" VerticalAlignment="Center"/>
-                                        <Button Grid.Column="1" Content="..." Command="{Binding PickFontCommand}" Margin="6,0,0,0" Classes="Outline"/>
-                                    </Grid>
+                            <Border Classes="Divider"/>
+
+                            <!-- Theme Mode -->
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize Theme}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="{c:Localize ThemeDesc}" Classes="Hint"/>
+                                </StackPanel>
+                                <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableThemes}" SelectedItem="{Binding SelectedBaseTheme}">
+                                     <ComboBox.ItemTemplate>
+                                         <DataTemplate>
+                                             <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                         </DataTemplate>
+                                     </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </Grid>
+
+                            <Border Classes="Divider"/>
+
+                            <!-- Accent Color -->
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize PrimaryColor}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="{c:Localize PrimaryColorDesc}" Classes="Hint"/>
+                                </StackPanel>
+                                <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableColors}" SelectedItem="{Binding SelectedColor}">
+                                     <ComboBox.ItemTemplate>
+                                         <DataTemplate>
+                                             <StackPanel Orientation="Horizontal" Spacing="8">
+                                                 <Border Background="{Binding Color, Converter={StaticResource ColorToBrushConverter}}" Width="14" Height="14" CornerRadius="7" VerticalAlignment="Center"/>
+                                                 <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                             </StackPanel>
+                                         </DataTemplate>
+                                     </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </Grid>
+                        </StackPanel>
+                    </lumina:LuminaCard>
+                </StackPanel>
+
+                <!-- ==================== Tab 1: Terminal ==================== -->
+                <StackPanel IsVisible="{Binding IsTabTerminal}" Spacing="18" HorizontalAlignment="Stretch">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{c:Localize TerminalSettings}" Classes="PageTitle"/>
+                        <TextBlock Text="终端字体、编码格式、交互行为与背景风格" Classes="PageSubtitle"/>
+                    </StackPanel>
+
+                    <!-- Typography Card -->
+                    <lumina:LuminaCard Padding="20">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="{c:Localize Font}" Classes="GroupTitle"/>
+
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize FontFamily}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="{c:Localize MonospaceRecommended}" Classes="Hint"/>
+                                </StackPanel>
+                                <Grid Grid.Column="1" ColumnDefinitions="*, Auto" Width="320" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                    <ComboBox ItemsSource="{Binding AvailableFonts}" SelectedItem="{Binding Settings.FontFamily, Mode=TwoWay}" HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
+                                    <Button Grid.Column="1" Content="..." Command="{Binding PickFontCommand}" Margin="6,0,0,0" Classes="Outline"/>
                                 </Grid>
+                            </Grid>
 
-                                <Border Classes="Divider"/>
+                            <Border Classes="Divider"/>
 
-                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="{c:Localize FontSize}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                                    <NumericUpDown Grid.Column="1" Value="{Binding Settings.FontSize}" Minimum="8" Maximum="72" Increment="1" MinWidth="124" VerticalAlignment="Center"/>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <TextBlock Text="{c:Localize FontSize}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                <NumericUpDown Grid.Column="1" Value="{Binding Settings.FontSize, Mode=TwoWay}" Minimum="8" Maximum="72" Increment="1"/>
+                            </Grid>
+                        </StackPanel>
+                    </lumina:LuminaCard>
 
-                        <!-- Color scheme -->
-                        <Border Classes="Card" Padding="18">
-                            <StackPanel Spacing="14">
-                                <TextBlock Text="{c:Localize ColorScheme}" Classes="GroupTitle"/>
+                    <!-- Behavior & Session Card -->
+                    <lumina:LuminaCard Padding="20">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="{c:Localize Behavior}" Classes="GroupTitle"/>
 
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <ComboBox ItemsSource="{Binding AvailableColorSchemes}"
-                                              SelectedItem="{Binding SelectedColorScheme}"
-                                              MinWidth="200" HorizontalAlignment="Stretch">
-                                        <ComboBox.ItemTemplate>
-                                            <DataTemplate x:DataType="m:TerminalColorScheme">
-                                                <StackPanel Orientation="Horizontal" Spacing="9">
-                                                    <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
-                                                        <Border Background="{Binding Background, Converter={StaticResource ColorToBrushConverter}}"
-                                                                Width="13" Height="13" CornerRadius="3" BorderBrush="{DynamicResource LuminaBorderDefaultBrush}" BorderThickness="1"/>
-                                                        <Border Background="{Binding Red, Converter={StaticResource ColorToBrushConverter}}" Width="13" Height="13" CornerRadius="3"/>
-                                                        <Border Background="{Binding Green, Converter={StaticResource ColorToBrushConverter}}" Width="13" Height="13" CornerRadius="3"/>
-                                                        <Border Background="{Binding Blue, Converter={StaticResource ColorToBrushConverter}}" Width="13" Height="13" CornerRadius="3"/>
-                                                        <Border Background="{Binding Yellow, Converter={StaticResource ColorToBrushConverter}}" Width="13" Height="13" CornerRadius="3"/>
-                                                        <Border Background="{Binding Magenta, Converter={StaticResource ColorToBrushConverter}}" Width="13" Height="13" CornerRadius="3"/>
-                                                    </StackPanel>
-                                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize EnableColors}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="启用 ANSI 语法着色输出" Classes="Hint"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.EnableColors, Mode=TwoWay}"/>
+                            </Grid>
+
+                            <Border Classes="Divider"/>
+
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize CopyOnSelect}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="{c:Localize CopyOnSelectDesc}" Classes="Hint"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.CopyOnSelect, Mode=TwoWay}"/>
+                            </Grid>
+
+                            <Border Classes="Divider"/>
+
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize EnableSuggestions}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="{c:Localize EnableSuggestionsDesc}" Classes="Hint"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.EnableSuggestions, Mode=TwoWay}"/>
+                            </Grid>
+
+                            <Border Classes="Divider"/>
+
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize ReuseWindowForCommandLine}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="{c:Localize ReuseWindowForCommandLineDesc}" Classes="Hint"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.ReuseWindowForCommandLine, Mode=TwoWay}"/>
+                            </Grid>
+
+                            <Border Classes="Divider"/>
+
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize Scrollback}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="终端历史输出保留行数" Classes="Hint"/>
+                                </StackPanel>
+                                <NumericUpDown Grid.Column="1" Value="{Binding Settings.ScrollbackLines, Mode=TwoWay}" Minimum="100" Maximum="50000" Increment="100"/>
+                            </Grid>
+
+                            <Border Classes="Divider"/>
+
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize HistoryRetentionLimit}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="{c:Localize HistoryRetentionLimitDesc}" Classes="Hint"/>
+                                </StackPanel>
+                                <NumericUpDown Grid.Column="1" Value="{Binding Settings.HistoryRetentionLimit, Mode=TwoWay}" Minimum="100" Maximum="10000" Increment="100"/>
+                            </Grid>
+
+                            <Border Classes="Divider"/>
+
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize RemoteEncoding}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="{c:Localize RemoteEncodingDesc}" Classes="Hint"/>
+                                </StackPanel>
+                                <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableEncodings}" SelectedItem="{Binding SelectedEncoding, Mode=TwoWay}"/>
+                            </Grid>
+
+                            <Border Classes="Divider"/>
+
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize LocalShellKind}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="{c:Localize LocalShellKindDesc}" Classes="Hint"/>
+                                </StackPanel>
+                                <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableLocalShells}" SelectedItem="{Binding SelectedLocalShell, Mode=TwoWay}"/>
+                            </Grid>
+
+                            <Border Classes="Divider"/>
+
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize CursorStyle}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="{c:Localize CursorStyleDesc}" Classes="Hint"/>
+                                </StackPanel>
+                                <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableCursorStyles}" SelectedItem="{Binding SelectedCursorStyle, Mode=TwoWay}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </Grid>
+                        </StackPanel>
+                    </lumina:LuminaCard>
+
+                    <!-- Background Image Card -->
+                    <lumina:LuminaCard Padding="20">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="{c:Localize BackgroundImage}" Classes="GroupTitle"/>
+                            <Grid ColumnDefinitions="*, Auto">
+                                <TextBox Text="{Binding Settings.BackgroundImagePath, Mode=TwoWay}" PlaceholderText="{c:Localize ImagePathWatermark}"/>
+                                <Button Grid.Column="1" Content="..." Margin="6,0,0,0" Click="BrowseFile_Click" Classes="Outline"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="Auto, *, Auto">
+                                <TextBlock Text="{c:Localize Opacity}" Classes="PropLabel" Margin="0,0,12,0"/>
+                                <Slider Grid.Column="1" Value="{Binding Settings.BackgroundImageOpacity, Mode=TwoWay}" Minimum="0" Maximum="1" TickFrequency="0.05" IsSnapToTickEnabled="True"/>
+                                <TextBlock Grid.Column="2" Text="{Binding Settings.BackgroundImageOpacity, StringFormat='{}{0:P0}'}" Classes="PropValue" Margin="12,0,0,0" Width="48"/>
+                            </Grid>
+                        </StackPanel>
+                    </lumina:LuminaCard>
+
+                    <!-- File Transfer (SFTP) Card -->
+                    <lumina:LuminaCard Padding="20">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="{c:Localize FileTransferSettings}" Classes="GroupTitle"/>
+
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize FolderTransferMode}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="{c:Localize FolderTransferModeDesc}" Classes="Hint"/>
+                                </StackPanel>
+                                <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableFolderTransferModes}" SelectedItem="{Binding SelectedFolderTransferMode, Mode=TwoWay}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </Grid>
+
+                            <Border Classes="Divider"/>
+
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize AutoExtractAfterTransfer}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="{c:Localize AutoExtractAfterTransferDesc}" Classes="Hint"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.AutoExtractAfterTransfer, Mode=TwoWay}"/>
+                            </Grid>
+                        </StackPanel>
+                    </lumina:LuminaCard>
+                </StackPanel>
+
+                <!-- ==================== Tab 2: AI Assistant ==================== -->
+                <StackPanel IsVisible="{Binding IsTabAi}" Spacing="18" HorizontalAlignment="Stretch">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{c:Localize AiSettingsTitle}" Classes="PageTitle"/>
+                        <TextBlock Text="连接大语言模型，支持 OpenAI、DeepSeek、通义千问与本地 Ollama" Classes="PageSubtitle"/>
+                    </StackPanel>
+
+                    <!-- Provider Presets -->
+                    <lumina:LuminaCard Padding="20">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="{c:Localize QuickPresets}" Classes="GroupTitle"/>
+                            <TextBlock Text="快速填入服务商标准 API 接口地址与推荐模型：" Classes="Hint"/>
+                            <UniformGrid Columns="4" Margin="0,4,0,0" HorizontalAlignment="Stretch">
+                                <Button Content="DeepSeek" Command="{Binding SetAiPresetCommand}" CommandParameter="deepseek" Classes="Outline" Margin="0,0,8,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Height="36"/>
+                                <Button Content="OpenAI" Command="{Binding SetAiPresetCommand}" CommandParameter="openai" Classes="Outline" Margin="0,0,8,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Height="36"/>
+                                <Button Content="通义千问 (Qwen)" Command="{Binding SetAiPresetCommand}" CommandParameter="qwen" Classes="Outline" Margin="0,0,8,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Height="36"/>
+                                <Button Content="Ollama (Local)" Command="{Binding SetAiPresetCommand}" CommandParameter="ollama" Classes="Outline" Margin="0,0,0,0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Height="36"/>
+                            </UniformGrid>
+                        </StackPanel>
+                    </lumina:LuminaCard>
+
+                    <!-- API Credentials -->
+                    <lumina:LuminaCard Padding="20">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="{c:Localize AiSettings}" Classes="GroupTitle"/>
+
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize AiEndpoint}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="{c:Localize AiEndpointDesc}" Classes="Hint" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <TextBox Grid.Column="1" Text="{Binding Settings.AiEndpoint, Mode=TwoWay}"
+                                         PlaceholderText="https://api.openai.com/v1"/>
+                            </Grid>
+
+                            <Border Classes="Divider"/>
+
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize AiApiKey}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="服务提供商提供的身份认证 Token" Classes="Hint"/>
+                                </StackPanel>
+                                <TextBox Grid.Column="1" Text="{Binding Settings.AiApiKey, Mode=TwoWay}" PasswordChar="●"
+                                         PlaceholderText="sk-..."/>
+                            </Grid>
+
+                            <Border Classes="Divider"/>
+
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize AiModel}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="使用的具体大模型标识" Classes="Hint"/>
+                                </StackPanel>
+                                <TextBox Grid.Column="1" Text="{Binding Settings.AiModel, Mode=TwoWay}"
+                                         PlaceholderText="gpt-4o-mini / deepseek-chat"/>
+                            </Grid>
+                        </StackPanel>
+                    </lumina:LuminaCard>
+
+                    <!-- Security & Automation -->
+                    <lumina:LuminaCard Padding="20">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="安全与自动化" Classes="GroupTitle"/>
+
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize AiAutoApprove}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="{c:Localize AiAutoApproveDesc}" Classes="Hint" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.AiAutoApproveCommands, Mode=TwoWay}"/>
+                            </Grid>
+
+                            <Border Classes="Divider" Margin="0,4"/>
+
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize AiMaxToolRounds}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="{c:Localize AiMaxToolRoundsDesc}" Classes="Hint" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <NumericUpDown Grid.Column="1"
+                                               Value="{Binding Settings.AiMaxToolRounds, Mode=TwoWay}"
+                                               Minimum="5" Maximum="100" Increment="5"/>
+                            </Grid>
+                        </StackPanel>
+                    </lumina:LuminaCard>
+                </StackPanel>
+
+                <!-- ==================== Tab 3: Color Schemes ==================== -->
+                <StackPanel IsVisible="{Binding IsTabColorScheme}" Spacing="18" HorizontalAlignment="Stretch">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{c:Localize ColorSchemeSettings}" Classes="PageTitle"/>
+                        <TextBlock Text="自定义终端色彩主题、实时命令预览与 ANSI 16 色调色板" Classes="PageSubtitle"/>
+                    </StackPanel>
+
+                    <!-- Scheme Selector Card -->
+                    <lumina:LuminaCard Padding="20">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="{c:Localize ColorScheme}" Classes="GroupTitle"/>
+
+                            <Grid ColumnDefinitions="*, Auto">
+                                <ComboBox ItemsSource="{Binding AvailableColorSchemes}"
+                                          SelectedItem="{Binding SelectedColorScheme}"
+                                          HorizontalAlignment="Stretch">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="m:TerminalColorScheme">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                                                    <Border Background="{Binding Background, Converter={StaticResource ColorToBrushConverter}}"
+                                                            Width="12" Height="12" CornerRadius="2" BorderBrush="{DynamicResource LuminaBorderDefaultBrush}" BorderThickness="1"/>
+                                                    <Border Background="{Binding Red, Converter={StaticResource ColorToBrushConverter}}" Width="12" Height="12" CornerRadius="2"/>
+                                                    <Border Background="{Binding Green, Converter={StaticResource ColorToBrushConverter}}" Width="12" Height="12" CornerRadius="2"/>
+                                                    <Border Background="{Binding Blue, Converter={StaticResource ColorToBrushConverter}}" Width="12" Height="12" CornerRadius="2"/>
+                                                    <Border Background="{Binding Yellow, Converter={StaticResource ColorToBrushConverter}}" Width="12" Height="12" CornerRadius="2"/>
                                                 </StackPanel>
-                                            </DataTemplate>
-                                        </ComboBox.ItemTemplate>
-                                    </ComboBox>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" Margin="10,0,0,0">
-                                        <Button Content="{c:Localize DuplicateScheme}" Command="{Binding DuplicateSchemeCommand}" Classes="Outline" ToolTip.Tip="{c:Localize DuplicateSchemeDesc}"/>
-                                        <Button Content="{c:Localize DeleteScheme}" Command="{Binding DeleteSchemeCommand}" Classes="Outline"
-                                                IsEnabled="{Binding IsSchemeEditable}" ToolTip.Tip="{c:Localize DeleteSchemeDesc}"/>
-                                    </StackPanel>
-                                </Grid>
+                                                <TextBlock Text="{Binding Name}" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="12,0,0,0">
+                                    <Button Content="{c:Localize DuplicateScheme}" Command="{Binding DuplicateSchemeCommand}" Classes="Outline"/>
+                                    <Button Content="{c:Localize DeleteScheme}" Command="{Binding DeleteSchemeCommand}"
+                                            IsEnabled="{Binding IsSchemeEditable}" Classes="Outline"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </lumina:LuminaCard>
 
-                                <!-- Live preview -->
-                                <Border Background="{Binding SelectedColorScheme.Background, Converter={StaticResource ColorToBrushConverter}}"
-                                        CornerRadius="{DynamicResource AppRadiusSm}" Padding="14,12" MinHeight="40"
-                                        BorderBrush="{DynamicResource LuminaBorderDefaultBrush}" BorderThickness="1">
-                                    <StackPanel Spacing="4">
-                                        <TextBlock Text="user@host:~$ ls -la" FontFamily="Cascadia Mono, Consolas, monospace" FontSize="12"
-                                                   Foreground="{Binding SelectedColorScheme.Foreground, Converter={StaticResource ColorToBrushConverter}}"/>
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <TextBlock Text="Documents" FontFamily="Cascadia Mono, Consolas, monospace" FontSize="12"
-                                                       Foreground="{Binding SelectedColorScheme.Blue, Converter={StaticResource ColorToBrushConverter}}"/>
-                                            <TextBlock Text="script.sh" FontFamily="Cascadia Mono, Consolas, monospace" FontSize="12"
-                                                       Foreground="{Binding SelectedColorScheme.Green, Converter={StaticResource ColorToBrushConverter}}"/>
-                                            <TextBlock Text="error.log" FontFamily="Cascadia Mono, Consolas, monospace" FontSize="12"
-                                                       Foreground="{Binding SelectedColorScheme.Red, Converter={StaticResource ColorToBrushConverter}}"/>
-                                            <TextBlock Text="notes.txt" FontFamily="Cascadia Mono, Consolas, monospace" FontSize="12"
-                                                       Foreground="{Binding SelectedColorScheme.Yellow, Converter={StaticResource ColorToBrushConverter}}"/>
-                                            <TextBlock Text="archive.tar" FontFamily="Cascadia Mono, Consolas, monospace" FontSize="12"
-                                                       Foreground="{Binding SelectedColorScheme.Magenta, Converter={StaticResource ColorToBrushConverter}}"/>
+                    <!-- Live macOS-style Terminal Preview -->
+                    <lumina:LuminaCard Padding="20">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="{c:Localize Preview}" Classes="GroupTitle"/>
+
+                            <Border Background="{Binding SelectedColorScheme.Background, Converter={StaticResource ColorToBrushConverter}}"
+                                    CornerRadius="8"
+                                    BorderBrush="{DynamicResource LuminaBorderDefaultBrush}"
+                                    BorderThickness="1"
+                                    ClipToBounds="True">
+                                <Grid RowDefinitions="Auto, *">
+                                    <!-- Window Titlebar -->
+                                    <Border Background="#18000000" Padding="12,8" BorderBrush="{DynamicResource LuminaBorderSubtleBrush}" BorderThickness="0,0,0,1">
+                                        <Grid ColumnDefinitions="Auto, *">
+                                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                <Ellipse Width="10" Height="10" Fill="#FF5F56"/>
+                                                <Ellipse Width="10" Height="10" Fill="#FFBD2E"/>
+                                                <Ellipse Width="10" Height="10" Fill="#27C93F"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Text="jxterminal — zsh — 80x24" FontSize="11" HorizontalAlignment="Center"
+                                                       Foreground="{Binding SelectedColorScheme.Foreground, Converter={StaticResource ColorToBrushConverter}}" Opacity="0.6"/>
+                                        </Grid>
+                                    </Border>
+                                    <!-- Simulated Shell Session -->
+                                    <Border Grid.Row="1" Padding="16,14">
+                                        <StackPanel Spacing="6">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <TextBlock Text="user@jxterminal" FontFamily="{Binding Settings.FontFamily}" FontSize="12" FontWeight="Bold"
+                                                           Foreground="{Binding SelectedColorScheme.Green, Converter={StaticResource ColorToBrushConverter}}"/>
+                                                <TextBlock Text=":" FontFamily="{Binding Settings.FontFamily}" FontSize="12"
+                                                           Foreground="{Binding SelectedColorScheme.Foreground, Converter={StaticResource ColorToBrushConverter}}"/>
+                                                <TextBlock Text="~/workspace" FontFamily="{Binding Settings.FontFamily}" FontSize="12" FontWeight="Bold"
+                                                           Foreground="{Binding SelectedColorScheme.Blue, Converter={StaticResource ColorToBrushConverter}}"/>
+                                                <TextBlock Text="$ ls -la" FontFamily="{Binding Settings.FontFamily}" FontSize="12"
+                                                           Foreground="{Binding SelectedColorScheme.Foreground, Converter={StaticResource ColorToBrushConverter}}"/>
+                                            </StackPanel>
+
+                                            <Grid ColumnDefinitions="Auto, Auto, Auto, Auto" Margin="0,2,0,0">
+                                                <StackPanel Grid.Column="0" Margin="0,0,24,0" Spacing="2">
+                                                    <TextBlock Text="drwxr-xr-x" FontFamily="{Binding Settings.FontFamily}" FontSize="11" Foreground="{Binding SelectedColorScheme.Blue, Converter={StaticResource ColorToBrushConverter}}"/>
+                                                    <TextBlock Text="-rw-r--r--" FontFamily="{Binding Settings.FontFamily}" FontSize="11" Foreground="{Binding SelectedColorScheme.Foreground, Converter={StaticResource ColorToBrushConverter}}"/>
+                                                    <TextBlock Text="-rwxr-xr-x" FontFamily="{Binding Settings.FontFamily}" FontSize="11" Foreground="{Binding SelectedColorScheme.Green, Converter={StaticResource ColorToBrushConverter}}"/>
+                                                    <TextBlock Text="-rw-rw-r--" FontFamily="{Binding Settings.FontFamily}" FontSize="11" Foreground="{Binding SelectedColorScheme.Yellow, Converter={StaticResource ColorToBrushConverter}}"/>
+                                                    <TextBlock Text="-rw-r--r--" FontFamily="{Binding Settings.FontFamily}" FontSize="11" Foreground="{Binding SelectedColorScheme.Red, Converter={StaticResource ColorToBrushConverter}}"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Margin="0,0,24,0" Spacing="2">
+                                                    <TextBlock Text="4096" FontFamily="{Binding Settings.FontFamily}" FontSize="11" Foreground="{Binding SelectedColorScheme.Foreground, Converter={StaticResource ColorToBrushConverter}}" Opacity="0.7"/>
+                                                    <TextBlock Text="1024" FontFamily="{Binding Settings.FontFamily}" FontSize="11" Foreground="{Binding SelectedColorScheme.Foreground, Converter={StaticResource ColorToBrushConverter}}" Opacity="0.7"/>
+                                                    <TextBlock Text="81920" FontFamily="{Binding Settings.FontFamily}" FontSize="11" Foreground="{Binding SelectedColorScheme.Foreground, Converter={StaticResource ColorToBrushConverter}}" Opacity="0.7"/>
+                                                    <TextBlock Text="512" FontFamily="{Binding Settings.FontFamily}" FontSize="11" Foreground="{Binding SelectedColorScheme.Foreground, Converter={StaticResource ColorToBrushConverter}}" Opacity="0.7"/>
+                                                    <TextBlock Text="2048" FontFamily="{Binding Settings.FontFamily}" FontSize="11" Foreground="{Binding SelectedColorScheme.Foreground, Converter={StaticResource ColorToBrushConverter}}" Opacity="0.7"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2" Margin="0,0,24,0" Spacing="2">
+                                                    <TextBlock Text="Sep 13 21:00" FontFamily="{Binding Settings.FontFamily}" FontSize="11" Foreground="{Binding SelectedColorScheme.Foreground, Converter={StaticResource ColorToBrushConverter}}" Opacity="0.7"/>
+                                                    <TextBlock Text="Sep 13 21:10" FontFamily="{Binding Settings.FontFamily}" FontSize="11" Foreground="{Binding SelectedColorScheme.Foreground, Converter={StaticResource ColorToBrushConverter}}" Opacity="0.7"/>
+                                                    <TextBlock Text="Sep 13 21:15" FontFamily="{Binding Settings.FontFamily}" FontSize="11" Foreground="{Binding SelectedColorScheme.Foreground, Converter={StaticResource ColorToBrushConverter}}" Opacity="0.7"/>
+                                                    <TextBlock Text="Sep 13 21:20" FontFamily="{Binding Settings.FontFamily}" FontSize="11" Foreground="{Binding SelectedColorScheme.Foreground, Converter={StaticResource ColorToBrushConverter}}" Opacity="0.7"/>
+                                                    <TextBlock Text="Sep 13 21:25" FontFamily="{Binding Settings.FontFamily}" FontSize="11" Foreground="{Binding SelectedColorScheme.Foreground, Converter={StaticResource ColorToBrushConverter}}" Opacity="0.7"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="3" Spacing="2">
+                                                    <TextBlock Text="src/" FontFamily="{Binding Settings.FontFamily}" FontSize="11" FontWeight="Bold" Foreground="{Binding SelectedColorScheme.Blue, Converter={StaticResource ColorToBrushConverter}}"/>
+                                                    <TextBlock Text="README.md" FontFamily="{Binding Settings.FontFamily}" FontSize="11" Foreground="{Binding SelectedColorScheme.Foreground, Converter={StaticResource ColorToBrushConverter}}"/>
+                                                    <TextBlock Text="build.sh" FontFamily="{Binding Settings.FontFamily}" FontSize="11" FontWeight="Bold" Foreground="{Binding SelectedColorScheme.Green, Converter={StaticResource ColorToBrushConverter}}"/>
+                                                    <TextBlock Text="config.yaml" FontFamily="{Binding Settings.FontFamily}" FontSize="11" Foreground="{Binding SelectedColorScheme.Yellow, Converter={StaticResource ColorToBrushConverter}}"/>
+                                                    <TextBlock Text="error.log" FontFamily="{Binding Settings.FontFamily}" FontSize="11" Foreground="{Binding SelectedColorScheme.Red, Converter={StaticResource ColorToBrushConverter}}"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                    </lumina:LuminaCard>
+
+                    <!-- Core Colors Card -->
+                    <lumina:LuminaCard Padding="20">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="{c:Localize TerminalColors}" Classes="GroupTitle"/>
+
+                            <!-- Read-only protection notice for built-in schemes -->
+                            <Border IsVisible="{Binding !IsSchemeEditable}"
+                                    Background="{DynamicResource LuminaPrimaryBgBrush}"
+                                    BorderBrush="{DynamicResource LuminaPrimaryBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="{DynamicResource AppRadiusMd}"
+                                    Padding="14,10">
+                                <Grid ColumnDefinitions="Auto, *, Auto">
+                                    <avalonia:MaterialIcon Kind="InformationOutline" Width="18" Height="18"
+                                                           Foreground="{DynamicResource LuminaPrimaryBrush}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <TextBlock Grid.Column="1" Text="{c:Localize BuiltInSchemeReadOnlyHint}"
+                                               VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}" FontSize="12" TextWrapping="Wrap"/>
+                                    <Button Grid.Column="2" Content="{c:Localize DuplicateScheme}"
+                                            Command="{Binding DuplicateSchemeCommand}"
+                                            Classes="Primary Small" Margin="12,0,0,0"/>
+                                </Grid>
+                            </Border>
+
+                            <Grid ColumnDefinitions="*, *, *" Margin="0,0,0,4">
+                                <!-- Foreground -->
+                                <Border Grid.Column="0" Margin="0,0,6,0" Padding="12" CornerRadius="8" Background="{DynamicResource LuminaBackgroundBrush}" BorderBrush="{DynamicResource LuminaBorderSubtleBrush}" BorderThickness="1">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="{c:Localize Foreground}" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <ColorPicker Color="{Binding Settings.ColorScheme.Foreground, Mode=TwoWay}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                            <TextBlock Text="{Binding Settings.ColorScheme.Foreground, Converter={StaticResource ColorToHexConverter}}" Classes="Mono" FontSize="11" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
-                            </StackPanel>
-                        </Border>
+                                <!-- Background -->
+                                <Border Grid.Column="1" Margin="3,0,3,0" Padding="12" CornerRadius="8" Background="{DynamicResource LuminaBackgroundBrush}" BorderBrush="{DynamicResource LuminaBorderSubtleBrush}" BorderThickness="1">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="{c:Localize Background}" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <ColorPicker Color="{Binding Settings.ColorScheme.Background, Mode=TwoWay}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                            <TextBlock Text="{Binding Settings.ColorScheme.Background, Converter={StaticResource ColorToHexConverter}}" Classes="Mono" FontSize="11" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                                <!-- Selection -->
+                                <Border Grid.Column="2" Margin="6,0,0,0" Padding="12" CornerRadius="8" Background="{DynamicResource LuminaBackgroundBrush}" BorderBrush="{DynamicResource LuminaBorderSubtleBrush}" BorderThickness="1">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="{c:Localize SelectionColor}" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <ColorPicker Color="{Binding Settings.ColorScheme.SelectionBackground, Mode=TwoWay}" IsEnabled="{Binding IsSchemeEditable}"/>
+                                            <TextBlock Text="{Binding Settings.ColorScheme.SelectionBackground, Converter={StaticResource ColorToHexConverter}}" Classes="Mono" FontSize="11" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
 
-                        <!-- Terminal colors -->
-                        <Border Classes="Card" Padding="18">
-                            <StackPanel Spacing="14">
-                                <TextBlock Text="{c:Localize TerminalColors}" Classes="GroupTitle"/>
+                            <Border Classes="Divider"/>
 
-                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="{c:Localize Foreground}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
-                                        <TextBlock Text="{Binding Settings.ColorScheme.Foreground, Converter={StaticResource ColorToHexConverter}}" Classes="Mono" VerticalAlignment="Center"/>
-                                        <ColorPicker Color="{Binding Settings.ColorScheme.Foreground}" IsEnabled="{Binding IsSchemeEditable}"/>
-                                    </StackPanel>
-                                </Grid>
+                            <!-- ANSI 16 Swatches -->
+                            <TextBlock Text="{c:Localize NormalColors}" Classes="GroupTitle"/>
+                            <UniformGrid Columns="8" HorizontalAlignment="Stretch" Margin="0,0,0,4">
+                                <StackPanel Classes="Swatch"><TextBlock Text="Black"/><ColorPicker Color="{Binding Settings.ColorScheme.Black, Mode=TwoWay}" IsEnabled="{Binding IsSchemeEditable}"/></StackPanel>
+                                <StackPanel Classes="Swatch"><TextBlock Text="Red"/><ColorPicker Color="{Binding Settings.ColorScheme.Red, Mode=TwoWay}" IsEnabled="{Binding IsSchemeEditable}"/></StackPanel>
+                                <StackPanel Classes="Swatch"><TextBlock Text="Green"/><ColorPicker Color="{Binding Settings.ColorScheme.Green, Mode=TwoWay}" IsEnabled="{Binding IsSchemeEditable}"/></StackPanel>
+                                <StackPanel Classes="Swatch"><TextBlock Text="Yellow"/><ColorPicker Color="{Binding Settings.ColorScheme.Yellow, Mode=TwoWay}" IsEnabled="{Binding IsSchemeEditable}"/></StackPanel>
+                                <StackPanel Classes="Swatch"><TextBlock Text="Blue"/><ColorPicker Color="{Binding Settings.ColorScheme.Blue, Mode=TwoWay}" IsEnabled="{Binding IsSchemeEditable}"/></StackPanel>
+                                <StackPanel Classes="Swatch"><TextBlock Text="Magenta"/><ColorPicker Color="{Binding Settings.ColorScheme.Magenta, Mode=TwoWay}" IsEnabled="{Binding IsSchemeEditable}"/></StackPanel>
+                                <StackPanel Classes="Swatch"><TextBlock Text="Cyan"/><ColorPicker Color="{Binding Settings.ColorScheme.Cyan, Mode=TwoWay}" IsEnabled="{Binding IsSchemeEditable}"/></StackPanel>
+                                <StackPanel Classes="Swatch"><TextBlock Text="White"/><ColorPicker Color="{Binding Settings.ColorScheme.White, Mode=TwoWay}" IsEnabled="{Binding IsSchemeEditable}"/></StackPanel>
+                            </UniformGrid>
 
-                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="{c:Localize Background}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
-                                        <TextBlock Text="{Binding Settings.ColorScheme.Background, Converter={StaticResource ColorToHexConverter}}" Classes="Mono" VerticalAlignment="Center"/>
-                                        <ColorPicker Color="{Binding Settings.ColorScheme.Background}" IsEnabled="{Binding IsSchemeEditable}"/>
-                                    </StackPanel>
-                                </Grid>
+                            <TextBlock Text="{c:Localize BrightColors}" Classes="GroupTitle"/>
+                            <UniformGrid Columns="8" HorizontalAlignment="Stretch">
+                                <StackPanel Classes="Swatch"><TextBlock Text="Br.Black"/><ColorPicker Color="{Binding Settings.ColorScheme.BrightBlack, Mode=TwoWay}" IsEnabled="{Binding IsSchemeEditable}"/></StackPanel>
+                                <StackPanel Classes="Swatch"><TextBlock Text="Br.Red"/><ColorPicker Color="{Binding Settings.ColorScheme.BrightRed, Mode=TwoWay}" IsEnabled="{Binding IsSchemeEditable}"/></StackPanel>
+                                <StackPanel Classes="Swatch"><TextBlock Text="Br.Green"/><ColorPicker Color="{Binding Settings.ColorScheme.BrightGreen, Mode=TwoWay}" IsEnabled="{Binding IsSchemeEditable}"/></StackPanel>
+                                <StackPanel Classes="Swatch"><TextBlock Text="Br.Yellow"/><ColorPicker Color="{Binding Settings.ColorScheme.BrightYellow, Mode=TwoWay}" IsEnabled="{Binding IsSchemeEditable}"/></StackPanel>
+                                <StackPanel Classes="Swatch"><TextBlock Text="Br.Blue"/><ColorPicker Color="{Binding Settings.ColorScheme.BrightBlue, Mode=TwoWay}" IsEnabled="{Binding IsSchemeEditable}"/></StackPanel>
+                                <StackPanel Classes="Swatch"><TextBlock Text="Br.Magenta"/><ColorPicker Color="{Binding Settings.ColorScheme.BrightMagenta, Mode=TwoWay}" IsEnabled="{Binding IsSchemeEditable}"/></StackPanel>
+                                <StackPanel Classes="Swatch"><TextBlock Text="Br.Cyan"/><ColorPicker Color="{Binding Settings.ColorScheme.BrightCyan, Mode=TwoWay}" IsEnabled="{Binding IsSchemeEditable}"/></StackPanel>
+                                <StackPanel Classes="Swatch"><TextBlock Text="Br.White"/><ColorPicker Color="{Binding Settings.ColorScheme.BrightWhite, Mode=TwoWay}" IsEnabled="{Binding IsSchemeEditable}"/></StackPanel>
+                            </UniformGrid>
+                        </StackPanel>
+                    </lumina:LuminaCard>
+                </StackPanel>
 
-                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="{c:Localize SelectionColor}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
-                                        <TextBlock Text="{Binding Settings.ColorScheme.SelectionBackground, Converter={StaticResource ColorToHexConverter}}" Classes="Mono" VerticalAlignment="Center"/>
-                                        <ColorPicker Color="{Binding Settings.ColorScheme.SelectionBackground}" IsEnabled="{Binding IsSchemeEditable}"/>
-                                    </StackPanel>
-                                </Grid>
-
-                                <Border Classes="Divider"/>
-
-                                <TextBlock Text="{c:Localize AnsiColors}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-
-                                <TextBlock Text="{c:Localize NormalColors}" Classes="Hint"/>
-                                <WrapPanel Orientation="Horizontal">
-                                    <StackPanel Classes="Swatch">
-                                        <TextBlock Text="Black"/>
-                                        <ColorPicker Color="{Binding Settings.ColorScheme.Black}" IsEnabled="{Binding IsSchemeEditable}"/>
-                                    </StackPanel>
-                                    <StackPanel Classes="Swatch">
-                                        <TextBlock Text="Red"/>
-                                        <ColorPicker Color="{Binding Settings.ColorScheme.Red}" IsEnabled="{Binding IsSchemeEditable}"/>
-                                    </StackPanel>
-                                    <StackPanel Classes="Swatch">
-                                        <TextBlock Text="Green"/>
-                                        <ColorPicker Color="{Binding Settings.ColorScheme.Green}" IsEnabled="{Binding IsSchemeEditable}"/>
-                                    </StackPanel>
-                                    <StackPanel Classes="Swatch">
-                                        <TextBlock Text="Yellow"/>
-                                        <ColorPicker Color="{Binding Settings.ColorScheme.Yellow}" IsEnabled="{Binding IsSchemeEditable}"/>
-                                    </StackPanel>
-                                    <StackPanel Classes="Swatch">
-                                        <TextBlock Text="Blue"/>
-                                        <ColorPicker Color="{Binding Settings.ColorScheme.Blue}" IsEnabled="{Binding IsSchemeEditable}"/>
-                                    </StackPanel>
-                                    <StackPanel Classes="Swatch">
-                                        <TextBlock Text="Magenta"/>
-                                        <ColorPicker Color="{Binding Settings.ColorScheme.Magenta}" IsEnabled="{Binding IsSchemeEditable}"/>
-                                    </StackPanel>
-                                    <StackPanel Classes="Swatch">
-                                        <TextBlock Text="Cyan"/>
-                                        <ColorPicker Color="{Binding Settings.ColorScheme.Cyan}" IsEnabled="{Binding IsSchemeEditable}"/>
-                                    </StackPanel>
-                                    <StackPanel Classes="Swatch">
-                                        <TextBlock Text="White"/>
-                                        <ColorPicker Color="{Binding Settings.ColorScheme.White}" IsEnabled="{Binding IsSchemeEditable}"/>
-                                    </StackPanel>
-                                </WrapPanel>
-
-                                <TextBlock Text="{c:Localize BrightColors}" Classes="Hint"/>
-                                <WrapPanel Orientation="Horizontal">
-                                    <StackPanel Classes="Swatch">
-                                        <TextBlock Text="Bright Black"/>
-                                        <ColorPicker Color="{Binding Settings.ColorScheme.BrightBlack}" IsEnabled="{Binding IsSchemeEditable}"/>
-                                    </StackPanel>
-                                    <StackPanel Classes="Swatch">
-                                        <TextBlock Text="Bright Red"/>
-                                        <ColorPicker Color="{Binding Settings.ColorScheme.BrightRed}" IsEnabled="{Binding IsSchemeEditable}"/>
-                                    </StackPanel>
-                                    <StackPanel Classes="Swatch">
-                                        <TextBlock Text="Bright Green"/>
-                                        <ColorPicker Color="{Binding Settings.ColorScheme.BrightGreen}" IsEnabled="{Binding IsSchemeEditable}"/>
-                                    </StackPanel>
-                                    <StackPanel Classes="Swatch">
-                                        <TextBlock Text="Bright Yellow"/>
-                                        <ColorPicker Color="{Binding Settings.ColorScheme.BrightYellow}" IsEnabled="{Binding IsSchemeEditable}"/>
-                                    </StackPanel>
-                                    <StackPanel Classes="Swatch">
-                                        <TextBlock Text="Bright Blue"/>
-                                        <ColorPicker Color="{Binding Settings.ColorScheme.BrightBlue}" IsEnabled="{Binding IsSchemeEditable}"/>
-                                    </StackPanel>
-                                    <StackPanel Classes="Swatch">
-                                        <TextBlock Text="Bright Magenta"/>
-                                        <ColorPicker Color="{Binding Settings.ColorScheme.BrightMagenta}" IsEnabled="{Binding IsSchemeEditable}"/>
-                                    </StackPanel>
-                                    <StackPanel Classes="Swatch">
-                                        <TextBlock Text="Bright Cyan"/>
-                                        <ColorPicker Color="{Binding Settings.ColorScheme.BrightCyan}" IsEnabled="{Binding IsSchemeEditable}"/>
-                                    </StackPanel>
-                                    <StackPanel Classes="Swatch">
-                                        <TextBlock Text="Bright White"/>
-                                        <ColorPicker Color="{Binding Settings.ColorScheme.BrightWhite}" IsEnabled="{Binding IsSchemeEditable}"/>
-                                    </StackPanel>
-                                </WrapPanel>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Behavior -->
-                        <Border Classes="Card" Padding="18">
-                            <StackPanel Spacing="14">
-                                <TextBlock Text="{c:Localize Behavior}" Classes="GroupTitle"/>
-
-                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="{c:Localize EnableColors}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.EnableColors}" VerticalAlignment="Center"/>
-                                </Grid>
-
-                                <Border Classes="Divider"/>
-
-                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
-                                    <TextBlock Text="{c:Localize Scrollback}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                                    <NumericUpDown Grid.Column="1" Value="{Binding Settings.ScrollbackLines}" Minimum="100" Maximum="10000" Increment="100" MinWidth="124" VerticalAlignment="Center"/>
-                                </Grid>
-
-                                <Border Classes="Divider"/>
-
-                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
-                                    <StackPanel Spacing="2">
-                                        <TextBlock Text="{c:Localize RemoteEncoding}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                                        <TextBlock Text="{c:Localize RemoteEncodingDesc}" FontSize="11" Opacity="0.6"/>
-                                    </StackPanel>
-                                    <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableEncodings}" SelectedItem="{Binding SelectedEncoding}" MinWidth="124" VerticalAlignment="Center"/>
-                                </Grid>
-
-                                <Border Classes="Divider"/>
-
-                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
-                                    <StackPanel Spacing="2">
-                                        <TextBlock Text="{c:Localize LocalShellKind}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                                        <TextBlock Text="{c:Localize LocalShellKindDesc}" FontSize="11" Opacity="0.6"/>
-                                    </StackPanel>
-                                    <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableLocalShells}" SelectedItem="{Binding SelectedLocalShell}" MinWidth="124" VerticalAlignment="Center"/>
-                                </Grid>
-
-                                <Border Classes="Divider"/>
-
-                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
-                                    <StackPanel Spacing="2">
-                                        <TextBlock Text="{c:Localize CursorStyle}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                                        <TextBlock Text="{c:Localize CursorStyleDesc}" FontSize="11" Opacity="0.6"/>
-                                    </StackPanel>
-                                    <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableCursorStyles}" SelectedItem="{Binding SelectedCursorStyle}" MinWidth="124" VerticalAlignment="Center">
-                                        <ComboBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding DisplayName}"/>
-                                            </DataTemplate>
-                                        </ComboBox.ItemTemplate>
-                                    </ComboBox>
-                                </Grid>
-
-                                <Border Classes="Divider"/>
-
-                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
-                                    <StackPanel Spacing="2">
-                                        <TextBlock Text="{c:Localize CopyOnSelect}" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                                        <TextBlock Text="{c:Localize CopyOnSelectDesc}" FontSize="11" Opacity="0.6"/>
-                                    </StackPanel>
-                                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding Settings.CopyOnSelect}" VerticalAlignment="Center"/>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Background image -->
-                        <Border Classes="Card" Padding="18">
-                            <StackPanel Spacing="12">
-                                <TextBlock Text="{c:Localize BackgroundImage}" Classes="GroupTitle"/>
-                                <Grid ColumnDefinitions="*, Auto">
-                                    <TextBox Text="{Binding Settings.BackgroundImagePath}" PlaceholderText="{c:Localize ImagePathWatermark}"/>
-                                    <Button Grid.Column="1" Content="..." Margin="6,0,0,0" Click="BrowseFile_Click" Classes="Outline"/>
-                                </Grid>
-                                <Grid ColumnDefinitions="Auto, *, Auto">
-                                    <TextBlock Text="{c:Localize Opacity}" Classes="PropLabel" Margin="0,0,12,0"/>
-                                    <Slider Grid.Column="1" Value="{Binding Settings.BackgroundImageOpacity}" Minimum="0" Maximum="1" TickFrequency="0.05" IsSnapToTickEnabled="True"/>
-                                    <TextBlock Grid.Column="2" Text="{Binding Settings.BackgroundImageOpacity, StringFormat='{}{0:P0}'}" Classes="PropValue" Margin="12,0,0,0" Width="44"/>
-                                </Grid>
-                            </StackPanel>
-                        </Border>
+                <!-- ==================== Tab 4: About ==================== -->
+                <StackPanel IsVisible="{Binding IsTabAbout}" Spacing="18" HorizontalAlignment="Stretch">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{c:Localize About}" Classes="PageTitle"/>
+                        <TextBlock Text="{c:Localize AboutDescription}" Classes="PageSubtitle"/>
                     </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-        </TabControl>
+
+                    <!-- Application Info & Storage Card -->
+                    <lumina:LuminaCard Padding="24">
+                        <StackPanel Spacing="20">
+                            <Grid ColumnDefinitions="Auto, *">
+                                <Border Width="52" Height="52" CornerRadius="12" Background="{DynamicResource LuminaPrimaryBgBrush}"
+                                        BorderBrush="{DynamicResource LuminaPrimaryBrush}" BorderThickness="1.5"
+                                        VerticalAlignment="Center">
+                                    <avalonia:MaterialIcon Kind="ConsoleLine" Width="28" Height="28" Foreground="{DynamicResource LuminaPrimaryBrush}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center" Spacing="4">
+                                    <TextBlock Text="JxTerminal" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="{c:Localize AboutDescription}" FontSize="12" Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <Border Classes="Divider"/>
+
+                            <!-- Data Storage Directory -->
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="{c:Localize DataStorage}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <Border Background="{DynamicResource LuminaBackgroundBrush}" CornerRadius="6" Padding="12,10"
+                                            BorderBrush="{DynamicResource LuminaBorderSubtleBrush}" BorderThickness="1">
+                                        <TextBlock Text="{Binding AppDataDirectory}" Classes="Mono" FontSize="11" TextWrapping="Wrap"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
+                                    <Button Grid.Column="1" Margin="10,0,0,0" Content="{c:Localize OpenFolder}"
+                                            Command="{Binding OpenDataFolderCommand}" Classes="Primary" VerticalAlignment="Center"/>
+                                </Grid>
+                            </StackPanel>
+                        </StackPanel>
+                    </lumina:LuminaCard>
+                </StackPanel>
+
+                <!-- ==================== Tab 5: Sync ==================== -->
+                <StackPanel IsVisible="{Binding IsTabSync}" Spacing="18" HorizontalAlignment="Stretch" Margin="0,0,0,36">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{c:Localize SyncSettings}" Classes="PageTitle"/>
+                        <TextBlock Text="{c:Localize SyncSettingsTip}" Classes="PageSubtitle"/>
+                    </StackPanel>
+
+                    <!-- Server Connection Card -->
+                    <lumina:LuminaCard Padding="20">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="{c:Localize SyncServerConnection}" Classes="GroupTitle"/>
+
+                            <!-- ================= Display Mode ================= -->
+                            <StackPanel Spacing="14" IsVisible="{Binding Sync.CanShowServerDisplay}">
+                                <!-- Server URL Display -->
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                        <TextBlock Text="{c:Localize SyncServerUrl}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                        <TextBlock Text="{c:Localize SyncServerUrlDesc}" Classes="Hint" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <Border Grid.Column="1" Background="{DynamicResource LuminaBackgroundBrush}"
+                                            BorderBrush="{DynamicResource LuminaBorderSubtleBrush}"
+                                            BorderThickness="1" CornerRadius="6" Padding="14,8"
+                                            MinWidth="260" HorizontalAlignment="Right">
+                                        <TextBlock Text="{Binding Sync.ServerUrl}" Classes="Mono" FontSize="13"
+                                                   Foreground="{DynamicResource LuminaTextPrimaryBrush}"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
+                                </Grid>
+
+                                <Border Classes="Divider"/>
+
+                                <!-- Device Name Display -->
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                        <TextBlock Text="{c:Localize SyncDeviceName}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                        <TextBlock Text="{c:Localize SyncDeviceNameDesc}" Classes="Hint" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="{Binding Sync.DeviceName}" Classes="Mono" FontSize="13"
+                                               Foreground="{DynamicResource LuminaTextPrimaryBrush}"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                </Grid>
+
+                                <Border Classes="Divider"/>
+
+                                <!-- Display Mode Actions & Status -->
+                                <Grid Margin="0,4,0,0">
+                                    <TextBlock Text="{Binding Sync.ServerStatusText}"
+                                               Classes="Hint"
+                                               VerticalAlignment="Center"
+                                               HorizontalAlignment="Left"
+                                               TextWrapping="Wrap"
+                                               MaxWidth="420"
+                                               IsVisible="{Binding Sync.ServerStatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                        <Button Content="{c:Localize SyncTestConnection}" Command="{Binding Sync.TestConnectionCommand}" Classes="Outline"/>
+                                        <Button Content="{c:Localize SyncEditServer}" Command="{Binding Sync.StartEditingServerCommand}" Classes="Outline"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+
+                            <!-- ================= Edit Mode ================= -->
+                            <StackPanel Spacing="14" IsVisible="{Binding Sync.CanShowServerEdit}">
+                                <!-- Server URL Input -->
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                        <TextBlock Text="{c:Localize SyncServerUrl}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                        <TextBlock Text="{c:Localize SyncServerUrlDesc}" Classes="Hint" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <TextBox Grid.Column="1" Text="{Binding Sync.EditingServerUrl, Mode=TwoWay}"
+                                             PlaceholderText="http://127.0.0.1:5080"/>
+                                </Grid>
+
+                                <Border Classes="Divider"/>
+
+                                <!-- Device Name Input -->
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                        <TextBlock Text="{c:Localize SyncDeviceName}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                        <TextBlock Text="{c:Localize SyncDeviceNameDesc}" Classes="Hint" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <TextBox Grid.Column="1" Text="{Binding Sync.EditingDeviceName, Mode=TwoWay}"
+                                             PlaceholderText="Workstation-01"/>
+                                </Grid>
+
+                                <Border Classes="Divider"/>
+
+                                <!-- Edit Mode Actions & Tip -->
+                                <Grid Margin="0,4,0,0">
+                                    <TextBlock Text="{c:Localize SyncServerChangeTip}"
+                                               Classes="Hint"
+                                               VerticalAlignment="Center"
+                                               HorizontalAlignment="Left"
+                                               TextWrapping="Wrap"
+                                               MaxWidth="420"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                        <Button Content="{c:Localize Cancel}"
+                                                Command="{Binding Sync.CancelEditingServerCommand}"
+                                                Classes="Outline"
+                                                IsVisible="{Binding Sync.CanCancelServerEdit}"/>
+                                        <Button Content="{c:Localize SyncSaveAndConnect}"
+                                                Command="{Binding Sync.SaveServerCommand}"
+                                                Classes="Primary"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+
+                        </StackPanel>
+                    </lumina:LuminaCard>
+
+                    <!-- Account Card -->
+                    <lumina:LuminaCard Padding="20">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="{c:Localize SyncAccount}" Classes="GroupTitle"/>
+                            <TextBlock Text="{c:Localize SyncAccountDesc}" Classes="Hint"/>
+
+                            <!-- Disconnected status -->
+                            <Border Padding="16,14" CornerRadius="10"
+                                    Background="{DynamicResource LuminaBackgroundBrush}"
+                                    BorderBrush="{DynamicResource LuminaBorderSubtleBrush}"
+                                    BorderThickness="1"
+                                    IsVisible="{Binding Sync.CanShowDisconnected}">
+                                <Grid ColumnDefinitions="Auto, *">
+                                    <Border Width="46" Height="46" CornerRadius="10"
+                                            Background="{DynamicResource LuminaCardBgBrush}"
+                                            BorderBrush="{DynamicResource LuminaBorderSubtleBrush}"
+                                            BorderThickness="1"
+                                            VerticalAlignment="Center" Margin="0,0,14,0">
+                                        <avalonia:MaterialIcon Kind="CloudOffOutline" Width="24" Height="24"
+                                                               Foreground="{DynamicResource LuminaTextTertiaryBrush}"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{c:Localize SyncServerDisconnectedPrompt}"
+                                                   FontSize="14"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                        <TextBlock Text="{c:Localize SyncServerDisconnectedDesc}"
+                                                   Classes="Hint" TextWrapping="Wrap" FontSize="11"/>
+
+                                        <!-- Cached local account pill -->
+                                        <Border Margin="0,6,0,0" Padding="10,6" CornerRadius="6"
+                                                Background="{DynamicResource LuminaCardBgBrush}"
+                                                BorderBrush="{DynamicResource LuminaBorderSubtleBrush}"
+                                                BorderThickness="1"
+                                                HorizontalAlignment="Left"
+                                                IsVisible="{Binding Sync.IsLoggedIn}">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <avalonia:MaterialIcon Kind="AccountOutline" Width="14" Height="14"
+                                                                       Foreground="{DynamicResource LuminaPrimaryBrush}"
+                                                                       VerticalAlignment="Center"/>
+                                                <TextBlock Text="{c:Localize SyncCachedAccount}" Classes="Hint" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding Sync.Username}" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource LuminaTextPrimaryBrush}" VerticalAlignment="Center"/>
+                                                <Button Content="{c:Localize SyncClearCachedAccount}"
+                                                        Command="{Binding Sync.LogoutCommand}"
+                                                        Classes="Ghost" Margin="6,0,0,0" Padding="6,2" FontSize="11"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Logged-in profile badge & actions -->
+                            <Border Padding="16,14" CornerRadius="10"
+                                    Background="{DynamicResource LuminaBackgroundBrush}"
+                                    BorderBrush="{DynamicResource LuminaBorderSubtleBrush}"
+                                    BorderThickness="1"
+                                    IsVisible="{Binding Sync.CanShowLoggedIn}">
+                                <Grid ColumnDefinitions="Auto, *, Auto">
+                                    <!-- User Avatar Box -->
+                                    <Border Grid.Column="0" Width="46" Height="46" CornerRadius="10"
+                                            Background="{DynamicResource LuminaPrimaryBgBrush}"
+                                            BorderBrush="{DynamicResource LuminaPrimaryBrush}"
+                                            BorderThickness="1"
+                                            VerticalAlignment="Center" Margin="0,0,14,0">
+                                        <avalonia:MaterialIcon Kind="Account" Width="26" Height="26"
+                                                               Foreground="{DynamicResource LuminaPrimaryBrush}"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+
+                                    <!-- User Identity Info -->
+                                    <StackPanel Grid.Column="1" Spacing="5" VerticalAlignment="Center" Margin="0,0,16,0">
+                                        <TextBlock Text="{Binding Sync.Username}"
+                                                   FontSize="16"
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+
+                                        <!-- Status line: 🟢 已登录云端 · 🛡️ 端到端加密保护 -->
+                                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                            <Border Width="7" Height="7" CornerRadius="3.5"
+                                                    Background="#10B981"
+                                                    VerticalAlignment="Center"/>
+                                            <TextBlock Text="{c:Localize SyncStatusLoggedIn}"
+                                                       FontSize="11"
+                                                       FontWeight="Medium"
+                                                       Foreground="{DynamicResource LuminaTextSecondaryBrush}"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock Text="·"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource LuminaTextTertiaryBrush}"
+                                                       VerticalAlignment="Center"/>
+                                            <avalonia:MaterialIcon Kind="ShieldCheckOutline" Width="13" Height="13"
+                                                                   Foreground="{DynamicResource LuminaPrimaryBrush}"
+                                                                   VerticalAlignment="Center"/>
+                                            <TextBlock Text="{c:Localize SyncE2EEProtected}"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource LuminaTextTertiaryBrush}"
+                                                       VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <!-- Action Buttons -->
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Button Command="{Binding Sync.OpenChangePasswordCommand}" Classes="Outline">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <avalonia:MaterialIcon Kind="KeyOutline" Width="14" Height="14" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{c:Localize SyncChangePassword}" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Command="{Binding Sync.LogoutCommand}" Classes="Outline">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <avalonia:MaterialIcon Kind="Logout" Width="14" Height="14" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{c:Localize SyncLogout}" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Login / register form -->
+                            <StackPanel Spacing="14" IsVisible="{Binding Sync.CanShowLoginForm}">
+                                <!-- Tip banner -->
+                                <Border Padding="12,10" CornerRadius="8"
+                                        Background="{DynamicResource LuminaBackgroundBrush}"
+                                        BorderBrush="{DynamicResource LuminaBorderSubtleBrush}"
+                                        BorderThickness="1">
+                                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <avalonia:MaterialIcon Kind="LockCheckOutline" Width="16" Height="16"
+                                                               Foreground="{DynamicResource LuminaPrimaryBrush}"
+                                                               VerticalAlignment="Center"/>
+                                        <TextBlock Text="{c:Localize SyncE2EETip}"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource LuminaTextSecondaryBrush}"
+                                                   VerticalAlignment="Center"
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                        <TextBlock Text="{c:Localize SyncUsername}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    </StackPanel>
+                                    <TextBox Grid.Column="1" Text="{Binding Sync.Username, Mode=TwoWay}"
+                                             PlaceholderText="alice"/>
+                                </Grid>
+
+                                <Border Classes="Divider"/>
+
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                        <TextBlock Text="{c:Localize SyncPassword}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    </StackPanel>
+                                    <TextBox Grid.Column="1" Text="{Binding Sync.Password, Mode=TwoWay}" PasswordChar="●"/>
+                                </Grid>
+
+                                <Border Classes="Divider"/>
+
+                                <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                    <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                        <TextBlock Text="{c:Localize SyncRegistrationSecret}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                        <TextBlock Text="{c:Localize SyncRegistrationSecretDesc}" Classes="Hint"/>
+                                    </StackPanel>
+                                    <TextBox Grid.Column="1" Text="{Binding Sync.RegistrationSecret, Mode=TwoWay}"
+                                             PasswordChar="●" PlaceholderText="{c:Localize Optional}"/>
+                                </Grid>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                    <Button Content="{c:Localize SyncRegister}" Command="{Binding Sync.RegisterCommand}" Classes="Outline"/>
+                                    <Button Content="{c:Localize SyncLogin}" Command="{Binding Sync.LoginCommand}" Classes="Primary"/>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <TextBlock Text="{Binding Sync.StatusText}" Classes="Hint" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </lumina:LuminaCard>
+
+                    <!-- Cloud Sync Card -->
+                    <lumina:LuminaCard Padding="20" IsVisible="{Binding Sync.CanShowLoggedIn}">
+                        <StackPanel Spacing="16">
+                            <TextBlock Text="{c:Localize CloudSync}" Classes="GroupTitle"/>
+
+                            <!-- Auto Sync Switch -->
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <TextBlock Text="{c:Localize AutoSync}" FontWeight="SemiBold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    <TextBlock Text="{c:Localize AutoSyncDesc}" Classes="Hint" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Sync.AutoSyncEnabled, Mode=TwoWay}"/>
+                            </Grid>
+
+                            <Border Classes="Divider"/>
+
+                            <!-- Status & Last Sync Time & Sync Now Button -->
+                            <Grid Classes="SettingRow" ColumnDefinitions="*, Auto">
+                                <StackPanel Spacing="4" VerticalAlignment="Center" Margin="0,0,20,0">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Border Width="8" Height="8" CornerRadius="4" VerticalAlignment="Center"
+                                                Background="{DynamicResource LuminaPrimaryBrush}"/>
+                                        <TextBlock Text="{Binding Sync.StatusText}" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding Sync.LastSyncTimeText}" Classes="Hint"/>
+                                </StackPanel>
+
+                                <Button Grid.Column="1" Content="{c:Localize SyncNow}"
+                                        Command="{Binding Sync.SyncNowCommand}"
+                                        Classes="Primary"
+                                        IsEnabled="{Binding !Sync.IsBusy}"/>
+                            </Grid>
+                        </StackPanel>
+                    </lumina:LuminaCard>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
     </Grid>
 </UserControl>
-

@@ -1,4 +1,4 @@
-using Avalonia.Data;
+using Avalonia;
 using Avalonia.Markup.Xaml;
 using JxTerminal.Services;
 using System;
@@ -16,14 +16,13 @@ namespace JxTerminal.Converters
 
         public override object ProvideValue(IServiceProvider serviceProvider)
         {
-            var binding = new Binding
+            var target = (IProvideValueTarget?)serviceProvider?.GetService(typeof(IProvideValueTarget));
+            if (target?.TargetObject is AvaloniaObject targetObject && target.TargetProperty is AvaloniaProperty targetProperty)
             {
-                Source = LocalizationService.Instance,
-                Path = $"[{Key}]",
-                Mode = BindingMode.OneWay
-            };
+                targetObject.Bind(targetProperty, LocalizationService.Instance.GetObservable(Key));
+            }
 
-            return binding;
+            return LocalizationService.Instance[Key];
         }
     }
 }

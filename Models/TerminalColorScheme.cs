@@ -12,8 +12,12 @@ namespace JxTerminal.Models;
 /// </summary>
 public partial class TerminalColorScheme : ObservableObject, ICloneable
 {
-    [ObservableProperty]
     private string _name = "Custom";
+    public string Name
+    {
+        get => _name;
+        set => SetProperty(ref _name, value);
+    }
 
     /// <summary>
     /// Whether this is a built-in preset (read-only) or user-defined.

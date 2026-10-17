@@ -93,3 +93,19 @@ Thumbs.db
 # Runtime logs
 crash.log
 
+# TinyDb files & migration backups
+*.db
+*.db-*
+*.db.*
+*.migrated.bak
+
+# Security & keys
+master.key
+*.key
+
+# SSH host keys
+known_hosts
+
+# Runtime logs
+logs/
+

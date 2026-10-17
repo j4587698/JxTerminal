@@ -42,24 +42,6 @@ public partial class TerminalListView : UserControl
         }
     }
 
-    private void SftpPathTextBox_KeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter && sender is TextBox textBox)
-        {
-            var vm = FindViewModel(textBox);
-            vm?.Sftp?.RefreshFilesCommand.Execute(null);
-        }
-    }
-
-    private void SftpFileList_DoubleTapped(object? sender, TappedEventArgs e)
-    {
-        if (sender is ListBox listBox && listBox.SelectedItem is SftpFileItem item)
-        {
-            var vm = FindViewModel(listBox);
-            vm?.Sftp?.NavigateCommand.Execute(item);
-        }
-    }
-
     /// <summary>
     /// Finds the terminal control that belongs to the same tab as the given control.
     /// </summary>

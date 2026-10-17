@@ -26,6 +26,6 @@ public class MatchCountConverter : IMultiValueConverter
         if (count == 0) return LocalizationService.Instance["NoMatches"];
 
         int ordinal = values[0] is int o ? o : 0;
-        return $"{ordinal} / {count}";
+        return string.Format(LocalizationService.Instance["MatchCountFormat"], ordinal, count);
     }
 }

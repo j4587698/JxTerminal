@@ -6,26 +6,25 @@
              xmlns:c="using:JxTerminal.Converters"
              mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="500"
              x:Class="JxTerminal.Views.FontPickerView"
-             x:DataType="vm:FontPickerViewModel"
-             Width="400" Height="500">
-    <Grid RowDefinitions="Auto, *, Auto" Margin="20">
-        <TextBlock Text="{c:Localize SelectFont}" Classes="CardTitle" FontSize="17" Margin="0,0,0,14"/>
+             x:DataType="vm:FontPickerViewModel">
+    <Grid Width="380" Height="430" RowDefinitions="Auto, Auto, *, Auto">
+        <TextBox Grid.Row="0" Text="{Binding SearchText}" PlaceholderText="{c:Localize Search}" Classes="Rounded" Margin="0,0,0,8"/>
         
-        <Grid Grid.Row="1" RowDefinitions="Auto, *">
-            <TextBox Text="{Binding SearchText}" PlaceholderText="{c:Localize Search}" Classes="Rounded" Margin="0,0,0,10"/>
-            <ListBox Grid.Row="1" Classes="Plain" ItemsSource="{Binding FilteredFonts}" SelectedItem="{Binding SelectedFont}">
+        <CheckBox Grid.Row="1" Content="{c:Localize ShowAllFonts}" IsChecked="{Binding ShowAllFonts}" Margin="0,0,0,8"/>
+        
+        <Border Grid.Row="2" BorderBrush="{DynamicResource LuminaBorderSubtleBrush}" BorderThickness="1" CornerRadius="{DynamicResource AppRadiusSm}" Background="{DynamicResource LuminaSurfaceBrush}" ClipToBounds="True">
+            <ListBox Classes="Plain" ItemsSource="{Binding FilteredFonts}" SelectedItem="{Binding SelectedFont}">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <TextBlock Text="{Binding}" FontFamily="{Binding}"/>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
-        </Grid>
+        </Border>
         
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,14,0,0">
-            <Button Content="{c:Localize Cancel}" Command="{Binding CancelCommand}" Classes="Ghost"/>
-            <Button Content="{c:Localize Confirm}" Command="{Binding ConfirmCommand}" Classes="Primary"/>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button Content="{c:Localize Cancel}" Command="{Binding CancelCommand}" Classes="Ghost" IsCancel="True"/>
+            <Button Content="{c:Localize Confirm}" Command="{Binding ConfirmCommand}" Classes="Primary" IsDefault="True"/>
         </StackPanel>
     </Grid>
 </UserControl>
-

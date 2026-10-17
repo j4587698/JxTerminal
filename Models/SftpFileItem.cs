@@ -29,7 +29,16 @@ public class SftpFileItem
     }
     
     // Original reference
-    public ISftpFile OriginalFile { get; }
+    public ISftpFile? OriginalFile { get; }
+
+    public SftpFileItem(string name, string path = "", bool isDirectory = false, long size = 0)
+    {
+        Name = name;
+        Path = string.IsNullOrEmpty(path) ? "/" + name : path;
+        IsDirectory = isDirectory;
+        Size = size;
+        Icon = isDirectory ? MaterialIconKind.Folder : MaterialIconKind.FileDocument;
+    }
 
     public SftpFileItem(ISftpFile file)
     {

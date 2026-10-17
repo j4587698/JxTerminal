@@ -7,83 +7,326 @@
              xmlns:lumina="clr-namespace:LuminaUI.Controls;assembly=LuminaUI"
              xmlns:m="using:JxTerminal.Models"
              xmlns:avalonia="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="500"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
              x:Class="JxTerminal.Views.SnippetsView"
              x:DataType="vm:SnippetsViewModel">
-    <Grid RowDefinitions="Auto, *" Margin="20,16,24,20">
+
+    <UserControl.Styles>
+        <!-- Transparent ListBoxItem wrapper: eliminate all default ugly highlight boxes -->
+        <Style Selector="ListBox.CommandListBox ListBoxItem">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Focusable" Value="False"/>
+        </Style>
+        <Style Selector="ListBox.CommandListBox ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="ListBox.CommandListBox ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="ListBox.CommandListBox ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="ListBox.CommandListBox ListBoxItem:focus /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="ListBox.CommandListBox ListBoxItem:selected:focus /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+
+        <!-- Command Card Item styling -->
+        <Style Selector="Border.CommandCard">
+            <Setter Property="Padding" Value="14,9"/>
+            <Setter Property="Margin" Value="0,1"/>
+            <Setter Property="CornerRadius" Value="{DynamicResource AppRadiusSm}"/>
+            <Setter Property="Background" Value="{DynamicResource LuminaBackgroundBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource LuminaBorderSubtleBrush}"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.12"/>
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.12"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.CommandCard:pointerover">
+            <Setter Property="Background" Value="{DynamicResource LuminaSurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource LuminaBorderDefaultBrush}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto, *" Margin="16,14,16,14">
 
         <!-- Toolbar -->
         <Grid Grid.Row="0" ColumnDefinitions="Auto, *, Auto" Margin="0,0,0,14">
-            <StackPanel Orientation="Horizontal" Spacing="9" VerticalAlignment="Center">
-                <avalonia:MaterialIcon Kind="ScriptText" Width="20" Height="20" Foreground="{DynamicResource LuminaPrimaryBrush}"/>
-                <TextBlock Text="{c:Localize Snippets}" Classes="PageTitle"/>
+            <StackPanel Spacing="4">
+                <TextBlock Text="{c:Localize Snippets}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                <TextBlock Text="{c:Localize SnippetsEmptyHint}" Classes="PageSubtitle"/>
             </StackPanel>
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
-                <Button Command="{Binding AddSnippetCommand}" Classes="Outline">
-                    <StackPanel Orientation="Horizontal" Spacing="7">
-                        <avalonia:MaterialIcon Kind="Plus" Width="15" Height="15"/>
-                        <TextBlock Text="{c:Localize NewSnippet}"/>
-                    </StackPanel>
-                </Button>
-                <Button Classes="Ghost IconOnly" Command="{Binding EditSnippetCommand}"
-                        IsEnabled="{Binding SelectedSnippet, Converter={x:Static ObjectConverters.IsNotNull}}"
-                        ToolTip.Tip="{c:Localize RenameItem}">
-                    <avalonia:MaterialIcon Kind="Pencil" Width="17" Height="17" Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
-                </Button>
-                <Button Classes="Ghost IconOnly" Command="{Binding DeleteSnippetCommand}"
-                        IsEnabled="{Binding SelectedSnippet, Converter={x:Static ObjectConverters.IsNotNull}}"
-                        ToolTip.Tip="{c:Localize DeleteConfirmTitle}">
-                    <avalonia:MaterialIcon Kind="Delete" Width="17" Height="17" Foreground="{DynamicResource LuminaDangerBrush}"/>
-                </Button>
-                <Button Command="{Binding SendToTerminalCommand}" CommandParameter="{Binding SelectedSnippet}" Classes="Primary"
-                        IsEnabled="{Binding SelectedSnippet, Converter={x:Static ObjectConverters.IsNotNull}}">
-                    <StackPanel Orientation="Horizontal" Spacing="7">
-                        <avalonia:MaterialIcon Kind="ConsoleLine" Width="15" Height="15"/>
-                        <TextBlock Text="{c:Localize SendToTerminal}"/>
-                    </StackPanel>
-                </Button>
+
+            <!-- Actions & Search -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <!-- Search Box -->
+                <TextBox Width="230"
+                         Classes="Rounded"
+                         Text="{Binding SearchText, Mode=TwoWay}"
+                         PlaceholderText="{c:Localize Search}">
+                    <TextBox.InnerLeftContent>
+                        <avalonia:MaterialIcon Kind="Magnify" Width="16" Height="16" Margin="10,0,0,0" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+                    </TextBox.InnerLeftContent>
+                </TextBox>
+
+                <!-- Snippets Actions -->
+                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsSnippetsTab}">
+                    <Button Command="{Binding AddSnippetCommand}" Classes="Primary">
+                        <StackPanel Orientation="Horizontal" Spacing="7">
+                            <avalonia:MaterialIcon Kind="Plus" Width="15" Height="15"/>
+                            <TextBlock Text="{c:Localize NewSnippet}"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding RestoreDefaultSnippetsCommand}" Classes="Ghost"
+                            ToolTip.Tip="{c:Localize RestoreDefaultSnippets}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <avalonia:MaterialIcon Kind="RestoreAlert" Width="16" Height="16" Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
+                            <TextBlock Text="{c:Localize RestoreDefaultSnippets}"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <!-- History Actions -->
+                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsHistoryTab}">
+                    <Button Command="{Binding ClearHistoryCommand}" Classes="Ghost"
+                            IsEnabled="{Binding !HasNoHistory}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <avalonia:MaterialIcon Kind="DeleteSweepOutline" Width="16" Height="16" Foreground="{DynamicResource LuminaDangerBrush}"/>
+                            <TextBlock Text="{c:Localize ClearHistory}" Foreground="{DynamicResource LuminaDangerBrush}"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
             </StackPanel>
         </Grid>
 
-        <!-- Content -->
-        <Panel Grid.Row="1">
-            <ListBox ItemsSource="{Binding Snippets}" SelectedItem="{Binding SelectedSnippet, Mode=TwoWay}"
-                     DoubleTapped="SnippetList_DoubleTapped" Background="Transparent">
-                <ListBox.ItemTemplate>
-                    <DataTemplate x:DataType="m:SnippetItem">
-                        <Grid ColumnDefinitions="Auto, 180, *, Auto" Margin="4,2" VerticalAlignment="Center">
-                            <avalonia:MaterialIcon Grid.Column="0" Kind="ConsoleLine" Width="16" Height="16" Opacity="0.55" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                            <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" FontSize="13"
-                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
-                                       Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                            <TextBlock Grid.Column="2" Text="{Binding Command}" FontSize="12" Opacity="0.65"
-                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="14,0,0,0"
-                                       FontFamily="Consolas, monospace"
-                                       Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
-                            <Button Grid.Column="3" Classes="Ghost IconOnly Compact" Margin="10,0,0,0"
-                                    Command="{Binding $parent[ItemsControl].DataContext.SendToTerminalCommand}" CommandParameter="{Binding}"
-                                    ToolTip.Tip="{c:Localize SendToTerminal}">
-                                <avalonia:MaterialIcon Kind="Play" Width="14" Height="14" Foreground="{DynamicResource LuminaSuccessBrush}"/>
-                            </Button>
-                        </Grid>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
-
-            <!-- Empty state -->
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12"
-                        IsHitTestVisible="False"
-                        IsVisible="{Binding HasNoSnippets}">
-                <Border Width="70" Height="70" CornerRadius="{DynamicResource AppRadiusPill}"
-                        Background="{DynamicResource LuminaStateHoverBrush}" HorizontalAlignment="Center">
-                    <avalonia:MaterialIcon Kind="ScriptTextOutline" Width="30" Height="30" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+        <!-- Content Card -->
+        <lumina:LuminaCard Grid.Row="1" Padding="0" ClipToBounds="True">
+            <Grid RowDefinitions="Auto, *">
+                <!-- Tab bar -->
+                <Border Padding="16,10" Background="{DynamicResource LuminaBackgroundBrush}" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource LuminaBorderSubtleBrush}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <RadioButton Classes="TextPill" GroupName="CommandPageTabs"
+                                     IsChecked="{Binding IsSnippetsTabSelected, Mode=TwoWay}"
+                                     Command="{Binding SelectTabCommand}" CommandParameter="Snippets">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <avalonia:MaterialIcon Kind="CodeBraces" Width="14" Height="14"/>
+                                <TextBlock Text="{c:Localize Snippets}" VerticalAlignment="Center"/>
+                                <Border CornerRadius="8" Padding="5,1" Background="{DynamicResource LuminaSurfaceBrush}">
+                                    <TextBlock Text="{Binding SnippetCount}" FontSize="11" Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
+                                </Border>
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton Classes="TextPill" GroupName="CommandPageTabs"
+                                     IsChecked="{Binding IsHistoryTabSelected, Mode=TwoWay}"
+                                     Command="{Binding SelectTabCommand}" CommandParameter="History">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <avalonia:MaterialIcon Kind="History" Width="14" Height="14"/>
+                                <TextBlock Text="{c:Localize CommandHistory}" VerticalAlignment="Center"/>
+                                <Border CornerRadius="8" Padding="5,1" Background="{DynamicResource LuminaSurfaceBrush}">
+                                    <TextBlock Text="{Binding HistoryCount}" FontSize="11" Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
+                                </Border>
+                            </StackPanel>
+                        </RadioButton>
+                    </StackPanel>
                 </Border>
-                <StackPanel Spacing="5">
-                    <TextBlock Text="{c:Localize NoSnippetsTitle}" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center"
-                               Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
-                    <TextBlock Text="{c:Localize SnippetsEmptyHint}" Classes="PageSubtitle" HorizontalAlignment="Center"/>
-                </StackPanel>
-            </StackPanel>
-        </Panel>
+
+                <!-- List Content Panels -->
+                <Panel Grid.Row="1">
+                    <!-- Tab 1: Snippets List -->
+                    <Grid IsVisible="{Binding IsSnippetsTab}">
+                        <ListBox Classes="CommandListBox"
+                                 ItemsSource="{Binding FilteredSnippets}"
+                                 SelectedItem="{Binding SelectedSnippet, Mode=TwoWay}"
+                                 DoubleTapped="SnippetList_DoubleTapped"
+                                 Background="Transparent"
+                                 Padding="8">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="m:SnippetItem">
+                                    <Border Classes="CommandCard">
+                                        <Border.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="{c:Localize SendToTerminal}"
+                                                          Command="{Binding $parent[UserControl].DataContext.SendToTerminalCommand}"
+                                                          CommandParameter="{Binding}">
+                                                    <MenuItem.Icon><avalonia:MaterialIcon Kind="Play"/></MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem Header="{c:Localize Copy}"
+                                                          Command="{Binding $parent[UserControl].DataContext.CopyCommandCommand}"
+                                                          CommandParameter="{Binding Command}">
+                                                    <MenuItem.Icon><avalonia:MaterialIcon Kind="ContentCopy"/></MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem Header="{c:Localize Edit}"
+                                                          Command="{Binding $parent[UserControl].DataContext.EditSnippetCommand}"
+                                                          CommandParameter="{Binding}">
+                                                    <MenuItem.Icon><avalonia:MaterialIcon Kind="Pencil"/></MenuItem.Icon>
+                                                </MenuItem>
+                                                <Separator/>
+                                                <MenuItem Header="{c:Localize Delete}"
+                                                          Command="{Binding $parent[UserControl].DataContext.DeleteSnippetCommand}"
+                                                          CommandParameter="{Binding}"
+                                                          Foreground="{DynamicResource LuminaDangerBrush}">
+                                                    <MenuItem.Icon><avalonia:MaterialIcon Kind="Delete"/></MenuItem.Icon>
+                                                </MenuItem>
+                                            </ContextMenu>
+                                        </Border.ContextMenu>
+                                        <Grid ColumnDefinitions="Auto, 220, *, Auto" VerticalAlignment="Center">
+                                            <avalonia:MaterialIcon Grid.Column="0" Kind="ConsoleLine" Width="16" Height="16" Opacity="0.55" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" FontSize="13"
+                                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                            <SelectableTextBlock Grid.Column="2" Text="{Binding Command}" FontSize="12" Opacity="0.8"
+                                                                 TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="14,0,14,0"
+                                                                 FontFamily="Cascadia Mono, Consolas, monospace"
+                                                                 SelectionBrush="{DynamicResource LuminaPrimaryBrush}"
+                                                                 Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
+                                            <!-- Action Buttons directly on every item -->
+                                            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                <Button Classes="Ghost IconOnly Compact"
+                                                        Command="{Binding $parent[UserControl].DataContext.SendToTerminalCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip.Tip="{c:Localize SendToTerminal}">
+                                                    <avalonia:MaterialIcon Kind="Play" Width="15" Height="15" Foreground="{DynamicResource LuminaSuccessBrush}"/>
+                                                </Button>
+                                                <Button Classes="Ghost IconOnly Compact"
+                                                        Command="{Binding $parent[UserControl].DataContext.EditSnippetCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip.Tip="{c:Localize Edit}">
+                                                    <avalonia:MaterialIcon Kind="PencilOutline" Width="14" Height="14" Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
+                                                </Button>
+                                                <Button Classes="Ghost IconOnly Compact"
+                                                        Command="{Binding $parent[UserControl].DataContext.DeleteSnippetCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip.Tip="{c:Localize Delete}">
+                                                    <avalonia:MaterialIcon Kind="DeleteOutline" Width="15" Height="15" Foreground="{DynamicResource LuminaDangerBrush}"/>
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <!-- Snippets Empty state -->
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12"
+                                    IsHitTestVisible="False"
+                                    IsVisible="{Binding HasNoSnippets}">
+                            <Border Width="70" Height="70" CornerRadius="{DynamicResource AppRadiusPill}"
+                                    Background="{DynamicResource LuminaStateHoverBrush}" HorizontalAlignment="Center">
+                                <avalonia:MaterialIcon Kind="ScriptTextOutline" Width="30" Height="30" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+                            </Border>
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="{c:Localize NoSnippetsTitle}" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center"
+                                           Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                <TextBlock Text="{c:Localize SnippetsEmptyHint}" Classes="PageSubtitle" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Tab 2: History List -->
+                    <Grid IsVisible="{Binding IsHistoryTab}">
+                        <ListBox Classes="CommandListBox"
+                                 ItemsSource="{Binding FilteredHistoryItems}"
+                                 SelectedItem="{Binding SelectedHistoryItem, Mode=TwoWay}"
+                                 DoubleTapped="HistoryList_DoubleTapped"
+                                 Background="Transparent"
+                                 Padding="8">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="m:TerminalHistoryItem">
+                                    <Border Classes="CommandCard">
+                                        <Border.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="{c:Localize SendToTerminal}"
+                                                          Command="{Binding $parent[UserControl].DataContext.SendToTerminalCommand}"
+                                                          CommandParameter="{Binding}">
+                                                    <MenuItem.Icon><avalonia:MaterialIcon Kind="Play"/></MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem Header="{c:Localize Copy}"
+                                                          Command="{Binding $parent[UserControl].DataContext.CopyCommandCommand}"
+                                                          CommandParameter="{Binding Command}">
+                                                    <MenuItem.Icon><avalonia:MaterialIcon Kind="ContentCopy"/></MenuItem.Icon>
+                                                </MenuItem>
+                                                <MenuItem Header="{c:Localize SaveAsSnippet}"
+                                                          Command="{Binding $parent[UserControl].DataContext.SaveHistoryAsSnippetCommand}"
+                                                          CommandParameter="{Binding}">
+                                                    <MenuItem.Icon><avalonia:MaterialIcon Kind="BookmarkPlusOutline"/></MenuItem.Icon>
+                                                </MenuItem>
+                                                <Separator/>
+                                                <MenuItem Header="{c:Localize Delete}"
+                                                          Command="{Binding $parent[UserControl].DataContext.DeleteHistoryItemCommand}"
+                                                          CommandParameter="{Binding}"
+                                                          Foreground="{DynamicResource LuminaDangerBrush}">
+                                                    <MenuItem.Icon><avalonia:MaterialIcon Kind="Delete"/></MenuItem.Icon>
+                                                </MenuItem>
+                                            </ContextMenu>
+                                        </Border.ContextMenu>
+                                        <Grid ColumnDefinitions="Auto, *, Auto, Auto" VerticalAlignment="Center">
+                                            <avalonia:MaterialIcon Grid.Column="0" Kind="History" Width="16" Height="16" Opacity="0.5" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                            <SelectableTextBlock Grid.Column="1" Text="{Binding Command}" FontSize="13" FontWeight="SemiBold"
+                                                                 TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                                                 FontFamily="Cascadia Mono, Consolas, monospace"
+                                                                 SelectionBrush="{DynamicResource LuminaPrimaryBrush}"
+                                                                 Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding Timestamp, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}"
+                                                       FontSize="11" Margin="16,0,14,0" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+                                            <!-- Action Buttons directly on every history item -->
+                                            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                <Button Classes="Ghost IconOnly Compact"
+                                                        Command="{Binding $parent[UserControl].DataContext.SendToTerminalCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip.Tip="{c:Localize SendToTerminal}">
+                                                    <avalonia:MaterialIcon Kind="Play" Width="15" Height="15" Foreground="{DynamicResource LuminaSuccessBrush}"/>
+                                                </Button>
+                                                <Button Classes="Ghost IconOnly Compact"
+                                                        Command="{Binding $parent[UserControl].DataContext.SaveHistoryAsSnippetCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip.Tip="{c:Localize SaveAsSnippet}">
+                                                    <avalonia:MaterialIcon Kind="BookmarkPlusOutline" Width="15" Height="15" Foreground="{DynamicResource LuminaPrimaryBrush}"/>
+                                                </Button>
+                                                <Button Classes="Ghost IconOnly Compact"
+                                                        Command="{Binding $parent[UserControl].DataContext.DeleteHistoryItemCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip.Tip="{c:Localize Delete}">
+                                                    <avalonia:MaterialIcon Kind="DeleteOutline" Width="15" Height="15" Foreground="{DynamicResource LuminaDangerBrush}"/>
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <!-- History Empty state -->
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12"
+                                    IsHitTestVisible="False"
+                                    IsVisible="{Binding HasNoHistory}">
+                            <Border Width="70" Height="70" CornerRadius="{DynamicResource AppRadiusPill}"
+                                    Background="{DynamicResource LuminaStateHoverBrush}" HorizontalAlignment="Center">
+                                <avalonia:MaterialIcon Kind="History" Width="30" Height="30" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+                            </Border>
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="{c:Localize NoHistoryTitle}" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center"
+                                           Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                <TextBlock Text="{c:Localize NoHistoryHint}" Classes="PageSubtitle" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Panel>
+            </Grid>
+        </lumina:LuminaCard>
     </Grid>
 </UserControl>

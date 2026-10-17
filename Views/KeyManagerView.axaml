@@ -1,0 +1,201 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:JxTerminal.ViewModels"
+             xmlns:m="using:JxTerminal.Models"
+             xmlns:c="using:JxTerminal.Converters"
+             xmlns:lumina="clr-namespace:LuminaUI.Controls;assembly=LuminaUI"
+             xmlns:avalonia="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
+             x:Class="JxTerminal.Views.KeyManagerView"
+             x:DataType="vm:KeyManagerViewModel">
+
+    <Grid RowDefinitions="Auto, *" Margin="16,14,16,14">
+        <!-- Header -->
+        <Grid Grid.Row="0" ColumnDefinitions="*, Auto" Margin="0,0,0,14">
+            <StackPanel Spacing="4">
+                <TextBlock Text="{c:Localize Keys}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                <TextBlock Text="{c:Localize KeyManagerSubtitle}" Classes="PageSubtitle"/>
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBox Width="220"
+                         Classes="Rounded"
+                         PlaceholderText="{c:Localize Search}"
+                         Text="{Binding SearchText, Mode=TwoWay}">
+                    <TextBox.InnerLeftContent>
+                        <avalonia:MaterialIcon Kind="Magnify" Width="16" Height="16" Margin="10,0,0,0" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+                    </TextBox.InnerLeftContent>
+                </TextBox>
+                <Button Classes="Outline" Command="{Binding ImportKeyCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <avalonia:MaterialIcon Kind="FileImportOutline" Width="16" Height="16"/>
+                        <TextBlock Text="{c:Localize ImportKey}"/>
+                    </StackPanel>
+                </Button>
+                <Button Classes="Outline" Command="{Binding GenerateRsaKeyCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <avalonia:MaterialIcon Kind="ShieldKeyOutline" Width="16" Height="16"/>
+                        <TextBlock Text="RSA 4096"/>
+                    </StackPanel>
+                </Button>
+                <Button Classes="Primary" Command="{Binding GenerateKeyCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <avalonia:MaterialIcon Kind="KeyPlus" Width="16" Height="16"/>
+                        <TextBlock Text="{c:Localize GenerateKey}"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- Main Content -->
+        <Grid Grid.Row="1" ColumnDefinitions="360, *">
+            <!-- Key List -->
+            <lumina:LuminaCard Grid.Column="0" Padding="0" ClipToBounds="True">
+                <Grid RowDefinitions="*">
+                    <!-- Empty State -->
+                    <StackPanel IsVisible="{Binding HasNoKeys}" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12" Margin="20">
+                        <avalonia:MaterialIcon Kind="KeyVariant" Width="48" Height="48" Foreground="{DynamicResource LuminaTextTertiaryBrush}" HorizontalAlignment="Center" Opacity="0.5"/>
+                        <TextBlock Text="{c:Localize NoKeysFound}" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
+                        <TextBlock Text="{c:Localize NoKeysHint}" FontSize="12" TextWrapping="Wrap" TextAlignment="Center" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+                    </StackPanel>
+
+                    <!-- List -->
+                    <ListBox ItemsSource="{Binding FilteredKeys}"
+                             SelectedItem="{Binding SelectedKey, Mode=TwoWay}"
+                             Background="Transparent"
+                             Padding="6">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="m:KeyItem">
+                                <Border Padding="10,8" CornerRadius="{DynamicResource AppRadiusSm}">
+                                    <Border.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="{c:Localize CopyPublicKey}"
+                                                      Command="{Binding $parent[UserControl].DataContext.CopyPublicKeyCommand}">
+                                                <MenuItem.Icon><avalonia:MaterialIcon Kind="ContentCopy"/></MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="{c:Localize CopyFingerprint}"
+                                                      Command="{Binding $parent[UserControl].DataContext.CopyFingerprintCommand}">
+                                                <MenuItem.Icon><avalonia:MaterialIcon Kind="Fingerprint"/></MenuItem.Icon>
+                                            </MenuItem>
+                                            <Separator/>
+                                            <MenuItem Header="{c:Localize Delete}"
+                                                      Command="{Binding $parent[UserControl].DataContext.DeleteKeyCommand}"
+                                                      CommandParameter="{Binding}">
+                                                <MenuItem.Icon><avalonia:MaterialIcon Kind="Delete"/></MenuItem.Icon>
+                                            </MenuItem>
+                                        </ContextMenu>
+                                    </Border.ContextMenu>
+                                    <Grid ColumnDefinitions="Auto, *, Auto">
+                                        <Border Width="36" Height="36" CornerRadius="{DynamicResource AppRadiusMd}"
+                                                Background="{DynamicResource LuminaPrimaryBgBrush}"
+                                                VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <avalonia:MaterialIcon Kind="{Binding IconKind}" Width="18" Height="18"
+                                                                   Foreground="{DynamicResource LuminaPrimaryBrush}"
+                                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14"
+                                                       Foreground="{DynamicResource LuminaTextPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <TextBlock Text="{Binding DisplayType}" FontSize="11" Foreground="{DynamicResource LuminaPrimaryBrush}" FontWeight="Medium"/>
+                                                <TextBlock Text="•" FontSize="11" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+                                                <TextBlock Text="{Binding CreatedAt, StringFormat='{}{0:yyyy-MM-dd}'}" FontSize="11" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </lumina:LuminaCard>
+
+            <!-- Key Details Pane -->
+            <lumina:LuminaCard Grid.Column="1" Margin="20,0,0,0" Padding="24" IsVisible="{Binding SelectedKey, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <ScrollViewer>
+                    <StackPanel Spacing="20">
+                        <Grid ColumnDefinitions="*, Auto">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="{Binding SelectedKey.Name}" FontSize="20" FontWeight="Bold" Foreground="{DynamicResource LuminaTextPrimaryBrush}"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Border Background="{DynamicResource LuminaPrimaryBgBrush}" CornerRadius="4" Padding="6,2">
+                                        <TextBlock Text="{Binding SelectedKey.DisplayType}" FontSize="12" Foreground="{DynamicResource LuminaPrimaryBrush}" FontWeight="SemiBold"/>
+                                    </Border>
+                                    <TextBlock Text="{Binding SelectedKey.CreatedAt, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}" FontSize="12" Foreground="{DynamicResource LuminaTextTertiaryBrush}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </StackPanel>
+
+                            <Button Grid.Column="1" Classes="Danger Ghost IconOnly" Command="{Binding DeleteKeyCommand}" CommandParameter="{Binding SelectedKey}" ToolTip.Tip="{c:Localize Delete}">
+                                <avalonia:MaterialIcon Kind="DeleteOutline" Width="18" Height="18"/>
+                            </Button>
+                        </Grid>
+
+                        <Separator/>
+
+                        <!-- Fingerprint -->
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*, Auto">
+                                <TextBlock Text="{c:Localize Fingerprint}" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
+                                <Button Grid.Column="1" Classes="Ghost" Command="{Binding CopyFingerprintCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <avalonia:MaterialIcon Kind="ContentCopy" Width="14" Height="14"/>
+                                        <TextBlock Text="{c:Localize Copy}" FontSize="12"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                            <Border Background="{DynamicResource LuminaBackgroundBrush}" CornerRadius="{DynamicResource AppRadiusSm}" Padding="12,8" BorderThickness="1" BorderBrush="{DynamicResource LuminaBorderSubtleBrush}">
+                                <TextBlock Text="{Binding SelectedKey.Fingerprint}" FontFamily="Consolas, monospace" FontSize="12" Foreground="{DynamicResource LuminaTextPrimaryBrush}" TextWrapping="Wrap"/>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- Public Key -->
+                        <StackPanel Spacing="6">
+                            <Grid ColumnDefinitions="*, Auto">
+                                <TextBlock Text="{c:Localize PublicKeyOpenSsh}" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
+                                <Button Grid.Column="1" Classes="Ghost" Command="{Binding CopyPublicKeyCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <avalonia:MaterialIcon Kind="ContentCopy" Width="14" Height="14"/>
+                                        <TextBlock Text="{c:Localize Copy}" FontSize="12"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                            <Border Background="{DynamicResource LuminaBackgroundBrush}" CornerRadius="{DynamicResource AppRadiusSm}" Padding="12" BorderThickness="1" BorderBrush="{DynamicResource LuminaBorderSubtleBrush}">
+                                <TextBox Text="{Binding SelectedKey.PublicKeyOpenSsh, Mode=OneWay}"
+                                         IsReadOnly="True"
+                                         TextWrapping="Wrap"
+                                         AcceptsReturn="True"
+                                         MaxHeight="120"
+                                         FontFamily="Consolas, monospace"
+                                         FontSize="12"
+                                         Background="Transparent"
+                                         BorderThickness="0"/>
+                            </Border>
+                            <TextBlock Text="{c:Localize PublicKeyHint}" FontSize="11" Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
+                        </StackPanel>
+
+                        <!-- Actions -->
+                        <StackPanel Spacing="10" Margin="0,10,0,0">
+                            <TextBlock Text="{c:Localize Actions}" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource LuminaTextSecondaryBrush}"/>
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <Button Classes="Primary" Command="{Binding CopyPublicKeyCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <avalonia:MaterialIcon Kind="ContentCopy" Width="16" Height="16"/>
+                                        <TextBlock Text="{c:Localize CopyPublicKey}"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="Outline" Command="{Binding ExportPrivateKeyCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <avalonia:MaterialIcon Kind="Export" Width="16" Height="16"/>
+                                        <TextBlock Text="{c:Localize ExportPrivateKey}"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </lumina:LuminaCard>
+        </Grid>
+    </Grid>
+</UserControl>

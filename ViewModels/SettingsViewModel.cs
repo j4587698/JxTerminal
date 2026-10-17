@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using JxTerminal.Models;
 using JxTerminal.Services;
+using JxTerminal.Services.Terminal;
 using JxTerminal.Views;
 using LuminaUI.Theming;
 using System.Collections.Generic;
@@ -58,6 +59,18 @@ public partial class SettingsViewModel : ViewModelBase
     public ObservableCollection<LocalizedWrapper<ThemeVariant>> AvailableThemes { get; }
     public ObservableCollection<LocalizedWrapper<string>> AvailableLanguages { get; }
     public ObservableCollection<string> AvailableFonts { get; }
+    public ObservableCollection<LocalizedWrapper<FolderTransferMode>> AvailableFolderTransferModes { get; }
+
+    [ObservableProperty]
+    private LocalizedWrapper<FolderTransferMode> _selectedFolderTransferMode;
+
+    partial void OnSelectedFolderTransferModeChanged(LocalizedWrapper<FolderTransferMode> value)
+    {
+        if (value != null && Settings.FolderTransferMode != value.Value)
+        {
+            Settings.FolderTransferMode = value.Value;
+        }
+    }
 
     /// <summary>
     /// All available color schemes (built-in presets + user custom schemes).
@@ -77,7 +90,79 @@ public partial class SettingsViewModel : ViewModelBase
     private LocalizedWrapper<string> _selectedLanguage;
 
     [ObservableProperty]
-    private string _selectedSection = "General"; // "General" or "Terminal"
+    private int _selectedTabIndex;
+
+    public bool IsTabGeneral => SelectedTabIndex == 0;
+    public bool IsTabTerminal => SelectedTabIndex == 1;
+    public bool IsTabAi => SelectedTabIndex == 2;
+    public bool IsTabColorScheme => SelectedTabIndex == 3;
+    public bool IsTabAbout => SelectedTabIndex == 4;
+    public bool IsTabSync => SelectedTabIndex == 5;
+
+    partial void OnSelectedTabIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsTabGeneral));
+        OnPropertyChanged(nameof(IsTabTerminal));
+        OnPropertyChanged(nameof(IsTabAi));
+        OnPropertyChanged(nameof(IsTabColorScheme));
+        OnPropertyChanged(nameof(IsTabAbout));
+        OnPropertyChanged(nameof(IsTabSync));
+    }
+
+    public SyncViewModel Sync { get; }
+
+    public string AppDataDirectory => PathConfig.AppDataRoot;
+
+    [RelayCommand]
+    private void OpenDataFolder()
+    {
+        try
+        {
+            var dir = PathConfig.AppDataRoot;
+            if (System.IO.Directory.Exists(dir))
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = dir,
+                    UseShellExecute = true
+                });
+            }
+        }
+        catch (System.Exception ex)
+        {
+            AppLog.Error($"Failed to open data folder: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    private void SetAiPreset(string preset)
+    {
+        switch (preset?.ToLowerInvariant())
+        {
+            case "openai":
+                Settings.AiEndpoint = "https://api.openai.com/v1";
+                Settings.AiModel = "gpt-4o-mini";
+                break;
+            case "deepseek":
+                Settings.AiEndpoint = "https://api.deepseek.com/v1";
+                Settings.AiModel = "deepseek-chat";
+                break;
+            case "ollama":
+                Settings.AiEndpoint = "http://localhost:11434/v1";
+                Settings.AiModel = "qwen2.5-coder";
+                break;
+            case "qwen":
+                Settings.AiEndpoint = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+                Settings.AiModel = "qwen-plus";
+                break;
+        }
+    }
+
+    [RelayCommand]
+    private void SelectColorOption(AccentColorOption opt)
+    {
+        if (opt != null) SelectedColor = opt;
+    }
 
     /// <summary>
     /// Whether the current color scheme is editable (user-defined, not built-in).
@@ -89,6 +174,7 @@ public partial class SettingsViewModel : ViewModelBase
     {
         Settings = settings;
         _mainViewModel = mainViewModel;
+        Sync = new SyncViewModel(mainViewModel);
         
         // Wrap Languages
         AvailableLanguages = new ObservableCollection<LocalizedWrapper<string>>
@@ -97,7 +183,7 @@ public partial class SettingsViewModel : ViewModelBase
             new LocalizedWrapper<string>("zh-CN", "Chinese")
         };
         
-        var currentCulture = LocalizationService.Instance.CultureCode;
+        var currentCulture = string.IsNullOrWhiteSpace(Settings.Language) ? LocalizationService.Instance.CultureCode : Settings.Language;
         _selectedLanguage = AvailableLanguages.FirstOrDefault(l => l.Value == currentCulture)
                             ?? AvailableLanguages[0];
 
@@ -112,7 +198,9 @@ public partial class SettingsViewModel : ViewModelBase
             new("Cyan", "#0891B2")
         };
 
-        var currentAccent = LuminaThemeManager.ToHex(LuminaThemeManager.CurrentAccentColor);
+        var currentAccent = string.IsNullOrWhiteSpace(Settings.AccentColor) 
+            ? LuminaThemeManager.ToHex(LuminaThemeManager.CurrentAccentColor) 
+            : Settings.AccentColor;
         _selectedColor = AvailableColors.FirstOrDefault(c => c.Hex.Equals(currentAccent, System.StringComparison.OrdinalIgnoreCase))
                          ?? AvailableColors[0];
 
@@ -123,26 +211,44 @@ public partial class SettingsViewModel : ViewModelBase
             new LocalizedWrapper<ThemeVariant>(ThemeVariant.Light, "Light")
         };
         
-        _selectedBaseTheme = AvailableThemes.FirstOrDefault(t => t.Value == Application.Current?.RequestedThemeVariant)
+        var themeName = string.IsNullOrWhiteSpace(Settings.ThemeMode) ? "Dark" : Settings.ThemeMode;
+        _selectedBaseTheme = AvailableThemes.FirstOrDefault(t => t.Value.ToString().Equals(themeName, System.StringComparison.OrdinalIgnoreCase))
                              ?? AvailableThemes[0];
 
-        // Load System Fonts
-        AvailableFonts = new ObservableCollection<string>(FontManager.Current.SystemFonts.OrderBy(f => f.Name).Select(f => f.Name));
+        // Load System Fonts (monospaced by default)
+        AvailableFonts = new ObservableCollection<string>(FontHelper.GetMonospaceFonts());
         
-        // Ensure current font is in the list (or add it if it's a fallback/custom string)
-        if (!AvailableFonts.Contains(Settings.FontFamily))
+        // Ensure current font is in the list
+        if (!AvailableFonts.Contains(Settings.FontFamily) && !string.IsNullOrWhiteSpace(Settings.FontFamily))
         {
-             AvailableFonts.Insert(0, Settings.FontFamily);
+            AvailableFonts.Insert(0, Settings.FontFamily);
         }
 
-        // Color Schemes
+        // Color Schemes: load built-in presets
         AvailableColorSchemes = new ObservableCollection<TerminalColorScheme>(
             TerminalColorSchemes.GetAllPresets());
 
-        // If current settings have a custom (non-built-in) scheme, add it to the list
+        // Load all saved custom schemes from Settings.CustomColorSchemes
+        foreach (var cs in Settings.CustomColorSchemes)
+        {
+            cs.IsBuiltIn = false;
+            if (!AvailableColorSchemes.Any(s => s.Name == cs.Name))
+            {
+                AvailableColorSchemes.Add(cs);
+            }
+        }
+
+        // Backward compatibility: If active scheme is custom and not yet in list
         if (Settings.ColorScheme != null && !Settings.ColorScheme.IsBuiltIn)
         {
-            AvailableColorSchemes.Add(Settings.ColorScheme);
+            if (!AvailableColorSchemes.Any(s => s.Name == Settings.ColorScheme.Name))
+            {
+                AvailableColorSchemes.Add(Settings.ColorScheme);
+            }
+            if (!Settings.CustomColorSchemes.Any(s => s.Name == Settings.ColorScheme.Name))
+            {
+                Settings.CustomColorSchemes.Add(Settings.ColorScheme);
+            }
         }
 
         // Select the current scheme
@@ -171,7 +277,15 @@ public partial class SettingsViewModel : ViewModelBase
         _selectedCursorStyle = AvailableCursorStyles.FirstOrDefault(c => c.Value == Settings.CursorStyle)
                                ?? AvailableCursorStyles[0];
 
-        System.Diagnostics.Debug.WriteLine($"[SettingsViewModel] Settings HashCode: {Settings.GetHashCode()}");
+        // Folder Transfer Modes
+        AvailableFolderTransferModes = new ObservableCollection<LocalizedWrapper<FolderTransferMode>>
+        {
+            new(FolderTransferMode.TarGz, "FolderTransferTar"),
+            new(FolderTransferMode.Zip, "FolderTransferZip"),
+            new(FolderTransferMode.Standard, "FolderTransferStandard")
+        };
+        _selectedFolderTransferMode = AvailableFolderTransferModes.FirstOrDefault(m => m.Value == Settings.FolderTransferMode)
+            ?? AvailableFolderTransferModes[0];
     }
 
     public ObservableCollection<string> AvailableLocalShells { get; }
@@ -211,6 +325,7 @@ public partial class SettingsViewModel : ViewModelBase
         
         Settings.ApplyScheme(value);
         IsSchemeEditable = !value.IsBuiltIn;
+        _ = DataStore.SaveSettingsAsync(Settings);
     }
 
     partial void OnSelectedLanguageChanged(LocalizedWrapper<string> value)
@@ -220,6 +335,7 @@ public partial class SettingsViewModel : ViewModelBase
         _isUpdating = true;
         try
         {
+            Settings.Language = value.Value;
             LocalizationService.Instance.SetLanguage(value.Value);
         }
         finally
@@ -235,6 +351,7 @@ public partial class SettingsViewModel : ViewModelBase
         _isUpdating = true;
         try
         {
+            Settings.AccentColor = value.Hex;
             LuminaThemeManager.TrySetAccentColor(value.Hex);
         }
         finally
@@ -250,6 +367,7 @@ public partial class SettingsViewModel : ViewModelBase
         _isUpdating = true;
         try
         {
+            Settings.ThemeMode = value.Value.ToString();
             Application.Current!.RequestedThemeVariant = value.Value;
             LuminaThemeManager.SetThemeMode(value.Value == ThemeVariant.Light
                 ? LuminaThemeMode.Light
@@ -282,7 +400,13 @@ public partial class SettingsViewModel : ViewModelBase
         }
 
         AvailableColorSchemes.Add(clone);
+        if (!Settings.CustomColorSchemes.Any(s => s.Name == clone.Name))
+        {
+            Settings.CustomColorSchemes.Add(clone);
+        }
+
         SelectedColorScheme = clone;
+        _ = DataStore.SaveSettingsAsync(Settings);
     }
 
     /// <summary>
@@ -294,37 +418,41 @@ public partial class SettingsViewModel : ViewModelBase
         if (SelectedColorScheme == null || SelectedColorScheme.IsBuiltIn) return;
 
         var toRemove = SelectedColorScheme;
-        SelectedColorScheme = AvailableColorSchemes.FirstOrDefault(s => s.IsBuiltIn) ?? AvailableColorSchemes[0];
+        Settings.CustomColorSchemes.RemoveAll(s => s.Name == toRemove.Name);
         AvailableColorSchemes.Remove(toRemove);
+
+        SelectedColorScheme = AvailableColorSchemes.FirstOrDefault(s => s.IsBuiltIn) ?? AvailableColorSchemes[0];
+        _ = DataStore.SaveSettingsAsync(Settings);
     }
 
     [RelayCommand]
     private void PickFont()
     {
-        var vm = new FontPickerViewModel(AvailableFonts, Settings.FontFamily);
+        var vm = new FontPickerViewModel(FontHelper.GetMonospaceFonts(), FontHelper.GetAllFonts(), Settings.FontFamily);
         var view = new FontPickerView() { DataContext = vm };
-        view.Margin = new Thickness(24);
 
         void OnClose(object? sender, string? selectedFont)
         {
-             vm.RequestClose -= OnClose;
-             
-             if (selectedFont != null)
-             {
-                 if (string.IsNullOrWhiteSpace(selectedFont))
-                 {
-                     Settings.FontFamily = "DejaVu Sans Mono, Liberation Mono, Consolas, monospace";
-                 }
-                 else
-                 {
-                     Settings.FontFamily = selectedFont;
-                 }
-             }
-             
-             _mainViewModel.CloseDialog();
+            vm.RequestClose -= OnClose;
+
+            if (selectedFont != null)
+            {
+                var newFont = string.IsNullOrWhiteSpace(selectedFont)
+                    ? TerminalSettings.DefaultFontFamily
+                    : selectedFont;
+
+                if (!AvailableFonts.Contains(newFont))
+                {
+                    AvailableFonts.Insert(0, newFont);
+                }
+
+                Settings.FontFamily = newFont;
+            }
+
+            _mainViewModel.CloseDialog();
         }
         vm.RequestClose += OnClose;
 
-        _mainViewModel.ShowDialog(view);
+        _mainViewModel.ShowDialog(view, Services.LocalizationService.Instance["SelectFont"]);
     }
 }

@@ -19,13 +19,13 @@ public partial class SnippetEditViewModel : ViewModelBase
     /// <summary>True when creating a new snippet, false when editing an existing one.</summary>
     public bool IsNew { get; }
 
-    public string TitleKey => IsNew ? "NewSnippet" : "RenameItem";
+    public string TitleKey => IsNew ? "NewSnippet" : "EditSnippet";
 
     public event EventHandler<object?>? RequestClose;
 
-    public SnippetEditViewModel(SnippetItem? existing = null)
+    public SnippetEditViewModel(SnippetItem? existing = null, bool isNew = false)
     {
-        IsNew = existing == null;
+        IsNew = isNew || existing == null;
         if (existing != null)
         {
             _name = existing.Name;

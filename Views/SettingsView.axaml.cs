@@ -21,7 +21,7 @@ public partial class SettingsView : UserControl
 
         var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Select Background Image",
+            Title = Services.LocalizationService.Instance["SelectBackgroundImage"],
             AllowMultiple = false,
             FileTypeFilter = new[] { FilePickerFileTypes.ImageAll }
         });
@@ -33,9 +33,8 @@ public partial class SettingsView : UserControl
                 try
                 {
                     var sourcePath = files[0].Path.LocalPath;
-                    var appData = System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData);
-                    var bgDir = System.IO.Path.Combine(appData, "JxTerminal", "Backgrounds");
-                    
+                    var bgDir = Services.PathConfig.BackgroundsDir;
+
                     if (!System.IO.Directory.Exists(bgDir))
                         System.IO.Directory.CreateDirectory(bgDir);
 
@@ -53,18 +52,9 @@ public partial class SettingsView : UserControl
                 }
                 catch (System.Exception ex)
                 {
-                    // In a real app, show an error dialog/notification
-                    System.Diagnostics.Debug.WriteLine($"Failed to copy image: {ex.Message}");
+                    Services.AppLog.Error($"Failed to copy background image: {ex.Message}");
                 }
             }
-        }
-    }
-    private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (sender is ListBox listBox && listBox.SelectedItem is ListBoxItem item && item.Tag is string sectionName)
-        {
-            var control = this.FindControl<StackPanel>(sectionName);
-            control?.BringIntoView();
         }
     }
 }

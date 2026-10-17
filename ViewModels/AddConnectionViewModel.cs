@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using JxTerminal.Models;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.IO.Ports;
@@ -48,6 +49,13 @@ public partial class AddConnectionViewModel : ViewModelBase
     [ObservableProperty] private string _keyFilePath = "";
     [ObservableProperty] private string _passphrase = "";
     [ObservableProperty] private string _selectedGroup = "Default";
+
+    // Local shell path (no dedicated UI yet, but must round-trip so editing an
+    // existing Local connection does not wipe it).
+    [ObservableProperty] private string _shellPath = "";
+
+    public ObservableCollection<KeyItem> AvailableKeyStoreKeys => JxTerminal.Services.KeyStore.KeyStoreService.Instance.Keys;
+    [ObservableProperty] private KeyItem? _selectedKeyStoreKey;
 
     // Serial
     [ObservableProperty] [NotifyCanExecuteChangedFor(nameof(SaveCommand))] private string _serialPortName = "";
@@ -135,6 +143,12 @@ public partial class AddConnectionViewModel : ViewModelBase
         _authenticationType = existingConnection.AuthenticationType;
         _keyFilePath = existingConnection.KeyFilePath;
         _passphrase = existingConnection.Passphrase;
+        _shellPath = existingConnection.ShellPath;
+
+        if (existingConnection.KeyStoreId.HasValue)
+        {
+            SelectedKeyStoreKey = AvailableKeyStoreKeys.FirstOrDefault(k => k.Id == existingConnection.KeyStoreId.Value);
+        }
         
         // Serial
         _serialPortName = existingConnection.SerialPortName;
@@ -154,7 +168,8 @@ public partial class AddConnectionViewModel : ViewModelBase
 
     private Guid _id = Guid.NewGuid();
 
-    public Func<Task<string?>>? RequestPickKeyFile;
+    /// <summary>Raised to ask the view to pick a private key file (event, not a field, so only this VM invokes it).</summary>
+    public event Func<Task<string?>>? RequestPickKeyFile;
 
     [RelayCommand]
     public async Task SelectKeyFile()
@@ -165,6 +180,7 @@ public partial class AddConnectionViewModel : ViewModelBase
             if (!string.IsNullOrEmpty(file))
             {
                 KeyFilePath = file;
+                SelectedKeyStoreKey = null;
             }
         }
     }
@@ -215,8 +231,10 @@ public partial class AddConnectionViewModel : ViewModelBase
             Password = Password,
             AuthenticationType = AuthenticationType,
             KeyFilePath = KeyFilePath,
+            KeyStoreId = SelectedKeyStoreKey?.Id,
             Passphrase = Passphrase,
             GroupName = SelectedGroup,
+            ShellPath = ShellPath,
             SerialPortName = SerialPortName,
             BaudRate = BaudRate,
             DataBits = DataBits,

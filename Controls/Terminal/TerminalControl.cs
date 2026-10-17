@@ -14,6 +14,8 @@ using System.Text;
 using System.Threading.Tasks;
 using XTerm.Buffer;
 using XTerm.Common;
+using Material.Icons;
+using Material.Icons.Avalonia;
 
 namespace JxTerminal.Controls;
 
@@ -31,6 +33,8 @@ internal class TerminalTextInputMethodClient : TextInputMethodClient
         RaiseTextViewVisualChanged();
     }
     
+    // Deliberately returns null (despite the non-nullable signature) once detached:
+    // the IME framework tolerates a null visual but not an exception.
     public override Visual TextViewVisual => _control!;
     
     public override bool SupportsPreedit => true;
@@ -86,6 +90,11 @@ public class TerminalControl : Control
     private Point? _selectionEnd;
     private bool _isSelecting;
 
+    /// <summary>
+    /// True when non-empty text is currently selected in the terminal buffer.
+    /// </summary>
+    public bool HasSelection => _selectionStart != null && _selectionEnd != null && _selectionStart.Value != _selectionEnd.Value;
+
     // Scroll pinning: keep the viewport glued to the bottom while new output arrives,
     // unless the user scrolled upwards.
     private bool _stickToBottom = true;
@@ -93,6 +102,13 @@ public class TerminalControl : Control
     // Hovered hyperlink (URL detection)
     private Rect _hoverLinkRect;
     private string? _hoverLinkUrl;
+
+    // Coalesced render scheduling: multiple ScreenUpdated events within the same
+    // dispatcher pass collapse into a single InvalidateVisual cycle.
+    private bool _renderQueued;
+
+    // Last mouse button reported as pressed, so SGR release events can name the button.
+    private int _lastMouseButton;
 
     // Brush cache for rendering
     private readonly Dictionary<Color, SolidColorBrush> _brushCache = new();
@@ -108,6 +124,15 @@ public class TerminalControl : Control
     // IME support
     private readonly TerminalTextInputMethodClient _imClient = new();
     private string _preeditText = "";
+
+    // Auto-suggestion state
+    private string _inputLineBuffer = string.Empty;
+    private IReadOnlyList<Models.TerminalSuggestionItem> _suggestions = Array.Empty<Models.TerminalSuggestionItem>();
+    private int _selectedSuggestionIndex = -1;
+    private int _suggestionScrollOffset;
+    private const int MaxVisibleSuggestions = 7;
+    private bool _isSuggestionOpen;
+    private Rect _suggestionPopupBounds;
 
     // ANSI 256 color palette (instance-level, updated from color scheme)
     private Color[] _ansiColors = TerminalColorSchemes.Default.BuildAnsiPalette();
@@ -199,6 +224,15 @@ public class TerminalControl : Control
 
     public static readonly StyledProperty<Color> SelectionBackgroundProperty = 
         AvaloniaProperty.Register<TerminalControl, Color>(nameof(SelectionBackground), Color.FromArgb(77, 255, 255, 255));
+
+    public static readonly StyledProperty<bool> EnableSuggestionsProperty =
+        AvaloniaProperty.Register<TerminalControl, bool>(nameof(EnableSuggestions), true);
+
+    public bool EnableSuggestions
+    {
+        get => GetValue(EnableSuggestionsProperty);
+        set => SetValue(EnableSuggestionsProperty, value);
+    }
 
     // Search / find-in-buffer properties
     public static readonly StyledProperty<string?> SearchQueryProperty =
@@ -319,29 +353,58 @@ public class TerminalControl : Control
 
         // Context Menu
         var contextMenu = new ContextMenu();
-        var copyItem = new MenuItem();
+        var copyItem = new MenuItem { Icon = new MaterialIcon { Kind = MaterialIconKind.ContentCopy, Width = 15, Height = 15 } };
         copyItem.Click += async (s, e) => await CopyText();
-        var pasteItem = new MenuItem();
+        var pasteItem = new MenuItem { Icon = new MaterialIcon { Kind = MaterialIconKind.ContentPaste, Width = 15, Height = 15 } };
         pasteItem.Click += async (s, e) => await PasteText();
-        var selectAllItem = new MenuItem();
+        var pasteSelectionItem = new MenuItem { Icon = new MaterialIcon { Kind = MaterialIconKind.ClipboardArrowLeftOutline, Width = 15, Height = 15 } };
+        pasteSelectionItem.Click += (s, e) => PasteSelection();
+        var selectAllItem = new MenuItem { Icon = new MaterialIcon { Kind = MaterialIconKind.SelectAll, Width = 15, Height = 15 } };
         selectAllItem.Click += (s, e) => SelectAll();
-        var clearItem = new MenuItem();
+        var clearItem = new MenuItem { Icon = new MaterialIcon { Kind = MaterialIconKind.Broom, Width = 15, Height = 15 } };
         clearItem.Click += (s, e) => ClearScreen();
-        var clearScrollbackItem = new MenuItem();
+        var clearScrollbackItem = new MenuItem { Icon = new MaterialIcon { Kind = MaterialIconKind.DeleteSweepOutline, Width = 15, Height = 15 } };
         clearScrollbackItem.Click += (s, e) => ClearScrollback();
 
         contextMenu.Items.Add(copyItem);
         contextMenu.Items.Add(pasteItem);
+        contextMenu.Items.Add(pasteSelectionItem);
         contextMenu.Items.Add(new Separator());
         contextMenu.Items.Add(selectAllItem);
         contextMenu.Items.Add(clearItem);
         contextMenu.Items.Add(clearScrollbackItem);
+
+        contextMenu.Opening += async (s, e) =>
+        {
+            var selectedText = GetSelectedText();
+            bool hasSelection = !string.IsNullOrEmpty(selectedText);
+            copyItem.IsEnabled = hasSelection;
+            pasteSelectionItem.IsEnabled = hasSelection;
+            pasteItem.IsEnabled = false;
+
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel?.Clipboard != null)
+            {
+                try
+                {
+#pragma warning disable CS0618
+                    var clipText = await topLevel.Clipboard.TryGetTextAsync();
+#pragma warning restore CS0618
+                    pasteItem.IsEnabled = !string.IsNullOrEmpty(clipText);
+                }
+                catch
+                {
+                    pasteItem.IsEnabled = false;
+                }
+            }
+        };
 
         _localizeMenu = () =>
         {
             var l = Services.LocalizationService.Instance;
             copyItem.Header = l["Copy"];
             pasteItem.Header = l["Paste"];
+            pasteSelectionItem.Header = l["PasteSelection"];
             selectAllItem.Header = l["SelectAll"];
             clearItem.Header = l["ClearScreen"];
             clearScrollbackItem.Header = l["ClearScrollback"];
@@ -389,6 +452,7 @@ public class TerminalControl : Control
         Services.LocalizationService.Instance.PropertyChanged -= OnLocalizationChanged;
         Services.LocalizationService.Instance.PropertyChanged += OnLocalizationChanged;
         _localizeMenu?.Invoke();
+        ResizeTerminal(forceNotifyController: true);
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -415,9 +479,44 @@ public class TerminalControl : Control
             : "";
     }
 
+    /// <summary>
+    /// Builds the visible text of a line plus a per-UTF16-index grid column map.
+    /// Wide (CJK) glyphs occupy two columns but one text entry, so grid columns and
+    /// string indices diverge; this map is the single source of truth for the
+    /// conversion used by search, selection and word picking.
+    /// </summary>
+    private static string BuildLineTextWithColumnMap(BufferLine line, int cols, List<int> columns)
+    {
+        var sb = new StringBuilder();
+        columns.Clear();
+
+        int length = Math.Min(line.Length, cols);
+        for (int col = 0; col < length; col++)
+        {
+            var cell = line[col];
+            if (cell.Width == 0) continue; // trailing half of a wide glyph
+
+            var content = string.IsNullOrEmpty(cell.Content) ? " " : cell.Content;
+            for (int k = 0; k < content.Length; k++) columns.Add(col);
+            sb.Append(content);
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>First text index whose grid column is >= the given column (textLength when none).</summary>
+    private static int ColumnToTextIndex(List<int> columns, int col, int textLength)
+    {
+        for (int i = 0; i < columns.Count; i++)
+            if (columns[i] >= col) return i;
+        return textLength;
+    }
+
     private SolidColorBrush BrushFor(Color color)
     {
         if (_brushCache.TryGetValue(color, out var brush)) return brush;
+        // Truecolor escape sequences can mint an unbounded number of colors;
+        // cap the cache so long sessions cannot grow it forever.
+        if (_brushCache.Count > 512) _brushCache.Clear();
         brush = new SolidColorBrush(color);
         _brushCache[color] = brush;
         return brush;
@@ -435,6 +534,11 @@ public class TerminalControl : Control
         int count = terminal.Buffer.Lines.Length;
         _selectionStart = new Point(0, ToRelRow(0, count));
         _selectionEnd = new Point(Math.Max(0, terminal.Cols - 1), 0);
+        if (Controller != null)
+        {
+            Controller.SelectionStart = _selectionStart;
+            Controller.SelectionEnd = _selectionEnd;
+        }
         InvalidateVisual();
     }
 
@@ -482,28 +586,13 @@ public class TerminalControl : Control
 
         var comparison = SearchMatchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
         var buffer = terminal.Buffer;
-        var text = new StringBuilder();
         var columns = new List<int>();
 
         for (int row = 0; row < buffer.Lines.Length; row++)
         {
             if (buffer.Lines[row] is not BufferLine line) continue;
 
-            text.Clear();
-            columns.Clear();
-
-            int length = Math.Min(line.Length, terminal.Cols);
-            for (int col = 0; col < length; col++)
-            {
-                var cell = line[col];
-                if (cell.Width == 0) continue;
-
-                var content = string.IsNullOrEmpty(cell.Content) ? " " : cell.Content;
-                for (int k = 0; k < content.Length; k++) columns.Add(col);
-                text.Append(content);
-            }
-
-            var lineText = text.ToString();
+            var lineText = BuildLineTextWithColumnMap(line, terminal.Cols, columns);
             int index = 0;
             while (index <= lineText.Length - query.Length)
             {
@@ -616,6 +705,7 @@ public class TerminalControl : Control
         };
         _cursorBlinkTimer.Tick += (s, e) =>
         {
+            if (_isSelecting || HasSelection) return;
             _cursorVisible = !_cursorVisible;
             InvalidateVisual();
         };
@@ -657,6 +747,7 @@ public class TerminalControl : Control
         // Clear preedit text and disable IME
         _preeditText = "";
         _imClient.SetControl(null);
+        DismissSuggestions();
         
         InvalidateVisual();
     }
@@ -687,8 +778,12 @@ public class TerminalControl : Control
 
     private void OnScreenUpdated()
     {
+        if (_renderQueued) return;
+        _renderQueued = true;
         Dispatcher.UIThread.InvokeAsync(() =>
         {
+            _renderQueued = false;
+
             // Keep the viewport glued to the bottom while output streams in,
             // unless the user deliberately scrolled upwards.
             var terminal = Controller?.Terminal;
@@ -728,14 +823,25 @@ public class TerminalControl : Control
             if (change.OldValue is ITerminalController oldController)
             {
                 oldController.ScreenUpdated -= OnScreenUpdated;
+                oldController.SelectionStart = _selectionStart;
+                oldController.SelectionEnd = _selectionEnd;
             }
 
             if (change.NewValue is ITerminalController newController)
             {
                 newController.ScreenUpdated += OnScreenUpdated;
-                ResizeTerminal();
+                _selectionStart = newController.SelectionStart;
+                _selectionEnd = newController.SelectionEnd;
+                _isSelecting = false;
+                ResizeTerminal(forceNotifyController: true);
                 Dispatcher.UIThread.InvokeAsync(() => Focus());
                 OnScreenUpdated(); // Initial render
+            }
+            else
+            {
+                _selectionStart = null;
+                _selectionEnd = null;
+                _isSelecting = false;
             }
         }
         else if (change.Property == ScrollPositionProperty)
@@ -802,15 +908,20 @@ public class TerminalControl : Control
 
     private void UpdateTypeface()
     {
-        _typeface = new Typeface(FontFamily);
+        var family = FontFamily;
+        if (!string.IsNullOrWhiteSpace(family) && !family.Contains("monospace", StringComparison.OrdinalIgnoreCase))
+        {
+            family = $"{family}, monospace";
+        }
+        _typeface = new Typeface(family);
 
-        // Measure a representative character to determine grid size
-        // We use 'M' as a standard measure for width and height
-        var formatted = new FormattedText("M", System.Globalization.CultureInfo.CurrentCulture, 
+        // Measure a representative character to determine grid size.
+        // In terminals, digit '0' represents standard column width for monospace and tabular figures.
+        var formatted = new FormattedText("0", System.Globalization.CultureInfo.InvariantCulture, 
             FlowDirection.LeftToRight, _typeface, FontSize, Brushes.White);
         
-        _charWidth = formatted.WidthIncludingTrailingWhitespace;
-        _charHeight = formatted.Height;
+        _charWidth = Math.Max(1.0, formatted.WidthIncludingTrailingWhitespace);
+        _charHeight = Math.Max(1.0, formatted.Height);
     }
 
     /// <summary>
@@ -820,9 +931,11 @@ public class TerminalControl : Control
     {
         var terminal = Controller?.Terminal;
         if (terminal == null || _charHeight <= 0) return 0;
-        
+
         double usedHeight = terminal.Rows * _charHeight;
-        return (Bounds.Height - usedHeight) / 2;
+        // Clamp: while the control is smaller than the grid the midpoint is negative,
+        // which would shift content out of the visible area.
+        return Math.Max(0, (Bounds.Height - usedHeight) / 2);
     }
 
     /// <summary>
@@ -864,9 +977,10 @@ public class TerminalControl : Control
         ResizeTerminal();
     }
 
-    private void ResizeTerminal()
+    private void ResizeTerminal(bool forceNotifyController = false)
     {
         if (_charWidth <= 0 || _charHeight <= 0) return;
+        if (Bounds.Width < _charWidth || Bounds.Height < _charHeight) return;
 
         var terminal = Controller?.Terminal;
         if (terminal == null) return;
@@ -874,7 +988,9 @@ public class TerminalControl : Control
         var cols = Math.Max(2, (int)(Bounds.Width / _charWidth));
         var rows = Math.Max(2, (int)(Bounds.Height / _charHeight));
 
-        if (cols > 0 && rows > 0 && (cols != terminal.Cols || rows != terminal.Rows))
+        bool sizeChanged = cols != terminal.Cols || rows != terminal.Rows;
+
+        if (sizeChanged)
         {
             int oldRows = terminal.Rows;
             terminal.Resize(cols, rows);
@@ -891,8 +1007,12 @@ public class TerminalControl : Control
             }
 
             UpdateScrollProperties();
-            Controller?.Resize(rows, cols, (int)Bounds.Width, (int)Bounds.Height);
             InvalidateVisual();
+        }
+
+        if (sizeChanged || forceNotifyController)
+        {
+            Controller?.Resize(rows, cols, (int)Bounds.Width, (int)Bounds.Height);
         }
     }
 
@@ -900,13 +1020,7 @@ public class TerminalControl : Control
     {
         if (colorValue < 0 || !EnableColors) return defaultColor;
 
-        if (colorMode == (int)ColorMode.Palette256)
-        {
-            if (isBackground && colorValue == 0) return defaultColor;
-            if (isBold && !isBackground && colorValue >= 0 && colorValue < 8) colorValue += 8;
-            if (colorValue >= 0 && colorValue < 256) return _ansiColors[colorValue];
-        }
-        else if (colorMode == (int)ColorMode.RGB)
+        if (colorMode == (int)ColorMode.RGB)
         {
             byte r = (byte)((colorValue >> 16) & 0xFF);
             byte g = (byte)((colorValue >> 8) & 0xFF);
@@ -914,11 +1028,26 @@ public class TerminalControl : Control
             return Color.FromRgb(r, g, b);
         }
 
+        // Palette256 mode (or standard ANSI)
+        // In XTerm.NET:
+        // colorValue 0..15: Standard & bright ANSI colors
+        // colorValue 16..231: 256-color cube
+        // colorValue 232..255: 256-color grayscale
+        // colorValue 256: Default Foreground
+        // colorValue 257: Default Background
+        if (colorValue == 256) return ForegroundColor;
+        if (colorValue == 257) return BackgroundColor;
+
         if (colorValue >= 0 && colorValue < 256)
         {
-             if (isBackground && colorValue == 0) return defaultColor;
-             if (isBold && !isBackground && colorValue >= 0 && colorValue < 8) colorValue += 8;
-             return _ansiColors[colorValue];
+            if (isBold && !isBackground && colorValue >= 0 && colorValue < 8)
+            {
+                colorValue += 8;
+            }
+            if (colorValue < _ansiColors.Length)
+            {
+                return _ansiColors[colorValue];
+            }
         }
 
         return defaultColor;
@@ -957,26 +1086,41 @@ public class TerminalControl : Control
 
                 double yPos = verticalOffset + row * _charHeight;
 
-                // Batch consecutive same-style cells into a single text run: this cuts
-                // FormattedText allocations from one-per-cell to one-per-style-run.
+                // Batch consecutive same-style cells into a single text run: this aligns
+                // all glyph advances strictly to terminal grid columns (Windows Terminal AtlasEngine style),
+                // ensuring perfect cursor and click alignment for all fonts (monospace, CJK, proportional).
+                int runStartCol = -1;
+                int runCols = 0;
                 StringBuilder runText = new();
+                List<TerminalGlyphRenderer.CellSpan> runCells = new();
+                bool runHasVisibleChars = false;
                 Color runFg = default;
                 bool runBold = false;
-                double runX = 0;
-                int runCols = 0;
 
                 void FlushRun()
                 {
                     if (runText.Length == 0) return;
-                    var typeface = runBold
-                        ? new Typeface(_typeface.FontFamily, FontStyle.Normal, FontWeight.Bold)
-                        : _typeface;
-                    var formatted = new FormattedText(runText.ToString(),
-                        System.Globalization.CultureInfo.CurrentCulture,
-                        FlowDirection.LeftToRight, typeface, FontSize, BrushFor(runFg));
-                    double textVerticalOffset = (_charHeight - formatted.Height) / 2;
-                    context.DrawText(formatted, new Point(runX, yPos + textVerticalOffset));
+                    if (runHasVisibleChars)
+                    {
+                        var typeface = runBold
+                            ? new Typeface(_typeface.FontFamily, FontStyle.Normal, FontWeight.Bold)
+                            : _typeface;
+                        TerminalGlyphRenderer.DrawGridAlignedRun(
+                            context,
+                            runText.ToString(),
+                            runCells,
+                            typeface,
+                            FontSize,
+                            BrushFor(runFg),
+                            yPos,
+                            _charWidth,
+                            _charHeight);
+                    }
                     runText.Clear();
+                    runCells.Clear();
+                    runHasVisibleChars = false;
+                    runStartCol = -1;
+                    runCols = 0;
                 }
 
                 for (int col = 0; col < terminal.Cols && col < bl.Length; col++)
@@ -1009,22 +1153,27 @@ public class TerminalControl : Control
                     string content = cell.Content;
                     if (string.IsNullOrEmpty(content)) content = " ";
 
-                    // Break the run when style or x-position continuity changes.
+                    // Break the run when style or column continuity changes.
                     if (runText.Length > 0 &&
-                        (!fgColor.Equals(runFg) || isBold != runBold || col != (int)(runX / _charWidth) + runCols))
+                        (!fgColor.Equals(runFg) || isBold != runBold || col != runStartCol + runCols))
                     {
                         FlushRun();
                     }
 
                     if (runText.Length == 0)
                     {
-                        runX = xPos;
                         runFg = fgColor;
                         runBold = isBold;
+                        runStartCol = col;
                         runCols = 0;
                     }
 
                     runText.Append(content);
+                    runCells.Add(new TerminalGlyphRenderer.CellSpan(col, cell.Width, content.Length));
+                    if (!runHasVisibleChars && !string.IsNullOrWhiteSpace(content))
+                    {
+                        runHasVisibleChars = true;
+                    }
                     runCols += cell.Width;
                 }
 
@@ -1100,10 +1249,16 @@ public class TerminalControl : Control
 
                 if (IsFocused)
                 {
-                    // Focused: blinking solid cursor
-                    if (_cursorVisible)
+                    // Focused: blinking solid cursor when no text selected
+                    if (_cursorVisible && !HasSelection)
                     {
                         context.FillRectangle(BrushFor(cursorColor), cursorRect);
+                    }
+                    else if (HasSelection)
+                    {
+                        // When text is selected, draw a steady outline cursor so it does not fight with selection highlight
+                        var pen = new Pen(BrushFor(cursorColor), 1.2);
+                        context.DrawRectangle(null, pen, cursorRect);
                     }
                 }
                 else
@@ -1114,28 +1269,293 @@ public class TerminalControl : Control
                 }
             }
         }
+
+        if (_isSuggestionOpen && _suggestions.Count > 0 && CanShowSuggestions() && buffer != null)
+        {
+            int absoluteCursorY = buffer.YBase + buffer.Y;
+            int viewportY = buffer.YDisp;
+            int screenY = absoluteCursorY - viewportY;
+            double cursorX = buffer.X * _charWidth;
+            double cursorY = verticalOffset + screenY * _charHeight;
+            RenderSuggestions(context, cursorX, cursorY);
+        }
+    }
+
+    private bool CanShowSuggestions()
+    {
+        if (!EnableSuggestions || Controller == null) return false;
+        if (Controller.ApplicationCursorKeys || Controller.MouseTracking) return false;
+
+        return true;
+    }
+
+    private void UpdateSuggestions()
+    {
+        if (!CanShowSuggestions() || string.IsNullOrWhiteSpace(_inputLineBuffer))
+        {
+            DismissSuggestions();
+            return;
+        }
+
+        var list = Services.Terminal.TerminalSuggestionService.Instance.GetSuggestions(_inputLineBuffer);
+        if (list.Count > 0)
+        {
+            _suggestions = list;
+            _selectedSuggestionIndex = -1;
+            _suggestionScrollOffset = 0;
+            _isSuggestionOpen = true;
+        }
+        else
+        {
+            _suggestions = Array.Empty<Models.TerminalSuggestionItem>();
+            _suggestionScrollOffset = 0;
+            _isSuggestionOpen = false;
+        }
+        InvalidateVisual();
+    }
+
+    private void DismissSuggestions()
+    {
+        if (_isSuggestionOpen)
+        {
+            _isSuggestionOpen = false;
+            _suggestions = Array.Empty<Models.TerminalSuggestionItem>();
+            _selectedSuggestionIndex = -1;
+            _suggestionScrollOffset = 0;
+            _suggestionPopupBounds = default;
+            InvalidateVisual();
+        }
+    }
+
+    private void EnsureSuggestionVisible()
+    {
+        if (_suggestions.Count <= MaxVisibleSuggestions || _selectedSuggestionIndex < 0)
+        {
+            _suggestionScrollOffset = 0;
+            return;
+        }
+
+        if (_selectedSuggestionIndex >= _suggestionScrollOffset + MaxVisibleSuggestions)
+        {
+            _suggestionScrollOffset = _selectedSuggestionIndex - MaxVisibleSuggestions + 1;
+        }
+        else if (_selectedSuggestionIndex < _suggestionScrollOffset)
+        {
+            _suggestionScrollOffset = _selectedSuggestionIndex;
+        }
+
+        _suggestionScrollOffset = Math.Clamp(_suggestionScrollOffset, 0, _suggestions.Count - MaxVisibleSuggestions);
+    }
+
+    private void ApplySelectedSuggestion()
+    {
+        if (!_isSuggestionOpen || _suggestions.Count == 0 || _selectedSuggestionIndex < 0 || _selectedSuggestionIndex >= _suggestions.Count)
+            return;
+
+        var item = _suggestions[_selectedSuggestionIndex];
+        var suffix = Services.Terminal.TerminalSuggestionService.Instance.CalculateSuffix(_inputLineBuffer, item);
+
+        DismissSuggestions();
+
+        if (!string.IsNullOrEmpty(suffix))
+        {
+            _inputLineBuffer += suffix;
+            Controller?.SendInput(suffix);
+        }
+    }
+
+    private void RenderSuggestions(DrawingContext context, double cursorX, double cursorY)
+    {
+        if (!_isSuggestionOpen || _suggestions.Count == 0 || !CanShowSuggestions())
+            return;
+
+        int totalCount = _suggestions.Count;
+        int displayCount = Math.Min(totalCount, MaxVisibleSuggestions);
+        const double rowHeight = 26;
+        const double footerHeight = 22;
+        double cardHeight = displayCount * rowHeight + footerHeight + 8;
+        double cardWidth = Math.Min(480, Math.Max(340, Bounds.Width - 20));
+
+        double cardX = cursorX;
+        if (cardX + cardWidth > Bounds.Width - 10)
+        {
+            cardX = Math.Max(10, Bounds.Width - cardWidth - 10);
+        }
+
+        double cardY = cursorY + _charHeight + 4;
+        if (cardY + cardHeight > Bounds.Height - 10)
+        {
+            // Flip above cursor if bottom overflows
+            cardY = cursorY - cardHeight - 4;
+        }
+        cardY = Math.Max(4, cardY);
+
+        _suggestionPopupBounds = new Rect(cardX, cardY, cardWidth, cardHeight);
+
+        // Ensure scroll offset is valid
+        _suggestionScrollOffset = Math.Clamp(_suggestionScrollOffset, 0, Math.Max(0, totalCount - displayCount));
+
+        // Outer soft shadow
+        var shadowBrush = BrushFor(Color.FromArgb(90, 0, 0, 0));
+        context.FillRectangle(shadowBrush, new Rect(cardX - 1, cardY - 1, cardWidth + 2, cardHeight + 2), 8);
+
+        // Card surface background
+        var bgBrush = BrushFor(Color.FromArgb(246, 24, 25, 36));
+        context.FillRectangle(bgBrush, _suggestionPopupBounds, 7);
+
+        // Border outline
+        var borderPen = new Pen(BrushFor(Color.FromArgb(100, 100, 110, 140)), 1);
+        context.DrawRectangle(null, borderPen, _suggestionPopupBounds, 7);
+
+        bool hasScrollbar = totalCount > MaxVisibleSuggestions;
+        double itemContentRight = hasScrollbar ? cardWidth - 14 : cardWidth - 8;
+
+        // Draw items in the visible window
+        for (int i = 0; i < displayCount; i++)
+        {
+            int itemIndex = _suggestionScrollOffset + i;
+            if (itemIndex >= totalCount) break;
+
+            var item = _suggestions[itemIndex];
+            double itemY = cardY + 4 + i * rowHeight;
+            bool isSelected = (itemIndex == _selectedSuggestionIndex);
+
+            if (isSelected)
+            {
+                var selectBrush = BrushFor(Color.FromArgb(210, 37, 99, 235));
+                context.FillRectangle(selectBrush, new Rect(cardX + 4, itemY, itemContentRight, rowHeight - 2), 4);
+            }
+
+            // Category badge
+            Color badgeColor = item.Category switch
+            {
+                Models.SuggestionCategory.History => Color.FromRgb(245, 158, 11),
+                Models.SuggestionCategory.Snippet => Color.FromRgb(168, 85, 247),
+                Models.SuggestionCategory.Flag => Color.FromRgb(16, 185, 129),
+                Models.SuggestionCategory.Subcommand => Color.FromRgb(59, 130, 246),
+                _ => Color.FromRgb(6, 182, 212)
+            };
+
+            var badgeText = $"[{item.CategoryBadge}]";
+            var badgeFormatted = new FormattedText(
+                badgeText,
+                System.Globalization.CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight,
+                new Typeface(_typeface.FontFamily, FontStyle.Normal, FontWeight.Bold),
+                10,
+                BrushFor(isSelected ? Colors.White : badgeColor));
+
+            context.DrawText(badgeFormatted, new Point(cardX + 8, itemY + 5));
+
+            // Command Display Text
+            double cmdStartX = cardX + 54;
+            var cmdColor = isSelected ? Colors.White : ForegroundColor;
+            var cmdFormatted = new FormattedText(
+                item.DisplayText,
+                System.Globalization.CultureInfo.CurrentCulture,
+                FlowDirection.LeftToRight,
+                new Typeface(_typeface.FontFamily, FontStyle.Normal, FontWeight.Bold),
+                12,
+                BrushFor(cmdColor));
+
+            context.DrawText(cmdFormatted, new Point(cmdStartX, itemY + 4));
+
+            // Description
+            if (!string.IsNullOrEmpty(item.Description))
+            {
+                var descColor = isSelected
+                    ? Color.FromArgb(235, 225, 235, 255)
+                    : Color.FromRgb(150, 150, 165);
+
+                var descFormatted = new FormattedText(
+                    item.Description,
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    FlowDirection.LeftToRight,
+                    _typeface,
+                    11,
+                    BrushFor(descColor));
+
+                double descX = cardX + itemContentRight - descFormatted.Width - 4;
+                if (descX > cmdStartX + cmdFormatted.Width + 14)
+                {
+                    context.DrawText(descFormatted, new Point(descX, itemY + 5));
+                }
+            }
+        }
+
+        // Mini Scrollbar on the right
+        if (hasScrollbar)
+        {
+            double trackX = cardX + cardWidth - 6;
+            double trackY = cardY + 6;
+            double trackHeight = displayCount * rowHeight - 4;
+
+            // Subtle track background
+            var trackBrush = BrushFor(Color.FromArgb(25, 255, 255, 255));
+            context.FillRectangle(trackBrush, new Rect(trackX, trackY, 3, trackHeight), 1.5f);
+
+            // Thumb
+            double thumbHeight = Math.Max(18, trackHeight * displayCount / totalCount);
+            double maxScroll = totalCount - displayCount;
+            double thumbY = trackY + (_suggestionScrollOffset / maxScroll) * (trackHeight - thumbHeight);
+            var thumbBrush = BrushFor(Color.FromArgb(130, 255, 255, 255));
+            context.FillRectangle(thumbBrush, new Rect(trackX, thumbY, 3, thumbHeight), 1.5f);
+        }
+
+        // Footer hint bar
+        double footerY = cardY + cardHeight - footerHeight;
+        var dividerPen = new Pen(BrushFor(Color.FromArgb(40, 255, 255, 255)), 1);
+        context.DrawLine(dividerPen, new Point(cardX + 6, footerY), new Point(cardX + cardWidth - 6, footerY));
+
+        string hintText = _selectedSuggestionIndex >= 0
+            ? "Tab/Enter 确认 • ↑↓ 切换 • Esc 关闭"
+            : "↓ 选择 • → 采纳首项 • Tab 原生补全";
+
+        var hintFormatted = new FormattedText(
+            hintText,
+            System.Globalization.CultureInfo.CurrentCulture,
+            FlowDirection.LeftToRight,
+            _typeface,
+            10.5,
+            BrushFor(Color.FromRgb(125, 125, 140)));
+
+        context.DrawText(hintFormatted, new Point(cardX + 10, footerY + 4));
+
+        // Right-aligned item counter (e.g. 1/28 or total count when unselected)
+        var countText = _selectedSuggestionIndex >= 0
+            ? $"{_selectedSuggestionIndex + 1}/{totalCount}"
+            : $"{totalCount}";
+        var countFormatted = new FormattedText(
+            countText,
+            System.Globalization.CultureInfo.CurrentCulture,
+            FlowDirection.LeftToRight,
+            new Typeface(_typeface.FontFamily, FontStyle.Normal, FontWeight.Bold),
+            10,
+            BrushFor(Color.FromArgb(180, 148, 163, 184)));
+
+        double countX = cardX + cardWidth - countFormatted.Width - 10;
+        context.DrawText(countFormatted, new Point(countX, footerY + 4));
     }
 
     private void RenderSelection(DrawingContext context, TerminalBuffer buffer, double verticalOffset)
     {
         var terminal = Controller?.Terminal;
-        if (terminal == null) return;
-
-        var p1 = _selectionStart!.Value;
-        var p2 = _selectionEnd!.Value;
-
-        if (p1.Y > p2.Y || (p1.Y == p2.Y && p1.X > p2.X))
-        {
-            (p1, p2) = (p2, p1);
-        }
+        if (terminal == null || _selectionStart == null || _selectionEnd == null) return;
 
         int lineCount = buffer.Lines.Length;
-        int startRowSel = (int)ToAbsRow(p1.Y, lineCount);
-        int endRowSel = (int)ToAbsRow(p2.Y, lineCount);
-        int startColSel = (int)p1.X;
-        int endColSel = (int)p2.X;
+        int r1 = (int)ToAbsRow(_selectionStart.Value.Y, lineCount);
+        int r2 = (int)ToAbsRow(_selectionEnd.Value.Y, lineCount);
+        int c1 = (int)_selectionStart.Value.X;
+        int c2 = (int)_selectionEnd.Value.X;
 
-        for (int r = startRowSel; r <= endRowSel; r++)
+        // In absolute row coordinates (0 = top, lineCount-1 = bottom), ensure (r1, c1) <= (r2, c2)
+        if (r1 > r2 || (r1 == r2 && c1 > c2))
+        {
+            (r1, r2) = (r2, r1);
+            (c1, c2) = (c2, c1);
+        }
+
+        for (int r = r1; r <= r2; r++)
         {
             if (r < 0 || r >= lineCount) continue;
 
@@ -1148,16 +1568,16 @@ public class TerminalControl : Control
                 if (lineLen <= 0) lineLen = 0;
             }
 
-            int c1 = (r == startRowSel) ? startColSel : 0;
-            int c2 = (r == endRowSel) ? endColSel : lineLen;
+            int startCol = (r == r1) ? c1 : 0;
+            int endCol = (r == r2) ? c2 : lineLen;
 
-            if (c1 > lineLen) c1 = lineLen;
-            if (c2 > lineLen) c2 = lineLen;
-            if (c1 >= c2) continue;
+            if (startCol > lineLen) startCol = lineLen;
+            if (endCol > lineLen) endCol = lineLen;
+            if (startCol >= endCol) continue;
 
-            double selX = c1 * _charWidth;
+            double selX = startCol * _charWidth;
             double selY = verticalOffset + (r - buffer.YDisp) * _charHeight;
-            double w = (c2 - c1) * _charWidth;
+            double w = (endCol - startCol) * _charWidth;
 
             if (selY >= 0 && selY < Bounds.Height && w > 0)
             {
@@ -1176,6 +1596,20 @@ public class TerminalControl : Control
             ClearSelectionOnInput();
             Controller.SendInput(e.Text);
             e.Handled = true;
+
+            if (EnableSuggestions && CanShowSuggestions())
+            {
+                if (e.Text.Contains('\r') || e.Text.Contains('\n'))
+                {
+                    DismissSuggestions();
+                    _inputLineBuffer = string.Empty;
+                }
+                else
+                {
+                    _inputLineBuffer += e.Text;
+                    UpdateSuggestions();
+                }
+            }
         }
     }
 
@@ -1185,6 +1619,124 @@ public class TerminalControl : Control
         {
             base.OnKeyDown(e);
             return;
+        }
+
+        // Handle suggestion navigation and completion when popup is open
+        if (_isSuggestionOpen && _suggestions.Count > 0)
+        {
+            if (e.Key == Key.Down)
+            {
+                if (_selectedSuggestionIndex < 0)
+                {
+                    _selectedSuggestionIndex = 0;
+                }
+                else
+                {
+                    _selectedSuggestionIndex = (_selectedSuggestionIndex + 1) % _suggestions.Count;
+                }
+                EnsureSuggestionVisible();
+                InvalidateVisual();
+                e.Handled = true;
+                return;
+            }
+            if (e.Key == Key.Up)
+            {
+                if (_selectedSuggestionIndex < 0)
+                {
+                    _selectedSuggestionIndex = _suggestions.Count - 1;
+                }
+                else
+                {
+                    _selectedSuggestionIndex = (_selectedSuggestionIndex - 1 + _suggestions.Count) % _suggestions.Count;
+                }
+                EnsureSuggestionVisible();
+                InvalidateVisual();
+                e.Handled = true;
+                return;
+            }
+            if (e.Key == Key.PageDown)
+            {
+                if (_selectedSuggestionIndex < 0)
+                {
+                    _selectedSuggestionIndex = Math.Min(_suggestions.Count - 1, MaxVisibleSuggestions - 1);
+                }
+                else
+                {
+                    _selectedSuggestionIndex = Math.Min(_suggestions.Count - 1, _selectedSuggestionIndex + MaxVisibleSuggestions);
+                }
+                EnsureSuggestionVisible();
+                InvalidateVisual();
+                e.Handled = true;
+                return;
+            }
+            if (e.Key == Key.PageUp)
+            {
+                if (_selectedSuggestionIndex < 0)
+                {
+                    _selectedSuggestionIndex = 0;
+                }
+                else
+                {
+                    _selectedSuggestionIndex = Math.Max(0, _selectedSuggestionIndex - MaxVisibleSuggestions);
+                }
+                EnsureSuggestionVisible();
+                InvalidateVisual();
+                e.Handled = true;
+                return;
+            }
+            if (e.Key == Key.Right && e.KeyModifiers == KeyModifiers.None)
+            {
+                // Right arrow quickly accepts the first or currently selected suggestion
+                if (_selectedSuggestionIndex < 0)
+                {
+                    _selectedSuggestionIndex = 0;
+                }
+                ApplySelectedSuggestion();
+                e.Handled = true;
+                return;
+            }
+            if (e.Key == Key.Left && e.KeyModifiers == KeyModifiers.None)
+            {
+                // Left arrow moves cursor backwards in shell, dismiss suggestions to avoid confusion
+                DismissSuggestions();
+                // Allow left arrow to pass through to normal sequence generation
+            }
+            if (e.Key == Key.Tab)
+            {
+                if (_selectedSuggestionIndex >= 0)
+                {
+                    ApplySelectedSuggestion();
+                    e.Handled = true;
+                    return;
+                }
+                else
+                {
+                    // User has not explicitly selected a suggestion: dismiss popup and let Tab pass through to Linux shell
+                    DismissSuggestions();
+                    // Do not mark Handled, allow normal key sequence mapping below to send "\t"
+                }
+            }
+            if (e.Key == Key.Enter)
+            {
+                if (_selectedSuggestionIndex >= 0)
+                {
+                    ApplySelectedSuggestion();
+                    e.Handled = true;
+                    return;
+                }
+                else
+                {
+                    // User has not explicitly selected a suggestion: dismiss popup and execute input normally
+                    DismissSuggestions();
+                    // Do not mark Handled, allow normal key sequence mapping below to send "\r"
+                }
+            }
+            if (e.Key == Key.Escape)
+            {
+                DismissSuggestions();
+                e.Handled = true;
+                return;
+            }
         }
 
         string? sequence = null;
@@ -1218,8 +1770,7 @@ public class TerminalControl : Control
         }
 
         // Plain Ctrl+C copies when a selection exists, otherwise ^C is sent (standard terminal UX).
-        if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.C &&
-            _selectionStart.HasValue && _selectionEnd.HasValue)
+        if (e.KeyModifiers == KeyModifiers.Control && e.Key == Key.C && HasSelection)
         {
             _ = CopyText();
             e.Handled = true;
@@ -1316,7 +1867,7 @@ public class TerminalControl : Control
             var text = KeyToChar(e.Key);
             if (text != '\0')
             {
-                Controller.SendInput($"\x1b{text}");
+                Controller?.SendInput($"\x1b{text}");
                 e.Handled = true;
                 return;
             }
@@ -1325,8 +1876,38 @@ public class TerminalControl : Control
         if (sequence != null)
         {
             ClearSelectionOnInput();
-            Controller.SendInput(sequence);
+            Controller?.SendInput(sequence);
             e.Handled = true;
+
+            if (e.Key == Key.Back)
+            {
+                if (_inputLineBuffer.Length > 0)
+                {
+                    _inputLineBuffer = _inputLineBuffer.Substring(0, _inputLineBuffer.Length - 1);
+                }
+                if (EnableSuggestions && CanShowSuggestions() && _inputLineBuffer.Trim().Length > 0)
+                {
+                    UpdateSuggestions();
+                }
+                else
+                {
+                    DismissSuggestions();
+                }
+            }
+            else if (e.Key == Key.Enter)
+            {
+                if (!string.IsNullOrWhiteSpace(_inputLineBuffer))
+                {
+                    Services.Terminal.TerminalSuggestionService.Instance.RecordHistory(_inputLineBuffer);
+                }
+                _inputLineBuffer = string.Empty;
+                DismissSuggestions();
+            }
+            else if (ctrl && (e.Key == Key.C || e.Key == Key.U || e.Key == Key.D))
+            {
+                _inputLineBuffer = string.Empty;
+                DismissSuggestions();
+            }
         }
     }
 
@@ -1354,6 +1935,11 @@ public class TerminalControl : Control
         {
             _selectionStart = null;
             _selectionEnd = null;
+            if (Controller != null)
+            {
+                Controller.SelectionStart = null;
+                Controller.SelectionEnd = null;
+            }
             InvalidateVisual();
         }
     }
@@ -1394,26 +1980,50 @@ public class TerminalControl : Control
             return;
         }
 
-        if (!point.Properties.IsLeftButtonPressed) return;
-
         var pos = e.GetPosition(this);
+
+        if (_isSuggestionOpen && _suggestionPopupBounds.Contains(pos))
+        {
+            double relativeY = pos.Y - (_suggestionPopupBounds.Y + 4);
+            int clickedVisibleIndex = (int)(relativeY / 26);
+            int clickedIndex = _suggestionScrollOffset + clickedVisibleIndex;
+            if (clickedVisibleIndex >= 0 && clickedVisibleIndex < MaxVisibleSuggestions && clickedIndex >= 0 && clickedIndex < _suggestions.Count)
+            {
+                _selectedSuggestionIndex = clickedIndex;
+                ApplySelectedSuggestion();
+                e.Handled = true;
+                return;
+            }
+        }
+        else if (_isSuggestionOpen)
+        {
+            DismissSuggestions();
+        }
+
         int clicks = e.ClickCount;
 
         if (clicks >= 3)
         {
             SelectLine(pos);
             _isSelecting = false;
+            if (Controller != null)
+            {
+                Controller.SelectionStart = _selectionStart;
+                Controller.SelectionEnd = _selectionEnd;
+            }
         }
         else if (clicks == 2)
         {
             SelectWord(pos);
             _isSelecting = true; // allow drag to extend word-by-word
+            e.Pointer.Capture(this);
         }
         else
         {
             _selectionStart = GetGridPosition(pos);
             _selectionEnd = _selectionStart;
             _isSelecting = true;
+            e.Pointer.Capture(this);
         }
 
         Focus();
@@ -1426,17 +2036,26 @@ public class TerminalControl : Control
         if (terminal?.Buffer == null) return;
 
         var grid = GetGridPosition(pos);
-        string text = GetLineText(terminal.Buffer, (int)grid.Y, terminal.Cols);
-        int index = Math.Min((int)grid.X, Math.Max(0, text.Length - 1));
+        int count = terminal.Buffer.Lines.Length;
+        // grid.Y is a distance-from-end row; convert once to an absolute buffer row.
+        int absRow = (int)ToAbsRow(grid.Y, count);
+        if (terminal.Buffer.Lines[absRow] is not BufferLine line) return;
+
+        var columns = new List<int>();
+        string text = BuildLineTextWithColumnMap(line, terminal.Cols, columns);
+        if (text.Length == 0) return;
+
+        // grid.X is a grid column; map it to a string index (wide-glyph safe).
+        int index = Math.Min(ColumnToTextIndex(columns, (int)grid.X, text.Length), text.Length - 1);
+        if (index < 0) index = 0;
 
         int start = index, end = index;
         while (start > 0 && IsWordChar(text[start - 1])) start--;
         while (end < text.Length - 1 && IsWordChar(text[end + 1])) end++;
 
-        int count = terminal.Buffer.Lines.Length;
-        double relRow = ToRelRow(grid.Y, count);
-        _selectionStart = new Point(start, relRow);
-        _selectionEnd = new Point(end, relRow);
+        // Selection is stored in grid columns (RenderSelection multiplies by char width).
+        _selectionStart = new Point(columns[start], grid.Y);
+        _selectionEnd = new Point(columns[end], grid.Y);
     }
 
     private void SelectLine(Point pos)
@@ -1444,11 +2063,10 @@ public class TerminalControl : Control
         var terminal = Controller?.Terminal;
         if (terminal?.Buffer == null) return;
 
+        // grid.Y is already a distance-from-end row; use it as-is.
         var grid = GetGridPosition(pos);
-        int count = terminal.Buffer.Lines.Length;
-        double relRow = ToRelRow(grid.Y, count);
-        _selectionStart = new Point(0, relRow);
-        _selectionEnd = new Point(Math.Max(0, terminal.Cols - 1), relRow);
+        _selectionStart = new Point(0, grid.Y);
+        _selectionEnd = new Point(Math.Max(0, terminal.Cols - 1), grid.Y);
     }
 
     private static bool IsWordChar(char c)
@@ -1551,7 +2169,8 @@ public class TerminalControl : Control
 
         var pos = point.Position;
         int col = Math.Min(Math.Max((int)(pos.X / _charWidth), 0), terminal.Cols - 1) + 1;
-        double relY = (pos.Y - GetVerticalOffset()) / _charHeight + terminal.Buffer.YDisp;
+        // xterm mouse coordinates are viewport-relative; do NOT add buffer.YDisp here.
+        double relY = (pos.Y - GetVerticalOffset()) / _charHeight;
         int row = Math.Min(Math.Max((int)relY, 0), terminal.Rows - 1) + 1;
 
         var props = point.Properties;
@@ -1567,13 +2186,26 @@ public class TerminalControl : Control
         }
         else if (pressed == true)
         {
+            _lastMouseButton = button;
             code = button;
             final = "M";
         }
         else if (pressed == false)
         {
-            code = button;
-            final = "m";
+            if (Controller.SgrMouse)
+            {
+                // SGR release names the released button with a 'm' final. Button state
+                // is already cleared by the time PointerReleased fires, so use the
+                // button remembered from the matching press.
+                code = _lastMouseButton;
+                final = "m";
+            }
+            else
+            {
+                // Legacy X10 encodes any release as button 3 with the press final.
+                code = 3;
+                final = "M";
+            }
         }
         else
         {
@@ -1603,6 +2235,13 @@ public class TerminalControl : Control
     {
         base.OnPointerReleased(e);
         _isSelecting = false;
+        e.Pointer.Capture(null);
+
+        if (Controller != null)
+        {
+            Controller.SelectionStart = _selectionStart;
+            Controller.SelectionEnd = _selectionEnd;
+        }
 
         if (Controller?.MouseTracking == true)
         {
@@ -1612,16 +2251,40 @@ public class TerminalControl : Control
         }
 
         // Copy-on-select: push the finished selection straight to the clipboard.
-        if (CopyOnSelect && _selectionStart != null && _selectionEnd != null)
+        if (CopyOnSelect && HasSelection)
         {
             var text = GetSelectedText();
             if (!string.IsNullOrEmpty(text)) _ = CopyText();
         }
     }
 
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+    {
+        base.OnPointerCaptureLost(e);
+        _isSelecting = false;
+        if (Controller != null)
+        {
+            Controller.SelectionStart = _selectionStart;
+            Controller.SelectionEnd = _selectionEnd;
+        }
+    }
+
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
+
+        if (_isSuggestionOpen && _suggestionPopupBounds.Contains(e.GetPosition(this)))
+        {
+            int scrollDelta = (int)-e.Delta.Y;
+            if (scrollDelta != 0 && _suggestions.Count > MaxVisibleSuggestions)
+            {
+                _suggestionScrollOffset = Math.Clamp(_suggestionScrollOffset + scrollDelta, 0, _suggestions.Count - MaxVisibleSuggestions);
+                InvalidateVisual();
+            }
+            e.Handled = true;
+            return;
+        }
+
         var terminal = Controller?.Terminal;
         if (terminal?.Buffer == null) return;
 
@@ -1713,23 +2376,46 @@ public class TerminalControl : Control
 #pragma warning restore CS0618
     }
 
+    /// <summary>
+    /// Directly pastes the currently selected text into the terminal session.
+    /// </summary>
+    public void PasteSelection()
+    {
+        var text = GetSelectedText();
+        if (string.IsNullOrEmpty(text) || Controller == null) return;
+
+        var payload = Controller.BracketedPaste
+            ? $"\x1b[200~{text}\x1b[201~"
+            : text;
+        ClearSelectionOnInput();
+        Controller.SendInput(payload);
+    }
+
     private string GetSelectedText()
     {
         if (_selectionStart == null || _selectionEnd == null) return "";
         var terminal = Controller?.Terminal;
         if (terminal?.Buffer == null) return "";
 
-        var p1 = _selectionStart.Value;
-        var p2 = _selectionEnd.Value;
         var buffer = terminal.Buffer;
         int lineCount = buffer.Lines.Length;
 
-        if (p1.Y > p2.Y || (p1.Y == p2.Y && p1.X > p2.X)) (p1, p2) = (p2, p1);
+        int r1 = (int)ToAbsRow(_selectionStart.Value.Y, lineCount);
+        int r2 = (int)ToAbsRow(_selectionEnd.Value.Y, lineCount);
+        int c1 = (int)_selectionStart.Value.X;
+        int c2 = (int)_selectionEnd.Value.X;
 
-        int startRow = (int)ToAbsRow(p1.Y, lineCount);
-        int endRow = (int)ToAbsRow(p2.Y, lineCount);
-        int startCol = (int)p1.X;
-        int endCol = (int)p2.X;
+        // In absolute row coordinates (0 = top, lineCount-1 = bottom), ensure (r1, c1) <= (r2, c2)
+        if (r1 > r2 || (r1 == r2 && c1 > c2))
+        {
+            (r1, r2) = (r2, r1);
+            (c1, c2) = (c2, c1);
+        }
+
+        int startRow = r1;
+        int endRow = r2;
+        int startCol = c1;
+        int endCol = c2;
 
         var sb = new StringBuilder();
 
@@ -1738,29 +2424,49 @@ public class TerminalControl : Control
             if (r >= lineCount) break;
             var line = buffer.Lines[r];
 
-            string lineText = "";
-            if (line is BufferLine bl) lineText = bl.TranslateToString(true);
-            else lineText = line?.ToString() ?? "";
-
-            int c1 = 0;
-            int c2 = lineText.Length;
-
-            if (r == startRow) c1 = startCol;
-            if (r == endRow) c2 = endCol + 1;
-
-            c1 = Math.Max(0, Math.Min(c1, lineText.Length));
-            c2 = Math.Max(0, Math.Min(c2, lineText.Length));
-
-            if (c1 < c2)
+            string lineText;
+            List<int>? map = null;
+            if (line is BufferLine bl)
             {
-                if (r == startRow && r == endRow) sb.Append(lineText.Substring(c1, c2 - c1));
+                map = new List<int>();
+                lineText = BuildLineTextWithColumnMap(bl, terminal.Cols, map);
+            }
+            else
+            {
+                lineText = line?.ToString() ?? "";
+            }
+
+            // Selection X is stored in grid columns; convert to string indices so
+            // wide glyphs do not shift the copied range.
+            int sc1;
+            int sc2;
+            if (map != null)
+            {
+                sc1 = r == startRow ? ColumnToTextIndex(map, startCol, lineText.Length) : 0;
+                sc2 = r == endRow ? ColumnToTextIndex(map, endCol + 1, lineText.Length) : lineText.Length;
+            }
+            else
+            {
+                sc1 = r == startRow ? startCol : 0;
+                sc2 = r == endRow ? endCol + 1 : lineText.Length;
+                sc1 = Math.Max(0, Math.Min(sc1, lineText.Length));
+                sc2 = Math.Max(0, Math.Min(sc2, lineText.Length));
+            }
+
+            if (sc1 < sc2)
+            {
+                if (r == startRow && r == endRow) sb.Append(lineText.Substring(sc1, sc2 - sc1));
                 else if (r == startRow)
                 {
-                    sb.Append(lineText.Substring(c1));
+                    sb.Append(lineText.Substring(sc1));
                     sb.AppendLine();
                 }
-                else if (r == endRow) sb.Append(lineText.Substring(0, c2));
+                else if (r == endRow) sb.Append(lineText.Substring(0, sc2));
                 else sb.AppendLine(lineText);
+            }
+            else if (r > startRow && r < endRow)
+            {
+                sb.AppendLine();
             }
         }
 
