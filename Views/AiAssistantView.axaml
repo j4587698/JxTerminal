@@ -5,6 +5,7 @@
              xmlns:vm="using:JxTerminal.ViewModels"
              xmlns:c="using:JxTerminal.Converters"
              xmlns:lumina="clr-namespace:LuminaUI.Controls;assembly=LuminaUI"
+             xmlns:md="clr-namespace:LuminaUI.Markdown.Controls;assembly=LuminaUI.Markdown"
              xmlns:avalonia="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              mc:Ignorable="d" d:DesignWidth="380" d:DesignHeight="600"
              x:Class="JxTerminal.Views.AiAssistantView"
@@ -102,7 +103,20 @@
                                     </ContextMenu>
                                 </Border.ContextMenu>
                                 <Grid ColumnDefinitions="*, Auto">
+                                    <!-- Assistant replies go through the Markdig-backed renderer so
+                                         code fences, lists, tables and links keep their structure. -->
+                                    <md:LuminaMarkdown Grid.Column="0"
+                                                       Text="{Binding Content}"
+                                                       IsVisible="{Binding IsMarkdown}">
+                                        <md:LuminaMarkdown.Resources>
+                                            <x:Double x:Key="LuminaMarkdownFontSize">12.5</x:Double>
+                                            <x:Double x:Key="LuminaMarkdownLineHeight">19</x:Double>
+                                            <Thickness x:Key="LuminaMarkdownParagraphMargin">0,0,0,8</Thickness>
+                                            <Thickness x:Key="LuminaMarkdownHeadingMargin">0,10,0,6</Thickness>
+                                        </md:LuminaMarkdown.Resources>
+                                    </md:LuminaMarkdown>
                                     <SelectableTextBlock Grid.Column="0" Text="{Binding Content}" TextWrapping="Wrap" FontSize="12.5"
+                                                         IsVisible="{Binding IsPlainText}"
                                                          SelectionBrush="{DynamicResource LuminaPrimaryBrush}"/>
                                     <Button Grid.Column="1" Classes="Ghost IconOnly Compact"
                                             VerticalAlignment="Top" Margin="6,-2,-2,0"

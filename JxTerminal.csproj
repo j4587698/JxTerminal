@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\jxterminal.ico</ApplicationIcon>
@@ -34,27 +34,31 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="12.1.2" />
-    <PackageReference Include="Avalonia.Desktop" Version="12.1.2" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.2" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.2" />
-    <PackageReference Include="Avalonia.Controls.ColorPicker" Version="12.1.2" />
+    <PackageReference Include="Avalonia" Version="12.2.0" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.2.0" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.2.0" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.2.0" />
+    <PackageReference Include="Avalonia.Controls.ColorPicker" Version="12.2.0" />
+    <!-- Avalonia did not publish DataGrid 12.2.0; 12.1.2 is what LuminaUI.DataGrid 0.7.0 targets. -->
     <PackageReference Include="Avalonia.Controls.DataGrid" Version="12.1.2" />
     <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3">
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-    <PackageReference Include="LuminaUI" Version="0.6.9" />
-    <PackageReference Include="LuminaUI.ColorPicker" Version="0.6.9" />
-    <PackageReference Include="LuminaUI.DataGrid" Version="0.6.9" />
+    <!-- LuminaUI 0.7.0 targets net11.0 and Avalonia 12.2.0, so the whole UI stack moves together. -->
+    <PackageReference Include="LuminaUI" Version="0.7.0" />
+    <PackageReference Include="LuminaUI.ColorPicker" Version="0.7.0" />
+    <PackageReference Include="LuminaUI.DataGrid" Version="0.7.0" />
+    <!-- Markdig-backed renderer used for AI replies. -->
+    <PackageReference Include="LuminaUI.Markdown" Version="0.7.0" />
     <PackageReference Include="Material.Icons.Avalonia" Version="3.0.2" />
-    <PackageReference Include="Porta.Pty" Version="2.2.2" />
-    <PackageReference Include="SSH.NET" Version="2026.0.0" />
-    <PackageReference Include="XTerm.NET" Version="2.0.2" />
-    <PackageReference Include="System.IO.Ports" Version="10.0.12" />
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
-    <PackageReference Include="TinyDb" Version="0.6.3" />
+    <PackageReference Include="Porta.Pty" Version="2.2.4" />
+    <PackageReference Include="SSH.NET" Version="2026.0.1" />
+    <PackageReference Include="XTerm.NET" Version="3.0.3" />
+    <PackageReference Include="System.IO.Ports" Version="11.0.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="11.0.0" />
+    <PackageReference Include="TinyDb" Version="0.6.5" />
     <!-- System.Text.Encoding.CodePages ships in the runtime; Program.Main registers
          CodePagesEncodingProvider so GBK/GB18030/Big5/etc. session encodings resolve. -->
   </ItemGroup>

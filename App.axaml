@@ -3,6 +3,7 @@
              xmlns:local="using:JxTerminal"
              xmlns:lumina="clr-namespace:LuminaUI;assembly=LuminaUI"
              xmlns:luminaColorPicker="using:LuminaUI.ColorPicker"
+             xmlns:luminaMarkdown="using:LuminaUI.Markdown"
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="JxTerminal.App"
              RequestedThemeVariant="Default">
@@ -16,6 +17,7 @@
         <FluentTheme />
         <lumina:LuminaTheme />
         <luminaColorPicker:LuminaColorPickerTheme />
+        <luminaMarkdown:LuminaMarkdownTheme />
         <materialIcons:MaterialIconStyles />
         <StyleInclude Source="avares://JxTerminal/Styles/AppStyles.axaml" />
     </Application.Styles>

@@ -27,6 +27,14 @@ public partial class AiChatMessageItem : ObservableObject
     public bool IsUser => Role == "user";
     public bool IsAssistant => Role == "assistant";
 
+    /// <summary>
+    /// Assistant replies are rendered as Markdown; user input and tool activity lines stay plain
+    /// so shell commands and argument lists are never reinterpreted as formatting.
+    /// </summary>
+    public bool IsMarkdown => IsAssistant && !IsTool;
+
+    public bool IsPlainText => !IsMarkdown;
+
     public AiChatMessageItem(string role, string content, bool isTool = false)
     {
         Role = role;
