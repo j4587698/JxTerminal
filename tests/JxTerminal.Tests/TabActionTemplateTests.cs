@@ -14,6 +14,33 @@ namespace JxTerminal.Tests;
 [TestClass]
 public class TabActionTemplateTests
 {
+    /// <summary>
+    /// Every icon-only button template must open with a hit layer that cannot fail: a Border
+    /// spanning the full bounds with a hardcoded transparent background. Avalonia only hit
+    /// tests a Border when its Background is non-null, so binding that background to the
+    /// templated parent leaves the whole button dead the moment the binding yields null -
+    /// the hover background still paints, but only the icon itself stays clickable.
+    /// The painted background lives on the inner border so hover/pressed can keep swapping it.
+    /// </summary>
+    private static void AssertGuaranteedHitLayer(XElement controlTemplate, string context)
+    {
+        var hitArea = controlTemplate.Elements()
+            .FirstOrDefault(e => e.Name.LocalName == "Border" && (string?)e.Attribute("Name") == "PART_HitArea");
+        Assert.IsNotNull(hitArea, $"{context}: ControlTemplate root must be Border Name='PART_HitArea'");
+        Assert.AreEqual("Transparent", (string?)hitArea.Attribute("Background"),
+            $"{context}: PART_HitArea must hardcode Background='Transparent' instead of binding it");
+
+        var visualBorder = hitArea.Elements()
+            .FirstOrDefault(e => e.Name.LocalName == "Border" && (string?)e.Attribute("Name") == "PART_Border");
+        Assert.IsNotNull(visualBorder, $"{context}: PART_HitArea must contain Border Name='PART_Border'");
+        Assert.AreEqual("{TemplateBinding Background}", (string?)visualBorder.Attribute("Background"),
+            $"{context}: PART_Border must bind Background to the templated parent");
+
+        var presenter = visualBorder.Elements()
+            .FirstOrDefault(e => e.Name.LocalName == "ContentPresenter" && (string?)e.Attribute("Name") == "PART_ContentPresenter");
+        Assert.IsNotNull(presenter, $"{context}: PART_Border must contain ContentPresenter Name='PART_ContentPresenter'");
+    }
+
     private static string FindRepoRoot()
     {
         var dir = AppDomain.CurrentDomain.BaseDirectory;
@@ -50,18 +77,7 @@ public class TabActionTemplateTests
         var controlTemplate = templateSetter.Elements().FirstOrDefault(e => e.Name.LocalName == "ControlTemplate");
         Assert.IsNotNull(controlTemplate, "Setter must define a ControlTemplate");
 
-        // Root of the ControlTemplate must be Border Name="PART_Border"
-        // Border provides solid full-bounds hit-testing across all empty space when Background is set.
-        var rootBorder = controlTemplate.Elements().FirstOrDefault(e => e.Name.LocalName == "Border" && (string?)e.Attribute("Name") == "PART_Border");
-        Assert.IsNotNull(rootBorder, "ControlTemplate must have a root Border Name='PART_Border' to span the full bounds with guaranteed hit testing");
-
-        // Border must have Background="{TemplateBinding Background}"
-        var bgAttr = (string?)rootBorder.Attribute("Background");
-        Assert.AreEqual("{TemplateBinding Background}", bgAttr, "PART_Border must bind Background to {TemplateBinding Background}");
-
-        // Inside Border must be ContentPresenter Name="PART_ContentPresenter"
-        var innerPresenter = rootBorder.Elements().FirstOrDefault(e => e.Name.LocalName == "ContentPresenter" && (string?)e.Attribute("Name") == "PART_ContentPresenter");
-        Assert.IsNotNull(innerPresenter, "Border must contain ContentPresenter Name='PART_ContentPresenter'");
+        AssertGuaranteedHitLayer(controlTemplate, "Button.TabAction");
 
         // LuminaButtonPresenter (which causes dead zones on transparent buttons) must NOT be present
         var hasLuminaPresenter = controlTemplate.Descendants().Any(e => e.Name.LocalName.Contains("LuminaButtonPresenter"));
@@ -98,11 +114,7 @@ public class TabActionTemplateTests
         var controlTemplate = templateSetter.Elements().FirstOrDefault(e => e.Name.LocalName == "ControlTemplate");
         Assert.IsNotNull(controlTemplate);
 
-        var rootBorder = controlTemplate.Elements().FirstOrDefault(e => e.Name.LocalName == "Border" && (string?)e.Attribute("Name") == "PART_Border");
-        Assert.IsNotNull(rootBorder, "Button.TabClose must have a root Border Name='PART_Border'");
-
-        var innerPresenter = rootBorder.Elements().FirstOrDefault(e => e.Name.LocalName == "ContentPresenter" && (string?)e.Attribute("Name") == "PART_ContentPresenter");
-        Assert.IsNotNull(innerPresenter, "Border must contain ContentPresenter Name='PART_ContentPresenter'");
+        AssertGuaranteedHitLayer(controlTemplate, "Button.TabClose");
     }
 
     [TestMethod]
@@ -127,11 +139,36 @@ public class TabActionTemplateTests
         var controlTemplate = templateSetter.Elements().FirstOrDefault(e => e.Name.LocalName == "ControlTemplate");
         Assert.IsNotNull(controlTemplate);
 
-        var rootBorder = controlTemplate.Elements().FirstOrDefault(e => e.Name.LocalName == "Border" && (string?)e.Attribute("Name") == "PART_Border");
-        Assert.IsNotNull(rootBorder, "Button.IconOnly must have a root Border Name='PART_Border'");
+        AssertGuaranteedHitLayer(controlTemplate, "Button.IconOnly");
+    }
 
-        var innerPresenter = rootBorder.Elements().FirstOrDefault(e => e.Name.LocalName == "ContentPresenter" && (string?)e.Attribute("Name") == "PART_ContentPresenter");
-        Assert.IsNotNull(innerPresenter, "Border must contain ContentPresenter Name='PART_ContentPresenter'");
+    [TestMethod]
+    public void AppStyles_SegTab_HasGuaranteedHitLayer()
+    {
+        var repoRoot = FindRepoRoot();
+        var doc = XDocument.Load(Path.Combine(repoRoot, "Styles", "AppStyles.axaml"));
+
+        var style = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "Style" &&
+            (string?)e.Attribute("Selector") == "RadioButton.SegTab");
+        Assert.IsNotNull(style, "Style with Selector='RadioButton.SegTab' must exist");
+
+        var controlTemplate = style.Elements()
+            .Where(e => e.Name.LocalName == "Setter" && (string?)e.Attribute("Property") == "Template")
+            .SelectMany(s => s.Elements().Where(e => e.Name.LocalName == "ControlTemplate"))
+            .FirstOrDefault();
+        Assert.IsNotNull(controlTemplate, "RadioButton.SegTab must define a custom Template");
+
+        // RadioButton derives from Button, so its click also needs a hit-testable visual under
+        // the pointer - the icon alone is not enough.
+        var hitArea = controlTemplate.Elements()
+            .FirstOrDefault(e => e.Name.LocalName == "Border" && (string?)e.Attribute("Name") == "PART_HitArea");
+        Assert.IsNotNull(hitArea, "RadioButton.SegTab must open with Border Name='PART_HitArea'");
+        Assert.AreEqual("Transparent", (string?)hitArea.Attribute("Background"),
+            "PART_HitArea must hardcode Background='Transparent' instead of binding it");
+
+        var visualBorder = hitArea.Elements()
+            .FirstOrDefault(e => e.Name.LocalName == "Border" && (string?)e.Attribute("Name") == "PART_Background");
+        Assert.IsNotNull(visualBorder, "PART_HitArea must contain Border Name='PART_Background'");
     }
 
     [TestMethod]

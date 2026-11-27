@@ -7,9 +7,12 @@
              mc:Ignorable="d" d:DesignWidth="460"
              x:Class="JxTerminal.Views.AddConnectionView"
              x:DataType="vm:AddConnectionViewModel">
-    <!-- Serial mode is tall; never let the dialog clip on minimum-height windows. -->
-    <ScrollViewer MaxHeight="540" Width="460" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="14">
+    <!-- Serial mode is tall; never let the dialog clip on minimum-height windows.
+         字段区滚动、按钮行钉在底部：LuminaDialog 现在会把"剩余高度"约束传给内容，
+         这里用 * 行接住它，小窗口下按钮不会被滚出视野。 -->
+    <Grid Width="460" RowDefinitions="*,Auto">
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="14">
 
             <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto, Auto">
                  <TextBlock Text="{c:Localize Name}" VerticalAlignment="Center" Margin="0,0,10,0"/>
@@ -123,12 +126,13 @@
                 
                 <TextBlock Text="{c:Localize AskPasswordTip}" IsVisible="{Binding IsAskAuth}" Classes="Hint" FontStyle="Italic"/>
             </StackPanel>
-            
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,10,0,0">
-                <Button x:Name="CancelDialogButton" Command="{Binding CancelCommand}" Content="{c:Localize Cancel}" Classes="Ghost" IsCancel="True"/>
-                <Button x:Name="SaveDialogButton" Command="{Binding SaveCommand}" Content="{c:Localize Save}" Classes="Primary" IsDefault="True"/>
             </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,14,0,0">
+            <Button x:Name="CancelDialogButton" Command="{Binding CancelCommand}" Content="{c:Localize Cancel}" Classes="Ghost" IsCancel="True"/>
+            <Button x:Name="SaveDialogButton" Command="{Binding SaveCommand}" Content="{c:Localize Save}" Classes="Primary" IsDefault="True"/>
         </StackPanel>
-    </ScrollViewer>
+    </Grid>
 </UserControl>
 
