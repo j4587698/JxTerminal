@@ -241,8 +241,7 @@
                                                                     Command="{Binding #Root.DataContext.EditConnectionCommand}"
                                                                     CommandParameter="{Binding}"
                                                                     ToolTip.Tip="{c:Localize Edit}"
-                                                                    VerticalAlignment="Top"
-                                                                    Width="26" Height="26">
+                                                                    VerticalAlignment="Top">
                                                                 <avalonia:MaterialIcon Kind="PencilOutline" Width="14" Height="14"
                                                                                        Foreground="{DynamicResource LuminaTextTertiaryBrush}"/>
                                                             </Button>

@@ -238,20 +238,25 @@
         <Setter Property="Foreground" Value="{DynamicResource LuminaTextSecondaryBrush}" />
         <Setter Property="Template">
             <ControlTemplate>
-                <Border Name="PART_Background"
-                        Background="{TemplateBinding Background}"
+                <!-- Outer layer is hit testing only; see the IconOnly template for why. -->
+                <Border Name="PART_HitArea"
+                        Background="Transparent"
                         CornerRadius="{DynamicResource AppRadiusSm}">
-                    <Border.Transitions>
-                        <Transitions>
-                            <BrushTransition Property="Background" Duration="0:0:0.12" />
-                        </Transitions>
-                    </Border.Transitions>
-                    <icons:MaterialIcon Kind="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
-                                        Width="16"
-                                        Height="16"
-                                        HorizontalAlignment="Center"
-                                        VerticalAlignment="Center"
-                                        Foreground="{TemplateBinding Foreground}" />
+                    <Border Name="PART_Background"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="{DynamicResource AppRadiusSm}">
+                        <Border.Transitions>
+                            <Transitions>
+                                <BrushTransition Property="Background" Duration="0:0:0.12" />
+                            </Transitions>
+                        </Border.Transitions>
+                        <icons:MaterialIcon Kind="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                            Width="16"
+                                            Height="16"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            Foreground="{TemplateBinding Foreground}" />
+                    </Border>
                 </Border>
             </ControlTemplate>
         </Setter>
@@ -396,23 +401,35 @@
         </Setter>
         <Setter Property="Template">
             <ControlTemplate>
-                <Border Name="PART_Border"
-                        Background="{TemplateBinding Background}"
-                        BorderBrush="{TemplateBinding BorderBrush}"
-                        BorderThickness="{TemplateBinding BorderThickness}"
+                <!--
+                    The outer layer exists only for hit testing. Avalonia's Border takes part
+                    in hit testing only when its Background is not null, and the inner border's
+                    background comes from the templated parent. Without this transparent layer
+                    a click only registers where the content (the icon) actually is, even
+                    though the hover background covers the whole button. The visual background
+                    stays on the inner border so :pointerover / :pressed can still swap it.
+                -->
+                <Border Name="PART_HitArea"
+                        Background="Transparent"
                         CornerRadius="{TemplateBinding CornerRadius}">
-                    <Border.Transitions>
-                        <Transitions>
-                            <BrushTransition Property="Background" Duration="0:0:0.1" />
-                        </Transitions>
-                    </Border.Transitions>
-                    <ContentPresenter Name="PART_ContentPresenter"
-                                      Content="{TemplateBinding Content}"
-                                      ContentTemplate="{TemplateBinding ContentTemplate}"
-                                      Padding="{TemplateBinding Padding}"
-                                      RecognizesAccessKey="True"
-                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    <Border Name="PART_Border"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}">
+                        <Border.Transitions>
+                            <Transitions>
+                                <BrushTransition Property="Background" Duration="0:0:0.1" />
+                            </Transitions>
+                        </Border.Transitions>
+                        <ContentPresenter Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Padding="{TemplateBinding Padding}"
+                                          RecognizesAccessKey="True"
+                                          HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    </Border>
                 </Border>
             </ControlTemplate>
         </Setter>
@@ -445,23 +462,35 @@
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <ControlTemplate>
-                <Border Name="PART_Border"
-                        Background="{TemplateBinding Background}"
-                        BorderBrush="{TemplateBinding BorderBrush}"
-                        BorderThickness="{TemplateBinding BorderThickness}"
+                <!--
+                    The outer layer exists only for hit testing. Avalonia's Border takes part
+                    in hit testing only when its Background is not null, and the inner border's
+                    background comes from the templated parent. Without this transparent layer
+                    a click only registers where the content (the icon) actually is, even
+                    though the hover background covers the whole button. The visual background
+                    stays on the inner border so :pointerover / :pressed can still swap it.
+                -->
+                <Border Name="PART_HitArea"
+                        Background="Transparent"
                         CornerRadius="{TemplateBinding CornerRadius}">
-                    <Border.Transitions>
-                        <Transitions>
-                            <BrushTransition Property="Background" Duration="0:0:0.1" />
-                        </Transitions>
-                    </Border.Transitions>
-                    <ContentPresenter Name="PART_ContentPresenter"
-                                      Content="{TemplateBinding Content}"
-                                      ContentTemplate="{TemplateBinding ContentTemplate}"
-                                      Padding="{TemplateBinding Padding}"
-                                      RecognizesAccessKey="True"
-                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    <Border Name="PART_Border"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}">
+                        <Border.Transitions>
+                            <Transitions>
+                                <BrushTransition Property="Background" Duration="0:0:0.1" />
+                            </Transitions>
+                        </Border.Transitions>
+                        <ContentPresenter Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Padding="{TemplateBinding Padding}"
+                                          RecognizesAccessKey="True"
+                                          HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    </Border>
                 </Border>
             </ControlTemplate>
         </Setter>
@@ -496,23 +525,35 @@
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <ControlTemplate>
-                <Border Name="PART_Border"
-                        Background="{TemplateBinding Background}"
-                        BorderBrush="{TemplateBinding BorderBrush}"
-                        BorderThickness="{TemplateBinding BorderThickness}"
+                <!--
+                    The outer layer exists only for hit testing. Avalonia's Border takes part
+                    in hit testing only when its Background is not null, and the inner border's
+                    background comes from the templated parent. Without this transparent layer
+                    a click only registers where the content (the icon) actually is, even
+                    though the hover background covers the whole button. The visual background
+                    stays on the inner border so :pointerover / :pressed can still swap it.
+                -->
+                <Border Name="PART_HitArea"
+                        Background="Transparent"
                         CornerRadius="{TemplateBinding CornerRadius}">
-                    <Border.Transitions>
-                        <Transitions>
-                            <BrushTransition Property="Background" Duration="0:0:0.1" />
-                        </Transitions>
-                    </Border.Transitions>
-                    <ContentPresenter Name="PART_ContentPresenter"
-                                      Content="{TemplateBinding Content}"
-                                      ContentTemplate="{TemplateBinding ContentTemplate}"
-                                      Padding="{TemplateBinding Padding}"
-                                      RecognizesAccessKey="True"
-                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    <Border Name="PART_Border"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}">
+                        <Border.Transitions>
+                            <Transitions>
+                                <BrushTransition Property="Background" Duration="0:0:0.1" />
+                            </Transitions>
+                        </Border.Transitions>
+                        <ContentPresenter Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Padding="{TemplateBinding Padding}"
+                                          RecognizesAccessKey="True"
+                                          HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                    </Border>
                 </Border>
             </ControlTemplate>
         </Setter>
